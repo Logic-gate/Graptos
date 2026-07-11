@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Cleaf
+Comment=Small C/GTK text editor with YAML syntax highlighting
+Exec=cleaf %F
+Icon=accessories-text-editor
+Terminal=false
+Categories=Utility;TextEditor;Development;
+MimeType=text/plain;text/x-c;text/x-python;application/x-yaml;text/yaml;

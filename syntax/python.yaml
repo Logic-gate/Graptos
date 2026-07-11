@@ -1,0 +1,51 @@
+name: Python
+extensions: [.py]
+line_comment: "#"
+auto_indent: true
+indent_openers: [":"]
+indent_closers: []
+close_pairs: ["(=>)", "{=>}", "[=>]"]
+icon: mime
+filenames: []
+index: true
+import_style: python_module
+import_keywords: [import]
+import_from_keywords: [from]
+import_member_keywords: [import]
+import_roots: [., $VIRTUAL_ENV/lib/python*/site-packages, $VIRTUAL_ENV/lib64/python*/site-packages, $CONDA_PREFIX/lib/python*/site-packages, $CONDA_PREFIX/lib64/python*/site-packages, .venv/lib/python*/site-packages, .venv/lib64/python*/site-packages, venv/lib/python*/site-packages, venv/lib64/python*/site-packages, ~/.local/lib/python*/site-packages, ~/.local/lib64/python*/site-packages, /usr/lib/python*/site-packages, /usr/lib64/python*/site-packages, /usr/local/lib/python*/site-packages, /usr/local/lib64/python*/site-packages, /usr/lib/python*, /usr/local/lib/python*]
+import_env: [PYTHONPATH, VIRTUAL_ENV, CONDA_PREFIX]
+import_extensions: [.py, .pyi, .so, .pyd]
+import_member_files: [__init__.py, __init__.pyi, py.typed]
+import_strip_extensions: true
+import_dot_modules: false
+import_static_modules: [sys=argv|path|exit|version|version_info|platform|stdin|stdout|stderr|modules|executable|prefix|maxsize|getsizeof|getrefcount|getrecursionlimit|setrecursionlimit, math=sqrt|sin|cos|tan|asin|acos|atan|atan2|pow|log|log10|log2|ceil|floor|fabs|factorial|pi|e|tau|inf|nan|isfinite|isinf|isnan, os=path|getcwd|chdir|listdir|mkdir|makedirs|remove|rename|replace|rmdir|walk|environ|getenv|sep|pathsep|system|popen|stat|scandir, json=load|loads|dump|dumps|JSONEncoder|JSONDecoder|JSONDecodeError]
+completions: [and, as, assert, async, await, break, class, continue, def, del, elif, else, except, False, finally, for, from, global, if, import, in, is, lambda, None, nonlocal, not, or, pass, raise, return, True, try, while, with, yield, print, len, range, enumerate, zip, map, filter, open, isinstance, hasattr, getattr, setattr, dict, list, set, tuple, str, int, float, bool, bytes, object, super, self, property, dataclass, pathlib, typing, Optional, Union, Any, Callable, Iterable, Sequence, staticmethod, classmethod, Exception, ValueError, TypeError, RuntimeError, Path, Protocol, TypeVar, Generic, Literal, asyncio, json, os, sys, re, datetime, logging]
+line_close_pairs: []
+statement_required_enders: []
+statement_exempt_prefixes: ["#", "@", "def ", "class ", "if ", "elif ", "else", "for ", "while ", "try", "except", "finally", "with ", "match ", "case "]
+statement_exempt_suffixes: [":", "\\", ")", "]", "}"]
+rules:
+  - name: comment
+    pattern: "#.*$"
+    color: "#6A9955"
+  - name: string-double
+    pattern: "(?s)\"\"\".*?\"\"\"|'''.*?'''|\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'"
+    color: "#CE9178"
+  - name: keyword
+    pattern: "(?<![A-Za-z0-9_])(and|as|assert|async|await|break|class|continue|def|del|elif|else|except|False|finally|for|from|global|if|import|in|is|lambda|None|nonlocal|not|or|pass|raise|return|True|try|while|with|yield)(?![A-Za-z0-9_])"
+    color: "#569CD6"
+    bold: true
+    italic: true
+  - name: decorator
+    pattern: "^[[:space:]]*@[A-Za-z_][A-Za-z0-9_.]*"
+    color: "#DCDCAA"
+  - name: number
+    pattern: "(?<![A-Za-z0-9_])-?[0-9]+(\\.[0-9]+)?(?![A-Za-z0-9_])"
+    color: "#B5CEA8"
+  - name: todo-note
+    pattern: (?<![A-Za-z0-9_])(TODO|FIXME|BUG|HACK|NOTE|XXX|REVIEW)(?![A-Za-z0-9_])
+    color: "#D7BA7D"
+    bold: true
+  - name: builtin-function-extra
+    pattern: (?<![A-Za-z0-9_])(dir|vars|sorted|sum|min|max|any|all|abs|round|super)(?![A-Za-z0-9_])
+    color: "#DCDCAA"

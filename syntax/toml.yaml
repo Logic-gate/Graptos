@@ -1,0 +1,47 @@
+name: TOML
+extensions: [.toml]
+line_comment: "#"
+icon: mime
+filenames: [Cargo.toml, pyproject.toml]
+index: true
+import_style: generic
+completions: [true, false, name, version, dependencies, dev-dependencies, package, workspace, scripts, tool, build-system, description, project, authors, license, repository]
+auto_indent: false
+indent_openers: []
+indent_closers: []
+close_pairs: ["(=>)", "{=>}", "[=>]"]
+line_close_pairs: []
+statement_required_enders: []
+statement_exempt_prefixes: ["#", "["]
+statement_exempt_suffixes: []
+import_keywords: []
+import_from_keywords: []
+import_member_keywords: []
+import_roots: [.]
+import_env: []
+import_extensions: [.toml]
+import_member_files: []
+import_strip_extensions: false
+import_dot_modules: false
+rules:
+  - name: comment
+    pattern: "#.*$"
+    color: "#6A9955"
+  - name: section
+    pattern: "^\\s*\\[[^]]+\\]"
+    color: "#569CD6"
+    bold: true
+  - name: key
+    pattern: "^[[:space:]]*[A-Za-z0-9_.-]+[[:space:]]*="
+    color: "#9CDCFE"
+    bold: true
+  - name: string
+    pattern: "\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'"
+    color: "#CE9178"
+  - name: boolean
+    pattern: "(?<![A-Za-z0-9_])(true|false)(?![A-Za-z0-9_])"
+    color: "#569CD6"
+    italic: true
+  - name: datetime
+    pattern: "(?<![A-Za-z0-9_])[0-9]{4}-[0-9]{2}-[0-9]{2}(?:T[0-9:.+-]+Z?)?(?![A-Za-z0-9_])"
+    color: "#B5CEA8"

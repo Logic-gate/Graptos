@@ -1,0 +1,43 @@
+name: JSON
+extensions: [.json]
+line_comment: ""
+icon: mime
+filenames: [package.json, tsconfig.json]
+index: true
+import_style: generic
+completions: [true, false, null, name, version, scripts, dependencies, devDependencies, description, peerDependencies, repository, license, author, main, module, type, exports, imports]
+auto_indent: true
+indent_openers: ["{", "["]
+indent_closers: ["}", "]"]
+close_pairs: ["(=>)", "{=>}", "[=>]"]
+line_close_pairs: []
+statement_required_enders: []
+statement_exempt_prefixes: []
+statement_exempt_suffixes: [",", "{", "}", "[", "]"]
+import_keywords: []
+import_from_keywords: []
+import_member_keywords: []
+import_roots: [.]
+import_env: []
+import_extensions: [.json]
+import_member_files: []
+import_strip_extensions: false
+import_dot_modules: false
+rules:
+  - name: key
+    pattern: "\"[^\"\\\\]+\"[[:space:]]*:"
+    color: "#9CDCFE"
+    bold: true
+  - name: string
+    pattern: "\"(?:\\\\.|[^\"\\\\])*\""
+    color: "#CE9178"
+  - name: boolean
+    pattern: "(?<![A-Za-z0-9_])(true|false|null)(?![A-Za-z0-9_])"
+    color: "#569CD6"
+    italic: true
+  - name: number
+    pattern: "(?<![A-Za-z0-9_])-?[0-9]+(\\.[0-9]+)?(?![A-Za-z0-9_])"
+    color: "#B5CEA8"
+  - name: punctuation
+    pattern: '[{}\[\],:]'
+    color: "#808080"

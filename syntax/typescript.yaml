@@ -1,0 +1,53 @@
+name: TypeScript
+extensions: [.ts, .tsx, .mts, .cts]
+line_comment: "//"
+auto_indent: true
+indent_openers: ["{"]
+indent_closers: ["}"]
+close_pairs: ["(=>)", "{=>}", "[=>]"]
+icon: mime
+filenames: []
+index: true
+import_style: js_module
+import_keywords: [import, export, require]
+import_from_keywords: []
+import_member_keywords: [from]
+import_roots: [., node_modules, src, lib, $NODE_PATH]
+import_env: [NODE_PATH]
+import_extensions: [.ts, .tsx, .mts, .cts, .js, .jsx, .mjs, .cjs, .json, .d.ts]
+import_member_files: [index.ts, index.tsx, index.d.ts, index.js, package.json]
+import_strip_extensions: true
+import_dot_modules: false
+completions: [import, export, from, const, let, var, function, class, interface, type, enum, extends, implements, return, async, await, Promise, string, number, boolean, unknown, any, never, void, private, public, protected, readonly, abstract, namespace, declare, keyof, typeof, as, satisfies, Record, Array, Map, Set, Partial, Pick, Omit, Required, ReadonlyArray, Readonly, Exclude, Extract, NonNullable, ReturnType, Parameters, Awaited, ReactNode, FC]
+line_close_pairs: []
+statement_required_enders: []
+statement_exempt_prefixes: ["//", "/*", "*", "}", "{", "else", "case ", "default:", "if ", "if(", "for ", "for(", "while ", "while(", "switch ", "switch(", "try", "catch", "finally", "function ", "class ", "interface ", "type ", "enum ", "export ", "import "]
+statement_exempt_suffixes: [";", "{", "}", ":", ",", "*/"]
+rules:
+  - name: comment-block
+    pattern: "/\\*[^*]*\\*+(?:[^/*][^*]*\\*+)*/"
+    color: "#6A9955"
+  - name: comment-line
+    pattern: "//.*$"
+    color: "#6A9955"
+  - name: string
+    pattern: "`(?:\\\\.|[^`\\\\])*`|\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'"
+    color: "#CE9178"
+  - name: keyword
+    pattern: "(?<![A-Za-z0-9_])(import|export|from|const|let|var|function|class|interface|type|enum|extends|implements|return|if|else|for|while|switch|case|break|continue|try|catch|finally|throw|async|await|new|this|super)(?![A-Za-z0-9_])"
+    color: "#569CD6"
+    bold: true
+    italic: true
+  - name: type
+    pattern: "(?<![A-Za-z0-9_])(string|number|boolean|unknown|any|never|void|Promise|Record|Array|Map|Set)(?![A-Za-z0-9_])"
+    color: "#4EC9B0"
+  - name: number
+    pattern: "(?<![A-Za-z0-9_])-?[0-9]+(\\.[0-9]+)?(?![A-Za-z0-9_])"
+    color: "#B5CEA8"
+  - name: todo-note
+    pattern: (?<![A-Za-z0-9_])(TODO|FIXME|BUG|HACK|NOTE|XXX|REVIEW)(?![A-Za-z0-9_])
+    color: "#D7BA7D"
+    bold: true
+  - name: utility-type
+    pattern: (?<![A-Za-z0-9_])(ReadonlyArray|Readonly|Record|Partial|Required|Pick|Omit|Exclude|Extract|NonNullable|ReturnType|Parameters|Awaited)(?![A-Za-z0-9_])
+    color: "#4EC9B0"

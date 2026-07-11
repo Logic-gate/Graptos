@@ -1,0 +1,59 @@
+name: Markdown
+extensions: [.md, .markdown]
+completions: [TODO, NOTE, WARNING, IMPORTANT, ```bash, ```c, ```python, ```yaml, http, https, #, ##, ###, ####, #####, ######, ```, ~~~, -, *, 1., [link](url), ![alt](path), **bold**, *italic*, `code`, > quote, ---]
+line_comment: "<!--"
+icon: mime
+filenames: [README, CHANGELOG, LICENSE]
+index: true
+import_style: generic
+auto_indent: true
+indent_openers: [":", "-", "*", "+", ">"]
+indent_closers: []
+close_pairs: ["(=>)", "{=>}", "[=>]"]
+line_close_pairs: []
+statement_required_enders: []
+statement_exempt_prefixes: ["#", ">", "-", "*", "+", "```", "~~~"]
+statement_exempt_suffixes: []
+import_keywords: []
+import_from_keywords: []
+import_member_keywords: []
+import_roots: [., docs, images, assets]
+import_env: []
+import_extensions: [.md, .markdown, .txt]
+import_member_files: []
+import_strip_extensions: false
+import_dot_modules: false
+rules:
+  - name: heading
+    pattern: "^#{1,6}[[:space:]].*$"
+    color: "#569CD6"
+    bold: true
+  - name: codeblock
+    pattern: "(?s)```.*?```"
+    color: "#CE9178"
+  - name: inline-code
+    pattern: "`[^`]+`"
+    color: "#CE9178"
+  - name: link
+    pattern: "\\[[^]]+\\]\\([^)]+\\)"
+    color: "#4FC1FF"
+    underline: true
+  - name: emphasis
+    pattern: "(\\*\\*[^*]+\\*\\*|__[^_]+__)"
+    color: "#DCDCAA"
+    bold: true
+  - name: heading4
+    pattern: "^####[[:space:]].*$"
+    color: "#569CD6"
+    bold: true
+  - name: code-span
+    pattern: "`[^`]+`"
+    color: "#CE9178"
+  - name: link
+    pattern: "\[[^]]+\]\([^)]+\)"
+    color: "#9CDCFE"
+    underline: true
+  - name: bold
+    pattern: "\*\*[^*]+\*\*"
+    color: "#DCDCAA"
+    bold: true

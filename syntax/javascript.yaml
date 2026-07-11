@@ -1,0 +1,50 @@
+name: JavaScript
+extensions: [.js, .jsx, .mjs, .cjs]
+line_comment: "//"
+auto_indent: true
+indent_openers: ["{"]
+indent_closers: ["}"]
+close_pairs: ["(=>)", "{=>}", "[=>]"]
+icon: mime
+filenames: [vite.config.js, vite.config.mjs, ecosystem.config.cjs]
+index: true
+import_style: js_module
+import_keywords: [import, export, require]
+import_from_keywords: []
+import_member_keywords: [from]
+import_roots: [., node_modules, src, lib, $NODE_PATH]
+import_env: [NODE_PATH]
+import_extensions: [.js, .jsx, .mjs, .cjs, .json]
+import_member_files: [index.js, index.jsx, index.mjs, index.cjs, package.json]
+import_strip_extensions: true
+import_dot_modules: false
+completions: [import, export, from, const, let, var, function, class, extends, return, async, await, Promise, console, require, module, exports, if, else, for, while, switch, case, break, continue, try, catch, finally, throw, new, this, super, typeof, instanceof, undefined, null, true, false, JSON, Object, Array, Map, Set, Date, Error, fetch, document, window, process, setTimeout, clearTimeout, setInterval, clearInterval]
+line_close_pairs: []
+statement_required_enders: []
+statement_exempt_prefixes: ["//", "/*", "*", "}", "{", "else", "case ", "default:", "if ", "if(", "for ", "for(", "while ", "while(", "switch ", "switch(", "try", "catch", "finally", "function ", "class ", "export ", "import "]
+statement_exempt_suffixes: [";", "{", "}", ":", ",", "*/"]
+rules:
+  - name: comment-block
+    pattern: "/\\*[^*]*\\*+(?:[^/*][^*]*\\*+)*/"
+    color: "#6A9955"
+  - name: comment-line
+    pattern: "//.*$"
+    color: "#6A9955"
+  - name: string
+    pattern: "`(?:\\\\.|[^`\\\\])*`|\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'"
+    color: "#CE9178"
+  - name: keyword
+    pattern: "(?<![A-Za-z0-9_])(import|export|from|const|let|var|function|class|extends|return|if|else|for|while|switch|case|break|continue|try|catch|finally|throw|async|await|new|this|super)(?![A-Za-z0-9_])"
+    color: "#569CD6"
+    bold: true
+    italic: true
+  - name: number
+    pattern: "(?<![A-Za-z0-9_])-?[0-9]+(\\.[0-9]+)?(?![A-Za-z0-9_])"
+    color: "#B5CEA8"
+  - name: todo-note
+    pattern: (?<![A-Za-z0-9_])(TODO|FIXME|BUG|HACK|NOTE|XXX|REVIEW)(?![A-Za-z0-9_])
+    color: "#D7BA7D"
+    bold: true
+  - name: builtin-type
+    pattern: (?<![A-Za-z0-9_])(Promise|Object|Array|Map|Set|WeakMap|WeakSet|Date|RegExp|Error|TypeError|Symbol|BigInt|Number|String|Boolean|Math|JSON)(?![A-Za-z0-9_])
+    color: "#4EC9B0"

@@ -1,0 +1,49 @@
+name: HTML
+extensions: [.html, .htm, .xml, .svg]
+line_comment: "<!--"
+icon: mime
+filenames: []
+index: true
+import_style: generic
+completions: [html, head, body, div, span, script, style, link, meta, section, article, header, footer, main, class, id, doctype, title, nav, aside, form, input, button, label, select, option, textarea, ul, ol, li, table, thead, tbody, tr, td, th, src, href, alt, type, name, value, data-]
+auto_indent: true
+indent_openers: [">"]
+indent_closers: ["</"]
+close_pairs: ["(=>)", "{=>}", "[=>]"]
+line_close_pairs: []
+statement_required_enders: []
+statement_exempt_prefixes: ["<!--", "<!", "</"]
+statement_exempt_suffixes: [">", "/>", "-->"]
+import_keywords: [src, href, import]
+import_from_keywords: []
+import_member_keywords: []
+import_roots: [., src, public, assets]
+import_env: []
+import_extensions: [.html, .htm, .css, .js, .ts, .svg, .png, .jpg, .jpeg, .webp]
+import_member_files: []
+import_strip_extensions: false
+import_dot_modules: false
+rules:
+  - name: comment
+    pattern: "<!--[\\s\\S]*?-->"
+    color: "#6A9955"
+  - name: tag
+    pattern: "</?[A-Za-z][A-Za-z0-9:-]*[^>]*>"
+    color: "#569CD6"
+  - name: attribute
+    pattern: "[A-Za-z_:][-A-Za-z0-9_:.]*[[:space:]]*="
+    color: "#9CDCFE"
+  - name: string
+    pattern: "\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'"
+    color: "#CE9178"
+  - name: doctype
+    pattern: "<!DOCTYPE[^>]*>"
+    color: "#C586C0"
+    bold: true
+  - name: entity
+    pattern: "&[A-Za-z0-9#]+;"
+    color: "#B5CEA8"
+  - name: close-tag
+    pattern: "</[A-Za-z][A-Za-z0-9:-]*>"
+    color: "#569CD6"
+    bold: true
