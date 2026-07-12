@@ -1,0 +1,78 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c-cpp-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build with ${{ matrix.compiler }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - gcc
+          - clang
+
+    env:
+      CC: ${{ matrix.compiler }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential \
+            clang \
+            pkg-config \
+            libgtk-4-dev \
+            libgtksourceview-5-dev \
+            libjson-glib-dev
+
+      - name: Show compiler version
+        run: |
+          "$CC" --version
+          pkg-config --modversion gtk4
+          pkg-config --modversion gtksourceview-5
+          pkg-config --modversion json-glib-1.0
+
+      - name: Clean previous build
+        run: make clean
+
+      - name: Check C syntax
+        run: |
+          make check \
+            CC="$CC"
+
+      - name: Build Cleaf
+        run: |
+          make --jobs="$(nproc)" \
+            CC="$CC"
+
+      - name: Run unit tests
+        run: |
+          make test \
+            CC="$CC"
+
+      - name: Verify executable
+        run: |
+          test -x build/cleaf
+          file build/cleaf
+          ls -lh build/cleaf
