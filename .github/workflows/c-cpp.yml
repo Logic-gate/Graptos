@@ -17,8 +17,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build with ${{ matrix.compiler }}
+  build-test-smoke:
+    name: Build, test and smoke test with ${{ matrix.compiler }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -35,18 +35,19 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      - name: Install build dependencies
+      - name: Install build and test dependencies
         run: |
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends \
             build-essential \
             clang \
             pkg-config \
+            xvfb \
             libgtk-4-dev \
             libgtksourceview-5-dev \
             libjson-glib-dev
 
-      - name: Show compiler version
+      - name: Show compiler and dependency versions
         run: |
           "$CC" --version
           pkg-config --modversion gtk4
@@ -56,7 +57,7 @@ jobs:
       - name: Clean previous build
         run: make clean
 
-      - name: Check C syntax
+      - name: Check compiler warnings
         run: |
           make check \
             CC="$CC"
@@ -76,3 +77,9 @@ jobs:
           test -x build/cleaf
           file build/cleaf
           ls -lh build/cleaf
+
+      - name: Run window smoke tests
+        run: |
+          xvfb-run --auto-servernum \
+            make smoke-test \
+            CC="$CC"
