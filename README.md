@@ -29,13 +29,14 @@ Every feature should earn its place by being worth its runtime cost, dependency
 cost, and maintenance cost, so the editor can grow without losing what makes it
 lightweight.
 
-_You can track the development of Cleaf here_ ![Static Badge](https://img.shields.io/badge/build-Development-blue?label=Cleaf&link=https%3A%2F%2Fgithub.com%2Fusers%2FLogic-gate%2Fprojects%2F2)
+_You can track the development of Cleaf here_ [Cleaf Development](https://github.com/users/Logic-gate/projects/2).
+
 To get a sense of what is instored for cleaf, please visit [Milestones](https://github.com/Logic-gate/cleaf/milestones).
 
 Cleaf is being developed as a lightweight, reliable, and extensible text editor for Linux, written in C with GTK4.
 
 The project focuses first on a stable and responsive editing core, clear project navigation, strong file handling, and consistent native integration.
-More advanced capabilities—such as AI assistants, platform-specific tooling, build systems, and Sailfish OS support—will be provided through pluginsrather than being built directly into the core. The long-term goal is not to turn Cleaf into a full traditional IDE, but to provide a fast editor that can gain IDE-like functionality only where the user needs it.
+More advanced capabilities, such as AI assistants, platform-specific tooling, build systems, and Sailfish OS support, will be provided through pluginsrather than being built directly into the core. The long-term goal is not to turn Cleaf into a full traditional IDE, but to provide a fast editor that can gain IDE-like functionality only where the user needs it.
 
 ## Features
 
