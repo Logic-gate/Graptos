@@ -1,3 +1,8 @@
+/**
+ * @file src/editor/editor_tab_hover_refs.inc.c
+ * @brief Cleaf editor tab hover refs module.
+ */
+
 gboolean hex_to_rgba(const char *text, GdkRGBA *rgba) {
     if (!text || !rgba) return FALSE;
 
@@ -26,6 +31,9 @@ gboolean hex_to_rgba(const char *text, GdkRGBA *rgba) {
 }
 
 
+/**
+ * @brief On color swatch draw.
+ */
 void on_color_swatch_draw(GtkDrawingArea *area,
                           cairo_t *cr,
                           int width,
@@ -50,6 +58,9 @@ void on_color_swatch_draw(GtkDrawingArea *area,
 }
 
 
+/**
+ * @brief Hide color preview.
+ */
 void hide_color_preview(EditorTab *tab) {
     if (!tab || !tab->color_preview_valid) return;
 
@@ -61,6 +72,9 @@ void hide_color_preview(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Cancel hover hide.
+ */
 void cancel_hover_hide(EditorTab *tab) {
     if (!tab) return;
     if (tab->hover_hide_timeout != 0u) {
@@ -69,6 +83,9 @@ void cancel_hover_hide(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Hide hover preview.
+ */
 void hide_hover_preview(EditorTab *tab) {
     if (!tab) return;
 
@@ -89,6 +106,9 @@ void hide_hover_preview(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Hover transition timeout cb.
+ */
 gboolean hover_transition_timeout_cb(gpointer user_data) {
     EditorTab *tab = user_data;
     if (!tab) return G_SOURCE_REMOVE;
@@ -106,6 +126,9 @@ gboolean hover_transition_timeout_cb(gpointer user_data) {
 }
 
 
+/**
+ * @brief Schedule hover transition hide.
+ */
 void schedule_hover_transition_hide(EditorTab *tab) {
     if (!tab || tab->hover_pointer_inside) return;
     if (tab->hover_hide_timeout != 0u) return;
@@ -119,6 +142,9 @@ void schedule_hover_transition_hide(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Word at iter.
+ */
 char *word_at_iter(GtkTextBuffer *buffer, GtkTextIter *iter) {
     if (!buffer || !iter) return NULL;
 
@@ -161,6 +187,9 @@ char *word_at_iter(GtkTextBuffer *buffer, GtkTextIter *iter) {
 }
 
 
+/**
+ * @brief Set hover anchor from iter.
+ */
 static void set_hover_anchor_from_iter(EditorTab *tab, GtkTextIter *iter) {
     if (!tab || !iter || !tab->text_view) return;
 
@@ -177,6 +206,9 @@ static void set_hover_anchor_from_iter(EditorTab *tab, GtkTextIter *iter) {
 }
 
 
+/**
+ * @brief Schedule reference lookup at iter.
+ */
 static void schedule_reference_lookup_at_iter(EditorTab *tab,
                                               GtkTextIter *iter) {
     if (!tab || !iter || !tab->buffer) return;
@@ -217,6 +249,9 @@ static void schedule_reference_lookup_at_iter(EditorTab *tab,
 }
 
 
+/**
+ * @brief Editor tab show reference at pointer or cursor.
+ */
 void editor_tab_show_reference_at_pointer_or_cursor(EditorTab *tab) {
     if (!tab || !tab->text_view || !tab->buffer) return;
 
@@ -240,6 +275,9 @@ void editor_tab_show_reference_at_pointer_or_cursor(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Hover clear rows.
+ */
 void hover_clear_rows(EditorTab *tab) {
     if (!tab || !tab->hover_list) return;
 
@@ -248,6 +286,9 @@ void hover_clear_rows(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Editor tab jump to line internal.
+ */
 void editor_tab_jump_to_line_internal(EditorTab *tab, guint line) {
     if (!tab || !tab->buffer || line == 0u) return;
 
@@ -277,12 +318,18 @@ void editor_tab_jump_to_line_internal(EditorTab *tab, guint line) {
 }
 
 
+/**
+ * @brief Editor tab jump to line.
+ */
 void editor_tab_jump_to_line(EditorTab *tab, guint line) {
     // Public wrapper keeps callers away from the internal implementation name.
     editor_tab_jump_to_line_internal(tab, line);
 }
 
 
+/**
+ * @brief Hover row activated.
+ */
 void hover_row_activated(GtkListBox *box,
                          GtkListBoxRow *row,
                          gpointer user_data) {
@@ -317,6 +364,9 @@ void hover_row_activated(GtkListBox *box,
 }
 
 
+/**
+ * @brief Reference row new.
+ */
 GtkWidget *reference_row_new(IndexReference *ref) {
     GtkWidget *row = gtk_list_box_row_new();
 

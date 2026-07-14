@@ -1,3 +1,8 @@
+/**
+ * @file src/git/git_actions.inc.c
+ * @brief Cleaf git actions module.
+ */
+
 static void show_git_output(EditorWindow *win,
                             const char *title,
                             const char *body) {
@@ -45,6 +50,9 @@ static void show_git_output(EditorWindow *win,
     cleaf_widget_destroy(window);
 }
 
+/**
+ * @brief Show git error.
+ */
 static void show_git_error(EditorWindow *win,
                            const char *operation,
                            const CleafGitResult *result) {
@@ -66,6 +74,9 @@ static void show_git_error(EditorWindow *win,
     g_string_free(text, TRUE);
 }
 
+/**
+ * @brief Show result or error.
+ */
 static void show_result_or_error(EditorWindow *win,
                                  const char *title,
                                  const CleafGitResult *result,
@@ -86,6 +97,9 @@ static void show_result_or_error(EditorWindow *win,
     g_string_free(text, TRUE);
 }
 
+/**
+ * @brief Repo summary.
+ */
 static char *repo_summary(const char *repo) {
     GString *summary = g_string_new(NULL);
     g_string_append_printf(summary, "Repository: %s\n", repo ? repo : "none");
@@ -109,6 +123,9 @@ static char *repo_summary(const char *repo) {
     return g_string_free(summary, FALSE);
 }
 
+/**
+ * @brief Action git status.
+ */
 void action_git_status(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -138,6 +155,9 @@ void action_git_status(GtkWidget *widget, gpointer user_data) {
     g_free(repo);
 }
 
+/**
+ * @brief Diff syntax.
+ */
 static SyntaxDef *diff_syntax(EditorWindow *win) {
     if (!win || !win->syntaxes) return NULL;
     for (guint i = 0u; i < win->syntaxes->len; i++) {
@@ -147,6 +167,9 @@ static SyntaxDef *diff_syntax(EditorWindow *win) {
     return NULL;
 }
 
+/**
+ * @brief Open text tab.
+ */
 static void open_text_tab(EditorWindow *win,
                           const char *title,
                           const char *text,
@@ -165,6 +188,9 @@ static void open_text_tab(EditorWindow *win,
     editor_tab_update_status(tab);
 }
 
+/**
+ * @brief Action git diff.
+ */
 void action_git_diff(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -191,11 +217,17 @@ void action_git_diff(GtkWidget *widget, gpointer user_data) {
     g_free(repo);
 }
 
+/**
+ * @brief Refresh after command.
+ */
 static void refresh_after_command(EditorWindow *win, const char *status) {
     if (status) app_window_set_status(win, status);
     cleaf_git_refresh_and_rebuild(win);
 }
 
+/**
+ * @brief Action git stage.
+ */
 void action_git_stage(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -217,6 +249,9 @@ void action_git_stage(GtkWidget *widget, gpointer user_data) {
     g_free(repo);
 }
 
+/**
+ * @brief Action git unstage.
+ */
 void action_git_unstage(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -242,6 +277,9 @@ void action_git_unstage(GtkWidget *widget, gpointer user_data) {
     g_free(repo);
 }
 
+/**
+ * @brief Action git stage all.
+ */
 void action_git_stage_all(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -259,6 +297,9 @@ void action_git_stage_all(GtkWidget *widget, gpointer user_data) {
     g_free(repo);
 }
 
+/**
+ * @brief Action git commit.
+ */
 void action_git_commit(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -304,6 +345,9 @@ void action_git_commit(GtkWidget *widget, gpointer user_data) {
     g_free(repo);
 }
 
+/**
+ * @brief Action git pull.
+ */
 void action_git_pull(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -320,6 +364,9 @@ void action_git_pull(GtkWidget *widget, gpointer user_data) {
     g_free(repo);
 }
 
+/**
+ * @brief Action git push.
+ */
 void action_git_push(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;

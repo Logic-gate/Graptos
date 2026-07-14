@@ -1,3 +1,8 @@
+/**
+ * @file src/app/app_file_search_actions.inc.c
+ * @brief Cleaf app file search actions module.
+ */
+
 void set_search_panel(EditorWindow *win, gboolean visible, gboolean replace_mode) {
     if (!win || !win->search_revealer) return;
     /* Find and Replace as one panel.
@@ -16,6 +21,9 @@ void set_search_panel(EditorWindow *win, gboolean visible, gboolean replace_mode
 }
 
 
+/**
+ * @brief Action new.
+ */
 void action_new(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -24,6 +32,9 @@ void action_new(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Action open.
+ */
 void action_open(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -37,6 +48,9 @@ void action_open(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Action open folder.
+ */
 void action_open_folder(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -61,6 +75,9 @@ void action_open_folder(GtkWidget *widget, gpointer user_data) {
     g_free(folder);
 }
 
+/**
+ * @brief Cleaf executable path.
+ */
 static char *cleaf_executable_path(void) {
     GError *error = NULL;
     char *path = g_file_read_link("/proc/self/exe", &error);
@@ -72,6 +89,9 @@ static char *cleaf_executable_path(void) {
     return g_strdup("cleaf");
 }
 
+/**
+ * @brief Action open folder new instance.
+ */
 void action_open_folder_new_instance(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -111,6 +131,9 @@ void action_open_folder_new_instance(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Action save.
+ */
 void action_save(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorTab *tab = app_window_current_tab(user_data);
@@ -118,6 +141,9 @@ void action_save(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Action save as.
+ */
 void action_save_as(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorTab *tab = app_window_current_tab(user_data);
@@ -125,24 +151,36 @@ void action_save_as(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Action show find.
+ */
 void action_show_find(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     set_search_panel(user_data, TRUE, FALSE);
 }
 
 
+/**
+ * @brief Action show replace.
+ */
 void action_show_replace(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     set_search_panel(user_data, TRUE, TRUE);
 }
 
 
+/**
+ * @brief Action hide search.
+ */
 void action_hide_search(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     set_search_panel(user_data, FALSE, FALSE);
 }
 
 
+/**
+ * @brief Action find next.
+ */
 void action_find_next(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -152,6 +190,9 @@ void action_find_next(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Action find prev.
+ */
 void action_find_prev(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -161,6 +202,9 @@ void action_find_prev(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Action replace.
+ */
 void action_replace(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -171,6 +215,9 @@ void action_replace(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Action replace all.
+ */
 void action_replace_all(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -181,6 +228,9 @@ void action_replace_all(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Action comment.
+ */
 void action_comment(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorTab *tab = app_window_current_tab(user_data);
@@ -188,6 +238,9 @@ void action_comment(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Action reload syntax.
+ */
 void action_reload_syntax(GtkWidget *widget, gpointer user_data) {
     // Syntax definitions are runtime files, so reload them without restarting the editor
     (void)widget;
@@ -195,6 +248,9 @@ void action_reload_syntax(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Action syntax diagnostics.
+ */
 void action_syntax_diagnostics(GtkWidget *widget, gpointer user_data) {
     //Should add functional diagnostics. This is just for show.
     (void)widget;

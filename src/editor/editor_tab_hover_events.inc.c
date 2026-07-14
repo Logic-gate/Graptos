@@ -1,3 +1,8 @@
+/**
+ * @file src/editor/editor_tab_hover_events.inc.c
+ * @brief Cleaf editor tab hover events module.
+ */
+
 gboolean hover_timeout_cb(gpointer user_data) {
     EditorTab *tab = user_data;
     if (!tab) return G_SOURCE_REMOVE;
@@ -93,6 +98,9 @@ gboolean hover_timeout_cb(gpointer user_data) {
 }
 
 
+/**
+ * @brief On text view motion.
+ */
 void on_text_view_motion(GtkEventControllerMotion *controller,
                          double x,
                          double y,
@@ -133,6 +141,9 @@ void on_text_view_motion(GtkEventControllerMotion *controller,
 }
 
 
+/**
+ * @brief On text view leave.
+ */
 void on_text_view_leave(GtkEventControllerMotion *controller,
                         gpointer user_data) {
     (void)controller;
@@ -153,6 +164,9 @@ void on_text_view_leave(GtkEventControllerMotion *controller,
 }
 
 
+/**
+ * @brief On hover popover enter.
+ */
 void on_hover_popover_enter(GtkEventControllerMotion *controller,
                             double x,
                             double y,
@@ -170,6 +184,9 @@ void on_hover_popover_enter(GtkEventControllerMotion *controller,
 }
 
 
+/**
+ * @brief On hover popover leave.
+ */
 void on_hover_popover_leave(GtkEventControllerMotion *controller,
                             gpointer user_data) {
     (void)controller;
@@ -183,6 +200,9 @@ void on_hover_popover_leave(GtkEventControllerMotion *controller,
 }
 
 
+/**
+ * @brief Color preview row new.
+ */
 GtkWidget *color_preview_row_new(EditorTab *tab, const char *hex) {
     GtkWidget *row = gtk_list_box_row_new();
 
@@ -217,6 +237,9 @@ GtkWidget *color_preview_row_new(EditorTab *tab, const char *hex) {
 }
 
 
+/**
+ * @brief Show color preview in hover.
+ */
 void show_color_preview_in_hover(EditorTab *tab,
                                  const char *hex,
                                  GtkTextIter *where) {
@@ -268,6 +291,9 @@ void show_color_preview_in_hover(EditorTab *tab,
 }
 
 
+/**
+ * @brief Maybe show color preview.
+ */
 void maybe_show_color_preview(EditorTab *tab) {
     if (!tab || !tab->buffer || !tab->hover_popover || !tab->hover_list) return;
     if (!tab->inspect_reference_active) return;

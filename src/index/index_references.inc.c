@@ -1,3 +1,8 @@
+/**
+ * @file src/index/index_references.inc.c
+ * @brief Cleaf index references module.
+ */
+
 static char *definition_in_text(const char *path_label, const char *text, const char *word) {
     if (!text || !word || word[0] == '\0') return NULL;
     const char *p = text;
@@ -30,6 +35,9 @@ static char *definition_in_text(const char *path_label, const char *text, const 
     return NULL;
 }
 
+/**
+ * @brief Index definition for word.
+ */
 char *index_definition_for_word(EditorTab *tab, const char *word) {
     if (!tab || !word || strlen(word) < 2u) return NULL;
     char *text = tab_text(tab);
@@ -57,6 +65,9 @@ char *index_definition_for_word(EditorTab *tab, const char *word) {
     return def;
 }
 
+/**
+ * @brief Index reference free.
+ */
 void index_reference_free(gpointer data) {
     IndexReference *ref = data;
     if (!ref) return;
@@ -67,6 +78,9 @@ void index_reference_free(gpointer data) {
     g_free(ref);
 }
 
+/**
+ * @brief Relative display path.
+ */
 static char *relative_display_path(EditorTab *tab, const char *path) {
     if (!path) return g_strdup("current buffer");
     const char *root = tab && tab->win ? project_root_for_path(tab->win, path) : NULL;
@@ -78,11 +92,17 @@ static char *relative_display_path(EditorTab *tab, const char *path) {
     return g_filename_display_name(path);
 }
 
+/**
+ * @brief Language for path.
+ */
 static const char *language_for_path(EditorTab *tab, const char *path) {
     if (!path) return "Buffer";
     return syntax_language_for_path(tab && tab->win ? tab->win->syntaxes : NULL, path);
 }
 
+/**
+ * @brief Line looks definition.
+ */
 static gboolean line_looks_definition(const char *trim, const char *word) {
     if (!trim || !word || word[0] == '\0') return FALSE;
     gsize wlen = strlen(word);
@@ -101,6 +121,9 @@ static gboolean line_looks_definition(const char *trim, const char *word) {
     return FALSE;
 }
 
+/**
+ * @brief Seen reference.
+ */
 static gboolean seen_reference(GHashTable *seen, const char *path, guint line) {
     char *key = g_strdup_printf("%s:%u", path ? path : "<buffer>", line);
     gboolean found = g_hash_table_contains(seen, key);
@@ -109,6 +132,9 @@ static gboolean seen_reference(GHashTable *seen, const char *path, guint line) {
     return found;
 }
 
+/**
+ * @brief Add reference.
+ */
 static void add_reference(GPtrArray *out, GHashTable *seen, EditorTab *tab, const char *path, guint line, const char *snippet, const char *kind, guint max_results) {
     if (!out || !seen || !snippet || out->len >= max_results) return;
     if (seen_reference(seen, path, line)) return;
@@ -122,6 +148,9 @@ static void add_reference(GPtrArray *out, GHashTable *seen, EditorTab *tab, cons
     g_ptr_array_add(out, ref);
 }
 
+/**
+ * @brief Collect references from text.
+ */
 static void collect_references_from_text(GPtrArray *out, GHashTable *seen, EditorTab *tab, const char *path, const char *text, const char *word, guint max_results, gboolean definitions_first) {
     if (!out || !text || !word) return;
     const char *p = text;
@@ -144,6 +173,9 @@ static void collect_references_from_text(GPtrArray *out, GHashTable *seen, Edito
     }
 }
 
+/**
+ * @brief Index references for word.
+ */
 GPtrArray *index_references_for_word(EditorTab *tab, const char *word, guint max_results) {
     if (max_results == 0u) max_results = 20u;
     GPtrArray *out = g_ptr_array_new_with_free_func(index_reference_free);

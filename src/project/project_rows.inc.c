@@ -1,3 +1,8 @@
+/**
+ * @file src/project/project_rows.inc.c
+ * @brief Cleaf project rows module.
+ */
+
 static GtkWidget *project_icon_widget_for_path(const char *path,
                                                 gboolean is_dir) {
     GPtrArray *candidates = project_icon_candidates_for_path(path, is_dir);
@@ -12,7 +17,7 @@ static GtkWidget *project_icon_widget_for_path(const char *path,
     gtk_widget_set_halign(icon, GTK_ALIGN_CENTER);
     gtk_widget_set_valign(icon, GTK_ALIGN_CENTER);
     gtk_picture_set_can_shrink(GTK_PICTURE(icon), TRUE);
-    gtk_picture_set_keep_aspect_ratio(GTK_PICTURE(icon), TRUE);
+    gtk_picture_set_content_fit(GTK_PICTURE(icon), GTK_CONTENT_FIT_CONTAIN);
 
     GdkDisplay *display = gdk_display_get_default();
     GtkIconTheme *theme = display ? gtk_icon_theme_get_for_display(display) : NULL;
@@ -49,6 +54,9 @@ static GtkWidget *project_icon_widget_for_path(const char *path,
     return icon;
 }
 
+/**
+ * @brief Git status css class.
+ */
 static const char *git_status_css_class(const char *status) {
     if (!status || status[0] == '\0') return NULL;
     switch (status[0]) {
@@ -64,6 +72,9 @@ static const char *git_status_css_class(const char *status) {
 }
 
 
+/**
+ * @brief Append project row.
+ */
 static void append_project_row(ProjectBuild *build,
                                const char *path,
                                guint depth) {
@@ -140,6 +151,9 @@ static void append_project_row(ProjectBuild *build,
     g_free(base);
 }
 
+/**
+ * @brief Add visible path.
+ */
 static void add_visible_path(ProjectBuild *build,
                              const char *path,
                              guint depth) {
@@ -166,20 +180,32 @@ static void add_visible_path(ProjectBuild *build,
     g_ptr_array_free(names, TRUE);
 }
 
+/**
+ * @brief Project root count.
+ */
 guint project_root_count(EditorWindow *win) {
     if (!win || !win->project_roots) return 0u;
     return win->project_roots->len;
 }
 
+/**
+ * @brief Project root at.
+ */
 const char *project_root_at(EditorWindow *win, guint index) {
     if (!win || !win->project_roots || index >= win->project_roots->len) return NULL;
     return g_ptr_array_index(win->project_roots, index);
 }
 
+/**
+ * @brief Project has roots.
+ */
 gboolean project_has_roots(EditorWindow *win) {
     return project_root_count(win) > 0u;
 }
 
+/**
+ * @brief Project root for path.
+ */
 const char *project_root_for_path(EditorWindow *win, const char *path) {
     if (!win || !path) return NULL;
     const char *best = NULL;
@@ -203,6 +229,9 @@ const char *project_root_for_path(EditorWindow *win, const char *path) {
     return best;
 }
 
+/**
+ * @brief Project root exists.
+ */
 static gboolean project_root_exists(EditorWindow *win, const char *canonical) {
     if (!canonical) return FALSE;
     guint count = project_root_count(win);

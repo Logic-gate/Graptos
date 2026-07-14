@@ -1,3 +1,8 @@
+/**
+ * @file src/app/app_window_events.inc.c
+ * @brief Cleaf app window events module.
+ */
+
 static EditorTab *find_tab_for_path(EditorWindow *win, const char *canonical_path) {
     if (!win || !win->notebook || !canonical_path) return NULL;
 
@@ -27,6 +32,9 @@ static EditorTab *find_tab_for_path(EditorWindow *win, const char *canonical_pat
 }
 
 
+/**
+ * @brief App window open file.
+ */
 gboolean app_window_open_file(EditorWindow *win, const char *path) {
     if (!win || !path || path[0] == '\0') return FALSE;
 
@@ -68,6 +76,9 @@ gboolean app_window_open_file(EditorWindow *win, const char *path) {
 }
 
 
+/**
+ * @brief On switch page.
+ */
 void on_switch_page(GtkNotebook *notebook,
                     GtkWidget *page,
                     guint page_num,
@@ -81,6 +92,9 @@ void on_switch_page(GtkNotebook *notebook,
 }
 
 
+/**
+ * @brief On syntax changed.
+ */
 void on_syntax_changed(GtkDropDown *drop_down,
                        GParamSpec *pspec,
                        gpointer user_data) {
@@ -111,6 +125,9 @@ void on_syntax_changed(GtkDropDown *drop_down,
 }
 
 
+/**
+ * @brief On window close request.
+ */
 gboolean on_window_close_request(GtkWindow *window, gpointer user_data) {
     (void)window;
 
@@ -128,6 +145,9 @@ gboolean on_window_close_request(GtkWindow *window, gpointer user_data) {
 }
 
 
+/**
+ * @brief Switch page delta.
+ */
 void switch_page_delta(EditorWindow *win, int delta) {
     if (!win || !win->notebook) return;
 
@@ -145,6 +165,9 @@ void switch_page_delta(EditorWindow *win, int delta) {
 }
 
 
+/**
+ * @brief On window key pressed.
+ */
 gboolean on_window_key_pressed(GtkEventControllerKey *controller,
                                guint keyval,
                                guint keycode,

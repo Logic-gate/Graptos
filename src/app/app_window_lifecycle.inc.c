@@ -1,3 +1,8 @@
+/**
+ * @file src/app/app_window_lifecycle.inc.c
+ * @brief Cleaf app window lifecycle module.
+ */
+
 EditorTab *app_window_current_tab(EditorWindow *win) {
     if (!win || !win->notebook) return NULL;
     gint page = gtk_notebook_get_current_page(GTK_NOTEBOOK(win->notebook));
@@ -7,6 +12,9 @@ EditorTab *app_window_current_tab(EditorWindow *win) {
     return g_object_get_data(G_OBJECT(child), "cleaf-tab");
 }
 
+/**
+ * @brief Codex status changed.
+ */
 static void codex_status_changed(CodexClient *client,
                                  CodexClientState state,
                                  const char *detail,
@@ -27,6 +35,9 @@ static void codex_status_changed(CodexClient *client,
 }
 
 
+/**
+ * @brief App window new.
+ */
 EditorWindow *app_window_new(GtkApplication *application) {
     EditorWindow *win = g_new0(EditorWindow, 1);
     if (!win) return NULL;
@@ -203,6 +214,9 @@ EditorWindow *app_window_new(GtkApplication *application) {
 }
 
 
+/**
+ * @brief App window free.
+ */
 void app_window_free(EditorWindow *win) {
     if (!win) return;
     project_tree_close_context(win);

@@ -1,9 +1,17 @@
+/**
+ * @file src/app/app_window_state.inc.c
+ * @brief Cleaf app window state module.
+ */
+
 GtkWindow *app_window_gtk(EditorWindow *win) {
     // Some helpers accept NULL parents, so keep this wrapper safe.
     return win && win->window ? GTK_WINDOW(win->window) : NULL;
 }
 
 
+/**
+ * @brief App window set status.
+ */
 void app_window_set_status(EditorWindow *win, const char *text) {
     if (!win || !win->status_label) return;
 
@@ -12,6 +20,9 @@ void app_window_set_status(EditorWindow *win, const char *text) {
 }
 
 
+/**
+ * @brief Canonical or dup.
+ */
 static char *canonical_or_dup(const char *path) {
     if (!path || path[0] == '\0') return NULL;
 
@@ -24,6 +35,9 @@ static char *canonical_or_dup(const char *path) {
 }
 
 
+/**
+ * @brief App window is file locked.
+ */
 gboolean app_window_is_file_locked(EditorWindow *win, const char *path) {
     if (!win || !win->locked_paths || !path) return FALSE;
 
@@ -37,6 +51,9 @@ gboolean app_window_is_file_locked(EditorWindow *win, const char *path) {
 }
 
 
+/**
+ * @brief App window set file locked.
+ */
 void app_window_set_file_locked(EditorWindow *win,
                                 const char *path,
                                 gboolean locked) {
@@ -87,6 +104,9 @@ void app_window_set_file_locked(EditorWindow *win,
 }
 
 
+/**
+ * @brief App window note path renamed.
+ */
 void app_window_note_path_renamed(EditorWindow *win,
                                   const char *old_path,
                                   const char *new_path) {

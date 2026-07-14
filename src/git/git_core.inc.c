@@ -1,3 +1,8 @@
+/**
+ * @file src/git/git_core.inc.c
+ * @brief Cleaf git core module.
+ */
+
 static void git_result_clear(CleafGitResult *result) {
     if (!result) return;
     g_clear_pointer(&result->out, g_free);
@@ -7,6 +12,9 @@ static void git_result_clear(CleafGitResult *result) {
     result->kind = CLEAF_GIT_ERROR_NONE;
 }
 
+/**
+ * @brief Contains ascii.
+ */
 static gboolean contains_ascii(const char *haystack, const char *needle) {
     if (!haystack || !needle) return FALSE;
     char *h = g_ascii_strdown(haystack, -1);
@@ -17,6 +25,9 @@ static gboolean contains_ascii(const char *haystack, const char *needle) {
     return found;
 }
 
+/**
+ * @brief Classify git error.
+ */
 static CleafGitErrorKind classify_git_error(const char *out, const char *err) {
     const char *text = err && err[0] ? err : out;
     if (!text || text[0] == '\0') return CLEAF_GIT_ERROR_OTHER;
@@ -60,6 +71,9 @@ static CleafGitErrorKind classify_git_error(const char *out, const char *err) {
     return CLEAF_GIT_ERROR_OTHER;
 }
 
+/**
+ * @brief Git error title.
+ */
 static const char *git_error_title(CleafGitErrorKind kind) {
     switch (kind) {
     case CLEAF_GIT_ERROR_NOT_REPO: return "Not a Git repository";
@@ -78,6 +92,9 @@ static const char *git_error_title(CleafGitErrorKind kind) {
     }
 }
 
+/**
+ * @brief Git error hint.
+ */
 static const char *git_error_hint(CleafGitErrorKind kind) {
     switch (kind) {
     case CLEAF_GIT_ERROR_AUTH:
@@ -103,6 +120,9 @@ static const char *git_error_hint(CleafGitErrorKind kind) {
     }
 }
 
+/**
+ * @brief Limit output.
+ */
 static void limit_output(char **text) {
     if (!text || !*text) return;
     if (strlen(*text) <= CLEAF_GIT_MAX_OUTPUT) return;
@@ -176,6 +196,9 @@ static gboolean run_argv(const char * const *argv,
     return FALSE;
 }
 
+/**
+ * @brief Git argv new.
+ */
 static GPtrArray *git_argv_new(const char *repo) {
     GPtrArray *argv = g_ptr_array_new_with_free_func(g_free);
     g_ptr_array_add(argv, g_strdup("git"));
@@ -186,10 +209,16 @@ static GPtrArray *git_argv_new(const char *repo) {
     return argv;
 }
 
+/**
+ * @brief Argv add.
+ */
 static void argv_add(GPtrArray *argv, const char *arg) {
     if (argv && arg) g_ptr_array_add(argv, g_strdup(arg));
 }
 
+/**
+ * @brief Run git args.
+ */
 static gboolean run_git_args(const char *repo,
                              const char *stdin_text,
                              CleafGitResult *result,
@@ -206,12 +235,18 @@ static gboolean run_git_args(const char *repo,
     return ok;
 }
 
+/**
+ * @brief Chomp dup.
+ */
 static char *chomp_dup(const char *text) {
     char *copy = g_strdup(text ? text : "");
     g_strchomp(copy);
     return copy;
 }
 
+/**
+ * @brief Dir for path.
+ */
 static char *dir_for_path(const char *path) {
     if (!path || path[0] == '\0') return NULL;
     if (g_file_test(path, G_FILE_TEST_IS_DIR)) return g_canonicalize_filename(path, NULL);
@@ -221,6 +256,9 @@ static char *dir_for_path(const char *path) {
     return canon;
 }
 
+/**
+ * @brief Cleaf git repo for path.
+ */
 char *cleaf_git_repo_for_path(const char *path) {
     char *dir = dir_for_path(path);
     if (!dir) return NULL;
@@ -238,6 +276,9 @@ char *cleaf_git_repo_for_path(const char *path) {
     return repo;
 }
 
+/**
+ * @brief Relpath for repo.
+ */
 static char *relpath_for_repo(const char *repo, const char *path) {
     if (!repo || !path) return NULL;
     char *canon = g_canonicalize_filename(path, NULL);
@@ -253,6 +294,9 @@ static char *relpath_for_repo(const char *repo, const char *path) {
     return rel;
 }
 
+/**
+ * @brief Current repo.
+ */
 static char *current_repo(EditorWindow *win, char **rel_file_out) {
     if (rel_file_out) *rel_file_out = NULL;
     EditorTab *tab = app_window_current_tab(win);
@@ -273,6 +317,9 @@ static char *current_repo(EditorWindow *win, char **rel_file_out) {
     return NULL;
 }
 
+/**
+ * @brief Marker for status.
+ */
 static const char *marker_for_status(const char *record) {
     if (!record || strlen(record) < 3u) return "";
     char x = record[0];
@@ -288,6 +335,9 @@ static const char *marker_for_status(const char *record) {
     return "";
 }
 
+/**
+ * @brief Status map add.
+ */
 static void status_map_add(EditorWindow *win,
                            const char *repo,
                            const char *record) {
@@ -309,6 +359,9 @@ static void status_map_add(EditorWindow *win,
     g_free(path);
 }
 
+/**
+ * @brief Refresh repo status.
+ */
 static void refresh_repo_status(EditorWindow *win, const char *repo) {
     if (!win || !repo) return;
     CleafGitResult result;
@@ -328,6 +381,9 @@ static void refresh_repo_status(EditorWindow *win, const char *repo) {
     git_result_clear(&result);
 }
 
+/**
+ * @brief Cleaf git status for file.
+ */
 const char *cleaf_git_status_for_file(EditorWindow *win, const char *path) {
     if (!win || !win->git_file_status || !path) return NULL;
     char *canon = g_canonicalize_filename(path, NULL);
@@ -336,6 +392,9 @@ const char *cleaf_git_status_for_file(EditorWindow *win, const char *path) {
     return status;
 }
 
+/**
+ * @brief Cleaf git refresh all.
+ */
 void cleaf_git_refresh_all(EditorWindow *win) {
     if (!win) return;
     if (!win->git_file_status) {
@@ -357,6 +416,9 @@ void cleaf_git_refresh_all(EditorWindow *win) {
     g_hash_table_destroy(seen);
 }
 
+/**
+ * @brief Cleaf git refresh and rebuild.
+ */
 void cleaf_git_refresh_and_rebuild(EditorWindow *win) {
     cleaf_git_refresh_all(win);
     project_tree_refresh(win);

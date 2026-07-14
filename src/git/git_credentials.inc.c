@@ -1,3 +1,8 @@
+/**
+ * @file src/git/git_credentials.inc.c
+ * @brief Cleaf git credentials module.
+ */
+
 static char *remote_host_for_repo(const char *repo) {
     CleafGitResult result;
     if (!run_git_args(repo, NULL, &result, "remote", "get-url", "origin", NULL)) {
@@ -24,6 +29,9 @@ static char *remote_host_for_repo(const char *repo) {
     return host;
 }
 
+/**
+ * @brief Credential dialog.
+ */
 static char *credential_dialog(EditorWindow *win,
                                char **protocol_out,
                                char **host_out,
@@ -160,6 +168,9 @@ void action_git_credentials(GtkWidget *widget, gpointer user_data) {
     g_free(protocol); g_free(host); g_free(username); g_free(secret); g_free(helper);
 }
 
+/**
+ * @brief Action git refresh.
+ */
 void action_git_refresh(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -167,6 +178,9 @@ void action_git_refresh(GtkWidget *widget, gpointer user_data) {
     app_window_set_status(win, "Git status refreshed.");
 }
 
+/**
+ * @brief Action git run.
+ */
 void action_git_run(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;

@@ -1,9 +1,24 @@
+/**
+ * @file unit_tests.c
+ * @brief Unit tests for protocol serialization and syntax diagnostics helpers.
+ *
+ * These tests intentionally avoid constructing GTK windows.  They exercise
+ * deterministic utility code that can run in a normal headless process.
+ */
+
 #include <glib.h>
 #include <string.h>
 
 #include "../src/codex_protocol.h"
 #include "../src/syntax.h"
 
+/**
+ * @brief Verifies that a Codex protocol request survives serialize/parse.
+ *
+ * The test builds a small JSON-RPC style request, serializes it to the
+ * line-oriented protocol format, parses it back, and checks the id, method,
+ * and params payload.
+ */
 static void test_codex_protocol_request_round_trip(void) {
     JsonNode *params = codex_protocol_object_params();
     JsonObject *params_object = json_node_get_object(params);
@@ -32,6 +47,12 @@ static void test_codex_protocol_request_round_trip(void) {
     json_node_free(params);
 }
 
+/**
+ * @brief Verifies malformed JSON is rejected with a JSON parser error.
+ *
+ * This covers the negative path for the protocol parser so callers can rely on
+ * a false return value and a populated GError when the input line is invalid.
+ */
 static void test_codex_protocol_rejects_invalid_json(void) {
     JsonNode *root = NULL;
     GError *error = NULL;
@@ -43,6 +64,13 @@ static void test_codex_protocol_rejects_invalid_json(void) {
     g_clear_error(&error);
 }
 
+/**
+ * @brief Verifies syntax diagnostics describe an empty syntax registry.
+ *
+ * The diagnostics text should still be useful when no syntax definitions are
+ * loaded, so the test checks that the output contains the standard heading and
+ * the explicit "none" marker.
+ */
 static void test_syntax_diagnostics_empty(void) {
     GPtrArray *syntaxes = g_ptr_array_new();
     char *text = syntax_diagnostics(syntaxes);
@@ -55,6 +83,13 @@ static void test_syntax_diagnostics_empty(void) {
     g_ptr_array_unref(syntaxes);
 }
 
+/**
+ * @brief Verifies syntax diagnostics summarize a populated syntax definition.
+ *
+ * A synthetic SyntaxDef is assembled in memory and passed to the diagnostics
+ * formatter.  The test checks visible summary fields such as name, icon,
+ * completion count, extensions, and index status.
+ */
 static void test_syntax_diagnostics_summary(void) {
     GPtrArray *syntaxes = g_ptr_array_new();
     GPtrArray *extensions = g_ptr_array_new();
@@ -96,6 +131,13 @@ static void test_syntax_diagnostics_summary(void) {
     g_ptr_array_unref(line_close_pairs);
 }
 
+/**
+ * @brief Registers and runs the unit test suite.
+ *
+ * @param argc Command-line argument count supplied by the test runner.
+ * @param argv Command-line argument vector supplied by the test runner.
+ * @return The GLib test runner exit status.
+ */
 int main(int argc, char **argv) {
     g_test_init(&argc, &argv, NULL);
     g_test_add_func("/codex/protocol/request_round_trip", test_codex_protocol_request_round_trip);

@@ -1,3 +1,8 @@
+/**
+ * @file src/ui/ui_editor_css.inc.c
+ * @brief Cleaf ui editor css module.
+ */
+
 static void append_bg_rule(GString *css, const char *selector,
                            const char *color) {
     if (!css || !selector || !color || color[0] != '#') return;
@@ -6,6 +11,9 @@ static void append_bg_rule(GString *css, const char *selector,
                            selector, color, color);
 }
 
+/**
+ * @brief Append fg rule.
+ */
 static void append_fg_rule(GString *css, const char *selector,
                            const char *color) {
     if (!css || !selector || !color || color[0] != '#') return;
