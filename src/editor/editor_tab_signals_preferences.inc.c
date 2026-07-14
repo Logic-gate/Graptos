@@ -1,3 +1,8 @@
+/**
+ * @file src/editor/editor_tab_signals_preferences.inc.c
+ * @brief Cleaf editor tab signals preferences module.
+ */
+
 void editor_tab_set_syntax(EditorTab *tab, SyntaxDef *syntax, gboolean manual) {
     if (!tab) return;
     tab->active_syntax = syntax;
@@ -19,6 +24,9 @@ void editor_tab_set_syntax(EditorTab *tab, SyntaxDef *syntax, gboolean manual) {
 }
 
 
+/**
+ * @brief Editor tab auto select syntax.
+ */
 void editor_tab_auto_select_syntax(EditorTab *tab) {
     if (!tab || !tab->win || tab->manual_syntax_override) return;
     SyntaxDef *syntax = syntax_for_path(tab->win->syntaxes, tab->file_path);
@@ -28,6 +36,9 @@ void editor_tab_auto_select_syntax(EditorTab *tab) {
 
 
 
+/**
+ * @brief On mark set.
+ */
 void on_mark_set(GtkTextBuffer *buffer, GtkTextIter *location, GtkTextMark *mark, gpointer user_data) {
     (void)buffer;
     (void)location;
@@ -120,6 +131,9 @@ void on_buffer_changed(GtkTextBuffer *buffer, gpointer user_data) {
 }
 
 
+/**
+ * @brief Editor tab set tab policy.
+ */
 void editor_tab_set_tab_policy(EditorTab *tab, guint width, gboolean insert_spaces) {
     if (!tab) return;
     if (width == 0u) width = 4u;
@@ -141,6 +155,9 @@ void editor_tab_set_tab_policy(EditorTab *tab, guint width, gboolean insert_spac
 }
 
 
+/**
+ * @brief Editor tab apply preferences.
+ */
 void editor_tab_apply_preferences(EditorTab *tab) {
     if (!tab || !tab->win || !tab->text_view) return;
     gtk_text_view_set_monospace(GTK_TEXT_VIEW(tab->text_view), !tab->win->use_system_interface_font);
@@ -150,6 +167,9 @@ void editor_tab_apply_preferences(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Editor tab set minimap visible.
+ */
 void editor_tab_set_minimap_visible(EditorTab *tab, gboolean visible) {
     if (!tab || !tab->minimap_scrolled) return;
     if (visible) {
@@ -163,6 +183,9 @@ void editor_tab_set_minimap_visible(EditorTab *tab, gboolean visible) {
 
 
 
+/**
+ * @brief Editor tab set preview visible.
+ */
 void editor_tab_set_preview_visible(EditorTab *tab, gboolean visible) {
     if (!tab || !tab->preview_scrolled) return;
     if (visible && preview_is_supported(tab)) {
@@ -173,6 +196,9 @@ void editor_tab_set_preview_visible(EditorTab *tab, gboolean visible) {
     }
 }
 
+/**
+ * @brief Editor tab set backup enabled.
+ */
 void editor_tab_set_backup_enabled(EditorTab *tab, gboolean enabled) {
     if (!tab) return;
     tab->backup_enabled = enabled;

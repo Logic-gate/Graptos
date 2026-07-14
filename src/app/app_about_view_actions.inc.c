@@ -1,3 +1,8 @@
+/**
+ * @file src/app/app_about_view_actions.inc.c
+ * @brief Cleaf app about view actions module.
+ */
+
 GtkWidget *pref_section(const char *text) {
     GtkWidget *label = gtk_label_new(text ? text : "");
     gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
@@ -5,6 +10,9 @@ GtkWidget *pref_section(const char *text) {
     return label;
 }
 
+/**
+ * @brief Pref tab label.
+ */
 GtkWidget *pref_tab_label(const char *text) {
     GtkWidget *label = gtk_label_new(text ? text : "");
     // Perhaps this should be in config or part of the themeing engine.
@@ -17,6 +25,9 @@ GtkWidget *pref_tab_label(const char *text) {
 }
 
 
+/**
+ * @brief Cleaf prefers dark theme.
+ */
 static gboolean cleaf_prefers_dark_theme(void) {
     GtkSettings *settings = gtk_settings_get_default();
     gboolean dark = FALSE;
@@ -28,6 +39,9 @@ static gboolean cleaf_prefers_dark_theme(void) {
     return dark;
 }
 
+/**
+ * @brief Cleaf logo path for theme.
+ */
 static char *cleaf_logo_path_for_theme(gboolean dark) {
     const char *filename = dark ? "cleaf-logo-dark.png" : "cleaf-logo-light.png";
 
@@ -42,6 +56,9 @@ static char *cleaf_logo_path_for_theme(gboolean dark) {
     return NULL;
 }
 
+/**
+ * @brief Cleaf about logo new.
+ */
 static GtkWidget *cleaf_about_logo_new(void) {
     char *path = cleaf_logo_path_for_theme(cleaf_prefers_dark_theme());
     if (!path) return NULL;
@@ -49,13 +66,16 @@ static GtkWidget *cleaf_about_logo_new(void) {
     GtkWidget *picture = gtk_picture_new_for_filename(path);
     gtk_widget_set_size_request(picture, 170, 170);
     gtk_picture_set_can_shrink(GTK_PICTURE(picture), TRUE);
-    gtk_picture_set_keep_aspect_ratio(GTK_PICTURE(picture), TRUE);
+    gtk_picture_set_content_fit(GTK_PICTURE(picture), GTK_CONTENT_FIT_CONTAIN);
     gtk_widget_set_halign(picture, GTK_ALIGN_CENTER);
     gtk_widget_set_valign(picture, GTK_ALIGN_CENTER);
     g_free(path);
     return picture;
 }
 
+/**
+ * @brief Cleaf about label new.
+ */
 static GtkWidget *cleaf_about_label_new(const char *text, gboolean title) {
     GtkWidget *label = gtk_label_new(text ? text : "");
     gtk_label_set_xalign(GTK_LABEL(label), 0.5f);
@@ -65,6 +85,9 @@ static GtkWidget *cleaf_about_label_new(const char *text, gboolean title) {
     return label;
 }
 
+/**
+ * @brief Action about.
+ */
 void action_about(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -97,6 +120,9 @@ void action_about(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Action show preferences.
+ */
 void action_show_preferences(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -107,6 +133,9 @@ void action_show_preferences(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Action toggle minimap.
+ */
 void action_toggle_minimap(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -118,6 +147,9 @@ void action_toggle_minimap(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Action toggle preview.
+ */
 void action_toggle_preview(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -128,6 +160,9 @@ void action_toggle_preview(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Action render latex.
+ */
 void action_render_latex(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorTab *tab = app_window_current_tab(user_data);

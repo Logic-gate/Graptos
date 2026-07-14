@@ -1,8 +1,16 @@
+/**
+ * @file src/project/project_tree.inc.c
+ * @brief Cleaf project tree module.
+ */
+
 typedef struct {
-    GtkWidget *scrolled;
-    gdouble value;
+    GtkWidget *scrolled; /**< Scrolled. */
+    gdouble value; /**< Value. */
 } ProjectScrollRestore;
 
+/**
+ * @brief Project tree scrolled window.
+ */
 static GtkWidget *project_tree_scrolled_window(EditorWindow *win) {
     GtkWidget *widget = win ? win->project_list : NULL;
     while (widget) {
@@ -12,6 +20,9 @@ static GtkWidget *project_tree_scrolled_window(EditorWindow *win) {
     return NULL;
 }
 
+/**
+ * @brief Project restore scroll cb.
+ */
 static gboolean project_restore_scroll_cb(gpointer user_data) {
     ProjectScrollRestore *restore = user_data;
     if (!restore || !restore->scrolled) {
@@ -30,6 +41,9 @@ static gboolean project_restore_scroll_cb(gpointer user_data) {
     return G_SOURCE_REMOVE;
 }
 
+/**
+ * @brief Project restore scroll later.
+ */
 static void project_restore_scroll_later(GtkWidget *scrolled, gdouble value) {
     if (!scrolled) return;
     ProjectScrollRestore *restore = g_new0(ProjectScrollRestore, 1);
@@ -38,6 +52,9 @@ static void project_restore_scroll_later(GtkWidget *scrolled, gdouble value) {
     g_idle_add_full(G_PRIORITY_LOW, project_restore_scroll_cb, restore, NULL);
 }
 
+/**
+ * @brief Project tree rebuild.
+ */
 static void project_tree_rebuild(EditorWindow *win) {
     if (!win || !win->project_list) return;
 
@@ -69,6 +86,9 @@ static void project_tree_rebuild(EditorWindow *win) {
     project_restore_scroll_later(scrolled, scroll_value);
 }
 
+/**
+ * @brief On project row activated.
+ */
 static void on_project_row_activated(GtkListBox *list_box,
                                      GtkListBoxRow *row,
                                      gpointer user_data) {
@@ -89,6 +109,9 @@ static void on_project_row_activated(GtkListBox *list_box,
     (void)app_window_open_file(win, data->path);
 }
 
+/**
+ * @brief Section label.
+ */
 static GtkWidget *section_label(const char *text) {
     GtkWidget *label = gtk_label_new(text ? text : "");
     gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
@@ -99,6 +122,9 @@ static GtkWidget *section_label(const char *text) {
     return label;
 }
 
+/**
+ * @brief Project tree create.
+ */
 GtkWidget *project_tree_create(EditorWindow *win) {
     if (!win) return NULL;
 
@@ -132,14 +158,23 @@ GtkWidget *project_tree_create(EditorWindow *win) {
     return box;
 }
 
+/**
+ * @brief Project tree close context.
+ */
 void project_tree_close_context(EditorWindow *win) {
     project_context_popover_close_for_list(win);
 }
 
+/**
+ * @brief Project tree refresh.
+ */
 void project_tree_refresh(EditorWindow *win) {
     project_tree_rebuild(win);
 }
 
+/**
+ * @brief Project tree clear.
+ */
 void project_tree_clear(EditorWindow *win) {
     if (!win) return;
     project_context_popover_close_for_list(win);
@@ -149,6 +184,9 @@ void project_tree_clear(EditorWindow *win) {
     project_tree_rebuild(win);
 }
 
+/**
+ * @brief Project tree load folder.
+ */
 void project_tree_load_folder(EditorWindow *win, const char *folder_path) {
     if (!win || !folder_path
         || !g_file_test(folder_path, G_FILE_TEST_IS_DIR)) {

@@ -1,5 +1,13 @@
+/**
+ * @file src/index/index_candidates.inc.c
+ * @brief Cleaf index candidates module.
+ */
+
 static void collect_include_paths_from_text(GPtrArray *paths, GHashTable *seen, EditorTab *tab, const char *text, guint depth);
 
+/**
+ * @brief Add include candidate.
+ */
 static void add_include_candidate(GPtrArray *paths, GHashTable *seen, EditorTab *tab, const char *name, gboolean system_include) {
     if (!paths || !seen || !tab || !name || name[0] == '\0') return;
     if (!system_include && tab->file_path) {
@@ -28,6 +36,9 @@ static void add_include_candidate(GPtrArray *paths, GHashTable *seen, EditorTab 
     }
 }
 
+/**
+ * @brief Collect include paths from text.
+ */
 static void collect_include_paths_from_text(GPtrArray *paths, GHashTable *seen, EditorTab *tab, const char *text, guint depth) {
     if (!paths || !seen || !tab || !text || depth > CLEAF_INDEX_MAX_INCLUDE_DEPTH) return;
     const char *p = text;
@@ -70,12 +81,18 @@ static void collect_include_paths_from_text(GPtrArray *paths, GHashTable *seen, 
     }
 }
 
+/**
+ * @brief Sort strings.
+ */
 static gint sort_strings(gconstpointer a, gconstpointer b) {
     const char *sa = *(char * const *)a;
     const char *sb = *(char * const *)b;
     return g_ascii_strcasecmp(sa ? sa : "", sb ? sb : "");
 }
 
+/**
+ * @brief Index candidates for tab.
+ */
 GPtrArray *index_candidates_for_tab(EditorTab *tab, const char *prefix, guint max_results) {
     if (max_results == 0u) max_results = 64u;
     GPtrArray *out = g_ptr_array_new_with_free_func(g_free);

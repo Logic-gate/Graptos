@@ -1,3 +1,8 @@
+/**
+ * @file src/app/app_window_tabs.inc.c
+ * @brief Cleaf app window tabs module.
+ */
+
 void app_window_add_tab(EditorWindow *win,
                         EditorTab *tab,
                         gboolean switch_to_tab) {
@@ -37,6 +42,9 @@ void app_window_add_tab(EditorWindow *win,
 }
 
 
+/**
+ * @brief App window close tab.
+ */
 void app_window_close_tab(EditorWindow *win, EditorTab *tab) {
     if (!win || !tab) return;
 
@@ -74,6 +82,9 @@ void app_window_close_tab(EditorWindow *win, EditorTab *tab) {
 }
 
 
+/**
+ * @brief App window close all tabs.
+ */
 gboolean app_window_close_all_tabs(EditorWindow *win) {
     if (!win || !win->notebook) return TRUE;
 
@@ -113,6 +124,9 @@ gboolean app_window_close_all_tabs(EditorWindow *win) {
 }
 
 
+/**
+ * @brief Combo index for syntax.
+ */
 int combo_index_for_syntax(EditorWindow *win, SyntaxDef *syntax) {
     if (!win || !syntax) return 0;
 
@@ -130,6 +144,9 @@ int combo_index_for_syntax(EditorWindow *win, SyntaxDef *syntax) {
 }
 
 
+/**
+ * @brief Populate syntax combo.
+ */
 void populate_syntax_combo(EditorWindow *win, EditorTab *tab) {
     if (!win || !win->syntax_combo) return;
 
@@ -171,6 +188,9 @@ void populate_syntax_combo(EditorWindow *win, EditorTab *tab) {
 }
 
 
+/**
+ * @brief App window update ui.
+ */
 void app_window_update_ui(EditorWindow *win) {
     if (!win) return;
 
@@ -225,6 +245,9 @@ void app_window_update_ui(EditorWindow *win) {
 }
 
 
+/**
+ * @brief App window reload syntaxes.
+ */
 void app_window_reload_syntaxes(EditorWindow *win) {
     if (!win) return;
 

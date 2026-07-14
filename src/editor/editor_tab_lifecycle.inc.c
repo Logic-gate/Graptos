@@ -1,3 +1,8 @@
+/**
+ * @file src/editor/editor_tab_lifecycle.inc.c
+ * @brief Cleaf editor tab lifecycle module.
+ */
+
 char *editor_tab_basename(EditorTab *tab) {
     if (!tab || !tab->file_path) return g_strdup("Untitled");
 
@@ -17,6 +22,9 @@ char *editor_tab_basename(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Buffer text.
+ */
 char *buffer_text(EditorTab *tab) {
     GtkTextIter start;
     GtkTextIter end;
@@ -27,6 +35,9 @@ char *buffer_text(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Insert text tagless.
+ */
 void insert_text_tagless(GtkTextBuffer *buffer,
                          GtkTextIter *where,
                          const char *text) {
@@ -37,12 +48,18 @@ void insert_text_tagless(GtkTextBuffer *buffer,
 }
 
 
+/**
+ * @brief Cancel timeout id.
+ */
 static void cancel_timeout_id(guint *id) {
     // Keep timeout cancellation behind one helper in case source handling changes.
     cleaf_source_cancel(id);
 }
 
 
+/**
+ * @brief Editor tab large file mode.
+ */
 gboolean editor_tab_large_file_mode(EditorTab *tab) {
     if (!tab || !tab->buffer) return FALSE;
 
@@ -55,24 +72,36 @@ gboolean editor_tab_large_file_mode(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Editor tab live features allowed.
+ */
 gboolean editor_tab_live_features_allowed(EditorTab *tab) {
     // Live features are disabled for large files to avoid editor lag.
     return tab && tab->buffer && !editor_tab_large_file_mode(tab);
 }
 
 
+/**
+ * @brief Editor tab highlighting allowed.
+ */
 gboolean editor_tab_highlighting_allowed(EditorTab *tab) {
     // Highlighting needs an active syntax and at least one loaded rule.
     return tab && tab->buffer && tab->active_syntax && tab->active_syntax->rules;
 }
 
 
+/**
+ * @brief Editor tab reference features allowed.
+ */
 gboolean editor_tab_reference_features_allowed(EditorTab *tab) {
     // Reference lookup only needs a valid text buffer for now.
     return tab && tab->buffer;
 }
 
 
+/**
+ * @brief Editor tab cancel live work.
+ */
 void editor_tab_cancel_live_work(EditorTab *tab) {
     if (!tab) return;
 
@@ -95,6 +124,9 @@ void editor_tab_cancel_live_work(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Editor tab lightweight ui timeout cb.
+ */
 gboolean editor_tab_lightweight_ui_timeout_cb(gpointer user_data) {
     EditorTab *tab = user_data;
     if (!tab) return G_SOURCE_REMOVE;
@@ -114,6 +146,9 @@ gboolean editor_tab_lightweight_ui_timeout_cb(gpointer user_data) {
 }
 
 
+/**
+ * @brief Editor tab schedule lightweight ui refresh.
+ */
 void editor_tab_schedule_lightweight_ui_refresh(EditorTab *tab) {
     if (!tab) return;
 
@@ -126,6 +161,9 @@ void editor_tab_schedule_lightweight_ui_refresh(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Popup append item.
+ */
 void popup_append_item(GtkWidget *menu,
                        const char *label,
                        GCallback callback,
@@ -138,6 +176,9 @@ void popup_append_item(GtkWidget *menu,
 }
 
 
+/**
+ * @brief On close button clicked.
+ */
 void on_close_button_clicked(GtkWidget *widget, gpointer user_data) {
     (void)widget;
 
@@ -148,6 +189,9 @@ void on_close_button_clicked(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Editor tab text rect to popover parent.
+ */
 gboolean editor_tab_text_rect_to_popover_parent(EditorTab *tab,
                                                 GdkRectangle *rect) {
     if (!tab || !rect || !tab->text_view || !tab->popover_parent) {
@@ -176,6 +220,9 @@ gboolean editor_tab_text_rect_to_popover_parent(EditorTab *tab,
 }
 
 
+/**
+ * @brief Editor tab destroy popovers.
+ */
 void editor_tab_destroy_popovers(EditorTab *tab) {
     if (!tab) return;
 
@@ -195,6 +242,9 @@ void editor_tab_destroy_popovers(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Editor tab free.
+ */
 void editor_tab_free(EditorTab *tab) {
     if (!tab) return;
 
@@ -228,11 +278,17 @@ void editor_tab_free(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Editor tab is locked.
+ */
 gboolean editor_tab_is_locked(EditorTab *tab) {
     return tab ? tab->locked : FALSE;
 }
 
 
+/**
+ * @brief Editor tab set locked.
+ */
 void editor_tab_set_locked(EditorTab *tab, gboolean locked) {
     if (!tab) return;
 
@@ -248,6 +304,9 @@ void editor_tab_set_locked(EditorTab *tab, gboolean locked) {
 }
 
 
+/**
+ * @brief Editor tab update title.
+ */
 void editor_tab_update_title(EditorTab *tab) {
     if (!tab) return;
 
@@ -269,6 +328,9 @@ void editor_tab_update_title(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Editor tab update status.
+ */
 void editor_tab_update_status(EditorTab *tab) {
     if (!tab || !tab->win) return;
 

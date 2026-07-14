@@ -1,8 +1,16 @@
+/**
+ * @file src/project/project_context.inc.c
+ * @brief Cleaf project context module.
+ */
+
 static gboolean project_path_is_expanded(EditorWindow *win, const char *path) {
     return win && win->project_expanded && path
         && g_hash_table_contains(win->project_expanded, path);
 }
 
+/**
+ * @brief Project set expanded.
+ */
 static void project_set_expanded(EditorWindow *win,
                                  const char *path,
                                  gboolean expanded) {
@@ -22,6 +30,9 @@ static void project_set_expanded(EditorWindow *win,
     }
 }
 
+/**
+ * @brief Row label.
+ */
 static GtkWidget *row_label(const char *text, const char *css_class) {
     GtkWidget *label = gtk_label_new(text ? text : "");
     gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
@@ -31,6 +42,9 @@ static GtkWidget *row_label(const char *text, const char *css_class) {
     return label;
 }
 
+/**
+ * @brief Close project folder for path.
+ */
 static void close_project_folder_for_path(EditorWindow *win, const char *path) {
     if (!win || !win->project_roots || !path) return;
 
@@ -69,6 +83,9 @@ static void close_project_folder_for_path(EditorWindow *win, const char *path) {
     g_free(root_copy);
 }
 
+/**
+ * @brief Project context open.
+ */
 static void project_context_open(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     ProjectAction *action = user_data;
@@ -84,6 +101,9 @@ static void project_context_open(GtkWidget *widget, gpointer user_data) {
     (void)app_window_open_file(action->win, action->path);
 }
 
+/**
+ * @brief Project context close folder.
+ */
 static void project_context_close_folder(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     ProjectAction *action = user_data;
@@ -91,6 +111,9 @@ static void project_context_close_folder(GtkWidget *widget, gpointer user_data) 
     close_project_folder_for_path(action->win, action->path);
 }
 
+/**
+ * @brief Project context toggle lock.
+ */
 static void project_context_toggle_lock(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     ProjectAction *action = user_data;
@@ -109,12 +132,18 @@ static void project_context_toggle_lock(GtkWidget *widget, gpointer user_data) {
     g_free(base);
 }
 
+/**
+ * @brief Invalid new name.
+ */
 static gboolean invalid_new_name(const char *name) {
     if (!name || name[0] == '\0') return TRUE;
     if (g_strcmp0(name, ".") == 0 || g_strcmp0(name, "..") == 0) return TRUE;
     return strchr(name, G_DIR_SEPARATOR) != NULL;
 }
 
+/**
+ * @brief Project context rename.
+ */
 static void project_context_rename(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     ProjectAction *action = user_data;
@@ -187,6 +216,9 @@ static void project_context_rename(GtkWidget *widget, gpointer user_data) {
     g_free(old_base);
 }
 
+/**
+ * @brief Project context button.
+ */
 static GtkWidget *project_context_button(const char *label,
                                          GCallback callback,
                                          EditorWindow *win,
@@ -200,6 +232,9 @@ static GtkWidget *project_context_button(const char *label,
     return button;
 }
 
+/**
+ * @brief Project context popover closed.
+ */
 static void project_context_popover_closed(GtkPopover *popover,
                                            gpointer user_data) {
     GtkWidget *owner = user_data;
@@ -214,6 +249,9 @@ static void project_context_popover_closed(GtkPopover *popover,
     cleaf_widget_destroy(GTK_WIDGET(popover));
 }
 
+/**
+ * @brief Project context popover close for list.
+ */
 static void project_context_popover_close_for_list(EditorWindow *win) {
     if (!win || !win->project_list) return;
     GtkWidget *old_popover = g_object_get_data(G_OBJECT(win->project_list),
@@ -226,6 +264,9 @@ static void project_context_popover_close_for_list(EditorWindow *win) {
     }
 }
 
+/**
+ * @brief On project row right click.
+ */
 static void on_project_row_right_click(GtkGestureClick *gesture,
                                        int n_press,
                                        double x,

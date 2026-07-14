@@ -1,3 +1,8 @@
+/**
+ * @file src/ui/ui_base_css.inc.c
+ * @brief Cleaf ui base css module.
+ */
+
 void cleaf_apply_css(void) {
     static const char *css_chunks[] = {
         "window.cleaf-window,"

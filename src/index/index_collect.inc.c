@@ -1,12 +1,23 @@
+/**
+ * @file src/index/index_collect.inc.c
+ * @brief Cleaf index collect module.
+ */
+
 
 static gboolean ascii_word_start(char ch) {
     return g_ascii_isalpha(ch) || ch == '_';
 }
 
+/**
+ * @brief Ascii word char.
+ */
 static gboolean ascii_word_char(char ch) {
     return g_ascii_isalnum(ch) || ch == '_';
 }
 
+/**
+ * @brief Tab text.
+ */
 static char *tab_text(EditorTab *tab) {
     if (!tab || !tab->buffer) return NULL;
     GtkTextIter start;
@@ -15,6 +26,9 @@ static char *tab_text(EditorTab *tab) {
     return gtk_text_buffer_get_text(tab->buffer, &start, &end, FALSE);
 }
 
+/**
+ * @brief Has word boundary.
+ */
 static gboolean has_word_boundary(const char *line, const char *word) {
     if (!line || !word || word[0] == '\0') return FALSE;
     const char *p = line;
@@ -55,6 +69,9 @@ static gboolean read_small_file(const char *path, char **out_text) {
     return TRUE;
 }
 
+/**
+ * @brief Add unique.
+ */
 static void add_unique(GPtrArray *out, GHashTable *seen, const char *word, const char *prefix, guint max_results) {
     if (!out || !seen || !word || !prefix) return;
     if (out->len >= max_results) return;
@@ -67,6 +84,9 @@ static void add_unique(GPtrArray *out, GHashTable *seen, const char *word, const
     g_ptr_array_add(out, g_strdup(word));
 }
 
+/**
+ * @brief Collect identifiers.
+ */
 static void collect_identifiers(GPtrArray *out, GHashTable *seen, const char *text, const char *prefix, guint max_results) {
     if (!out || !seen || !text || !prefix) return;
     const char *p = text;
@@ -83,6 +103,9 @@ static void collect_identifiers(GPtrArray *out, GHashTable *seen, const char *te
     }
 }
 
+/**
+ * @brief Collect c declarations.
+ */
 static void collect_c_declarations(GPtrArray *out, GHashTable *seen, const char *text, const char *prefix, guint max_results) {
     if (!text) return;
     const char *p = text;
@@ -143,6 +166,9 @@ static void collect_c_declarations(GPtrArray *out, GHashTable *seen, const char 
     }
 }
 
+/**
+ * @brief Add file path.
+ */
 static gboolean add_file_path(GPtrArray *paths, GHashTable *seen, const char *path) {
     if (!paths || !seen || !path) return FALSE;
     char *canonical = g_canonicalize_filename(path, NULL);
@@ -156,6 +182,9 @@ static gboolean add_file_path(GPtrArray *paths, GHashTable *seen, const char *pa
     return TRUE;
 }
 
+/**
+ * @brief Collect project files rec.
+ */
 static void collect_project_files_rec(GPtrArray *paths, GHashTable *seen, const char *dir, guint depth, GPtrArray *syntaxes) {
     if (!paths || !seen || !dir || depth > 8u || paths->len >= CLEAF_INDEX_MAX_PROJECT_FILES) return;
     GDir *gdir = g_dir_open(dir, 0, NULL);
@@ -176,6 +205,9 @@ static void collect_project_files_rec(GPtrArray *paths, GHashTable *seen, const 
     g_dir_close(gdir);
 }
 
+/**
+ * @brief Collect project files for window.
+ */
 static void collect_project_files_for_window(GPtrArray *paths,
                                              GHashTable *seen,
                                              EditorWindow *win) {
@@ -187,6 +219,9 @@ static void collect_project_files_for_window(GPtrArray *paths,
     }
 }
 
+/**
+ * @brief Find in projects.
+ */
 static char *find_in_projects(EditorWindow *win, const char *basename) {
     if (!win || !basename) return NULL;
     GPtrArray *paths = g_ptr_array_new_with_free_func(g_free);

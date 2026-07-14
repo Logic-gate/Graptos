@@ -58,3 +58,6 @@ dkms.conf
 .cleaf-backups/
 .cleaf-save-*.tmp
 .cleaf-latex-build/
+
+# Github actions
+.github/

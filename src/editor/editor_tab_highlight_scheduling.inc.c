@@ -1,6 +1,12 @@
+/**
+ * @file src/editor/editor_tab_highlight_scheduling.inc.c
+ * @brief Cleaf editor tab highlight scheduling module.
+ */
+
 void editor_tab_apply_highlight(EditorTab *tab) {
     if (!tab || !tab->buffer) return;
     /* Cleaf no longer applies regex YAML highlighting to the editor buffer.
+     * This change came when moving to GtkSourceView.
      * Highlighting is owned by GtkSourceView; YAML rules only generate optional
      * GtkSourceView style-scheme overrides when the user enables them.
      */
@@ -8,6 +14,9 @@ void editor_tab_apply_highlight(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Minimap timeout cb.
+ */
 gboolean minimap_timeout_cb(gpointer user_data) {
     EditorTab *tab = user_data;
     if (!tab) return G_SOURCE_REMOVE;
@@ -33,6 +42,9 @@ void editor_tab_schedule_minimap_update(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Preview timeout cb.
+ */
 gboolean preview_timeout_cb(gpointer user_data) {
     EditorTab *tab = user_data;
     if (!tab) return G_SOURCE_REMOVE;
@@ -62,6 +74,9 @@ void editor_tab_schedule_preview_update(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Highlight timeout cb.
+ */
 gboolean highlight_timeout_cb(gpointer user_data) {
     EditorTab *tab = user_data;
     if (!tab) return G_SOURCE_REMOVE;
@@ -71,6 +86,9 @@ gboolean highlight_timeout_cb(gpointer user_data) {
 }
 
 
+/**
+ * @brief Editor tab schedule highlight.
+ */
 void editor_tab_schedule_highlight(EditorTab *tab) {
     if (!tab) return;
     /* GtkSourceView performs syntax highlighting internally. There is no

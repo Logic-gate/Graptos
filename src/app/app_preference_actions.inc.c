@@ -1,3 +1,8 @@
+/**
+ * @file src/app/app_preference_actions.inc.c
+ * @brief Cleaf app preference actions module.
+ */
+
 void set_tab_policy(EditorWindow *win, guint width, gboolean insert_spaces) {
     if (!win) return;
     if (width == 0u) width = 4u;
@@ -9,18 +14,27 @@ void set_tab_policy(EditorWindow *win, guint width, gboolean insert_spaces) {
 }
 
 
+/**
+ * @brief Action tab spaces 2.
+ */
 void action_tab_spaces_2(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     set_tab_policy(user_data, 2u, TRUE);
 }
 
 
+/**
+ * @brief Action tab spaces 4.
+ */
 void action_tab_spaces_4(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     set_tab_policy(user_data, 4u, TRUE);
 }
 
 
+/**
+ * @brief Action tab spaces 8.
+ */
 void action_tab_spaces_8(GtkWidget *widget, gpointer user_data) {
     //I found this in Sublime, I have no idea who uses 8...propably legacy use.
     (void)widget;
@@ -28,12 +42,18 @@ void action_tab_spaces_8(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Action tab hard tabs.
+ */
 void action_tab_hard_tabs(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     set_tab_policy(user_data, 4u, FALSE);
 }
 
 
+/**
+ * @brief Action toggle autocomplete.
+ */
 void action_toggle_autocomplete(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -45,6 +65,9 @@ void action_toggle_autocomplete(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Action toggle autosave.
+ */
 void action_toggle_autosave(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -58,6 +81,9 @@ void action_toggle_autosave(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Action toggle backup.
+ */
 void action_toggle_backup(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -68,6 +94,9 @@ void action_toggle_backup(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Rgba to hex.
+ */
 char *rgba_to_hex(const GdkRGBA *rgba) {
     if (!rgba) return g_strdup("#000000");
     /*
@@ -87,6 +116,9 @@ char *rgba_to_hex(const GdkRGBA *rgba) {
 }
 
 
+/**
+ * @brief Choose color for slot.
+ */
 void choose_color_for_slot(EditorWindow *win,
                            GtkWidget *parent_widget,
                            const char *title,
@@ -116,36 +148,54 @@ void choose_color_for_slot(EditorWindow *win,
 }
 
 
+/**
+ * @brief Action choose background.
+ */
 void action_choose_background(GtkWidget *widget, gpointer user_data) {
     EditorWindow *win = user_data;
     choose_color_for_slot(win, widget, "Editor Background", win ? &win->editor_bg_color : NULL);
 }
 
 
+/**
+ * @brief Action choose sidebar background.
+ */
 void action_choose_sidebar_background(GtkWidget *widget, gpointer user_data) {
     EditorWindow *win = user_data;
     choose_color_for_slot(win, widget, "Sidebar Background", win ? &win->sidebar_bg_color : NULL);
 }
 
 
+/**
+ * @brief Action choose tabbar background.
+ */
 void action_choose_tabbar_background(GtkWidget *widget, gpointer user_data) {
     EditorWindow *win = user_data;
     choose_color_for_slot(win, widget, "Tab Bar Background", win ? &win->tabbar_bg_color : NULL);
 }
 
 
+/**
+ * @brief Action choose scroll preview background.
+ */
 void action_choose_scroll_preview_background(GtkWidget *widget, gpointer user_data) {
     EditorWindow *win = user_data;
     choose_color_for_slot(win, widget, "Scroll Preview Background", win ? &win->scroll_preview_bg_color : NULL);
 }
 
 
+/**
+ * @brief Action choose popover background.
+ */
 void action_choose_popover_background(GtkWidget *widget, gpointer user_data) {
     EditorWindow *win = user_data;
     choose_color_for_slot(win, widget, "Popover Background", win ? &win->popover_bg_color : NULL);
 }
 
 
+/**
+ * @brief Action reset background.
+ */
 void action_reset_background(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -156,6 +206,9 @@ void action_reset_background(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Action reset all backgrounds.
+ */
 void action_reset_all_backgrounds(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;

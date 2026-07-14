@@ -1,3 +1,8 @@
+/**
+ * @file src/project/project_util.inc.c
+ * @brief Cleaf project util module.
+ */
+
 static void project_row_free(gpointer data) {
     ProjectRow *row = data;
     if (!row) return;
@@ -5,6 +10,9 @@ static void project_row_free(gpointer data) {
     g_free(row);
 }
 
+/**
+ * @brief Project action free.
+ */
 static void project_action_free(gpointer data) {
     ProjectAction *action = data;
     if (!action) return;
@@ -12,6 +20,9 @@ static void project_action_free(gpointer data) {
     g_free(action);
 }
 
+/**
+ * @brief Project action new.
+ */
 static ProjectAction *project_action_new(EditorWindow *win,
                                          const char *path,
                                          gboolean is_dir) {
@@ -22,6 +33,9 @@ static ProjectAction *project_action_new(EditorWindow *win,
     return action;
 }
 
+/**
+ * @brief Compare names.
+ */
 static gint compare_names(gconstpointer a, gconstpointer b) {
     const char *sa = *(char * const *)a;
     const char *sb = *(char * const *)b;
@@ -34,6 +48,9 @@ static gint compare_names(gconstpointer a, gconstpointer b) {
     return g_ascii_strcasecmp(sa ? sa : "", sb ? sb : "");
 }
 
+/**
+ * @brief Should skip name.
+ */
 static gboolean should_skip_name(const char *name) {
     static const char *skip[] = {
         ".git", ".cache", ".venv", ".cleaf-backups", ".cleaf-autosave", ".cleaf-latex-build",
@@ -47,6 +64,9 @@ static gboolean should_skip_name(const char *name) {
     return FALSE;
 }
 
+/**
+ * @brief Sorted dir names.
+ */
 static GPtrArray *sorted_dir_names(const char *path) {
     GDir *dir = g_dir_open(path, 0, NULL);
     if (!dir) return NULL;
@@ -74,6 +94,9 @@ static GPtrArray *sorted_dir_names(const char *path) {
     return names;
 }
 
+/**
+ * @brief Add icon candidate.
+ */
 static void add_icon_candidate(GPtrArray *candidates, const char *name) {
     if (!candidates || !name || name[0] == '\0') return;
 
@@ -84,6 +107,9 @@ static void add_icon_candidate(GPtrArray *candidates, const char *name) {
     g_ptr_array_add(candidates, g_strdup(name));
 }
 
+/**
+ * @brief Add icon candidates from gicon.
+ */
 static void add_icon_candidates_from_gicon(GPtrArray *candidates, GIcon *icon) {
     if (!candidates || !icon) return;
 
@@ -95,6 +121,9 @@ static void add_icon_candidates_from_gicon(GPtrArray *candidates, GIcon *icon) {
     }
 }
 
+/**
+ * @brief Add extension icon candidates.
+ */
 static void add_extension_icon_candidates(GPtrArray *candidates, const char *path) {
     if (!candidates || !path) return;
 
@@ -163,6 +192,9 @@ static void add_extension_icon_candidates(GPtrArray *candidates, const char *pat
     }
 }
 
+/**
+ * @brief Project icon candidates for path.
+ */
 static GPtrArray *project_icon_candidates_for_path(const char *path,
                                                    gboolean is_dir) {
     GPtrArray *candidates = g_ptr_array_new_with_free_func(g_free);
