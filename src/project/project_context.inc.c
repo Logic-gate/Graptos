@@ -149,51 +149,36 @@ static void project_context_rename(GtkWidget *widget, gpointer user_data) {
     ProjectAction *action = user_data;
     if (!action || !action->win || !action->path) return;
 
-    char *old_base = g_path_get_basename(action->path);
-    char *new_name = dialog_prompt_text(app_window_gtk(action->win),
-                                        "Rename",
-                                        "New name:",
-                                        old_base);
-    if (!new_name) {
-        g_free(old_base);
-        return;
-    }
+    g_autofree char *old_base = g_path_get_basename(action->path);
+    g_autofree char *new_name = dialog_prompt_text(app_window_gtk(action->win),
+                                                   "Rename",
+                                                   "New name:",
+                                                   old_base);
+    if (!new_name) return;
     g_strstrip(new_name);
 
     if (invalid_new_name(new_name)) {
-        dialog_error(app_window_gtk(action->win), "Invalid name",
-                     "Use a plain file or folder name, not a path.");
-        g_free(new_name);
-        g_free(old_base);
+        app_window_set_error_status(action->win, "Invalid name",
+                                    "Use a plain file or folder name, not a path.");
         return;
     }
 
     if (g_strcmp0(new_name, old_base) == 0) {
-        g_free(new_name);
-        g_free(old_base);
         return;
     }
 
-    char *dir = g_path_get_dirname(action->path);
-    char *target = g_build_filename(dir, new_name, NULL);
+    g_autofree char *dir = g_path_get_dirname(action->path);
+    g_autofree char *target = g_build_filename(dir, new_name, NULL);
 
     if (g_file_test(target, G_FILE_TEST_EXISTS)) {
-        dialog_error(app_window_gtk(action->win), "Rename failed",
-                     "A file or folder with that name already exists.");
-        g_free(target);
-        g_free(dir);
-        g_free(new_name);
-        g_free(old_base);
+        app_window_set_error_status(action->win, "Rename failed",
+                                    "A file or folder with that name already exists.");
         return;
     }
 
     if (g_rename(action->path, target) != 0) {
-        dialog_error(app_window_gtk(action->win), "Rename failed",
-                     g_strerror(errno));
-        g_free(target);
-        g_free(dir);
-        g_free(new_name);
-        g_free(old_base);
+        app_window_set_error_status(action->win, "Rename failed",
+                                    g_strerror(errno));
         return;
     }
 
@@ -207,13 +192,8 @@ static void project_context_rename(GtkWidget *widget, gpointer user_data) {
     app_window_note_path_renamed(action->win, action->path, target);
     project_tree_rebuild(action->win);
 
-    char *msg = g_strdup_printf("Renamed %s to %s", old_base, new_name);
+    g_autofree char *msg = g_strdup_printf("Renamed %s to %s", old_base, new_name);
     app_window_set_status(action->win, msg);
-    g_free(msg);
-    g_free(target);
-    g_free(dir);
-    g_free(new_name);
-    g_free(old_base);
 }
 
 /**

@@ -6,7 +6,6 @@
 void editor_tab_apply_highlight(EditorTab *tab) {
     if (!tab || !tab->buffer) return;
     /* Cleaf no longer applies regex YAML highlighting to the editor buffer.
-     * This change came when moving to GtkSourceView.
      * Highlighting is owned by GtkSourceView; YAML rules only generate optional
      * GtkSourceView style-scheme overrides when the user enables them.
      */

@@ -79,10 +79,9 @@ void action_open_folder(GtkWidget *widget, gpointer user_data) {
  * @brief Cleaf executable path.
  */
 static char *cleaf_executable_path(void) {
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
     char *path = g_file_read_link("/proc/self/exe", &error);
     if (path) return path;
-    g_clear_error(&error);
 
     const char *prgname = g_get_prgname();
     if (prgname && prgname[0] != '\0') return g_strdup(prgname);
@@ -97,37 +96,30 @@ void action_open_folder_new_instance(GtkWidget *widget, gpointer user_data) {
     EditorWindow *win = user_data;
     if (!win) return;
 
-    char *folder = cleaf_select_folder_dialog(app_window_gtk(win),
-                                              "Open Folder in New Instance");
+    g_autofree char *folder = cleaf_select_folder_dialog(app_window_gtk(win),
+                                                         "Open Folder in New Instance");
     if (!folder) return;
 
-    char *exe = cleaf_executable_path();
+    g_autofree char *exe = cleaf_executable_path();
     if (!exe) {
-        dialog_error(app_window_gtk(win), "Could not launch instance",
-                     "Cleaf could not determine its executable path.");
-        g_free(folder);
+        app_window_set_error_status(win, "Could not launch instance",
+                                    "Cleaf could not determine its executable path.");
         return;
     }
 
     char *argv[] = { exe, folder, NULL };
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
     gboolean ok = g_spawn_async(NULL, argv, NULL, G_SPAWN_SEARCH_PATH,
                                 NULL, NULL, NULL, &error);
     if (!ok) {
-        dialog_error(app_window_gtk(win), "Could not launch instance",
-                     error ? error->message : "Unknown launch error.");
-        g_clear_error(&error);
+        app_window_set_error_status(win, "Could not launch instance",
+                                    error ? error->message : "Unknown launch error.");
     } else {
-        char *display = g_filename_display_basename(folder);
-        char *msg = g_strdup_printf("Opened new instance for: %s",
-                                    display ? display : folder);
+        g_autofree char *display = g_filename_display_basename(folder);
+        g_autofree char *msg = g_strdup_printf("Opened new instance for: %s",
+                                               display ? display : folder);
         app_window_set_status(win, msg);
-        g_free(msg);
-        g_free(display);
     }
-
-    g_free(exe);
-    g_free(folder);
 }
 
 
@@ -259,5 +251,4 @@ void action_syntax_diagnostics(GtkWidget *widget, gpointer user_data) {
     dialog_info(app_window_gtk(win), "Syntax Diagnostics", diag);
     g_free(diag);
 }
-
 

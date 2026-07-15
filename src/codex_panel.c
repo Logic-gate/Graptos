@@ -605,16 +605,15 @@ static void panel_revert_diff(GtkWidget *widget, gpointer user_data) {
                                "Reverse only the changes recorded for this Codex turn?")) {
         return;
     }
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
     if (codex_review_revert(panel->win, panel->turn_diff, &error)) {
         g_clear_pointer(&panel->turn_diff, g_free);
         gtk_widget_set_visible(panel->review_box, FALSE);
         app_window_set_status(panel->win, "Codex turn reverted");
     } else {
-        dialog_error(app_window_gtk(panel->win), "Could not revert Codex turn",
-                     error ? error->message : "The files changed after this turn.");
+        app_window_set_error_status(panel->win, "Could not revert Codex turn",
+                                    error ? error->message : "The files changed after this turn.");
     }
-    g_clear_error(&error);
 }
 
 /**

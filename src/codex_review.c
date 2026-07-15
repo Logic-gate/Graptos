@@ -52,20 +52,19 @@ static gboolean run_reverse_apply(const char *cwd,
                                   const char *diff,
                                   gboolean check,
                                   GError **error) {
-    GSubprocessLauncher *launcher = g_subprocess_launcher_new(
+    g_autoptr(GSubprocessLauncher) launcher = g_subprocess_launcher_new(
         G_SUBPROCESS_FLAGS_STDIN_PIPE |
         G_SUBPROCESS_FLAGS_STDOUT_PIPE |
         G_SUBPROCESS_FLAGS_STDERR_PIPE);
     g_subprocess_launcher_set_cwd(launcher, cwd);
-    GSubprocess *process = check
+    g_autoptr(GSubprocess) process = check
         ? g_subprocess_launcher_spawn(launcher, error, "git", "apply",
                                       "--reverse", "--check", NULL)
         : g_subprocess_launcher_spawn(launcher, error, "git", "apply",
                                       "--reverse", NULL);
-    g_object_unref(launcher);
     if (!process) return FALSE;
-    char *stdout_text = NULL;
-    char *stderr_text = NULL;
+    g_autofree char *stdout_text = NULL;
+    g_autofree char *stderr_text = NULL;
     gboolean communicated = g_subprocess_communicate_utf8(process, diff, NULL,
                                                            &stdout_text,
                                                            &stderr_text, error);
@@ -75,9 +74,6 @@ static gboolean run_reverse_apply(const char *cwd,
                     stderr_text && stderr_text[0] ? stderr_text
                                                   : "reverse patch failed");
     }
-    g_free(stdout_text);
-    g_free(stderr_text);
-    g_object_unref(process);
     return success;
 }
 
@@ -88,11 +84,10 @@ gboolean codex_review_revert(EditorWindow *win,
                              const char *diff,
                              GError **error) {
     if (!win || !diff || diff[0] == '\0') return FALSE;
-    char *fallback = win->project_root ? NULL : g_get_current_dir();
+    g_autofree char *fallback = win->project_root ? NULL : g_get_current_dir();
     const char *cwd = win->project_root ? win->project_root : fallback;
     gboolean valid = run_reverse_apply(cwd, diff, TRUE, error);
     gboolean reverted = valid && run_reverse_apply(cwd, diff, FALSE, error);
-    g_free(fallback);
     if (reverted) cleaf_git_refresh_and_rebuild(win);
     return reverted;
 }

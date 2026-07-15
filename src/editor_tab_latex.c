@@ -53,14 +53,13 @@ static char *find_latex_command(void) {
  * @brief Basename without suffix.
  */
 static char *basename_without_suffix(const char *path) {
-    char *base = g_path_get_basename(path ? path : "document.tex");
+    g_autofree char *base = g_path_get_basename(path ? path : "document.tex");
     char *dot = base ? strrchr(base, '.') : NULL;
     if (dot && dot != base) *dot = '\0';
     if (!base || base[0] == '\0') {
-        g_free(base);
         return g_strdup("document");
     }
-    return base;
+    return g_steal_pointer(&base);
 }
 
 /**
@@ -75,31 +74,25 @@ static gboolean ensure_saved_source(EditorTab *tab, char **source_path_out) {
         return *source_path_out != NULL;
     }
 
-    char *text = buffer_text(tab);
+    g_autofree char *text = buffer_text(tab);
     if (!text) return FALSE;
 
-    GError *error = NULL;
-    char *tmp_dir = g_dir_make_tmp("cleaf-latex-XXXXXX", &error);
+    g_autoptr(GError) error = NULL;
+    g_autofree char *tmp_dir = g_dir_make_tmp("cleaf-latex-XXXXXX", &error);
     if (!tmp_dir) {
-        dialog_error(app_window_gtk(tab->win), "Could not create temp dir",
-                     error ? error->message : "Unknown error");
-        g_clear_error(&error);
-        g_free(text);
+        app_window_set_error_status(tab->win, "Could not create temp dir",
+                                    error ? error->message : "Unknown error");
         return FALSE;
     }
 
     char *source = g_build_filename(tmp_dir, "document.tex", NULL);
-    g_free(tmp_dir);
     if (!write_text_atomic(source, text, &error)) {
-        dialog_error(app_window_gtk(tab->win), "Could not write temp TeX file",
-                     error ? error->message : "Unknown error");
-        g_clear_error(&error);
+        app_window_set_error_status(tab->win, "Could not write temp TeX file",
+                                    error ? error->message : "Unknown error");
         g_free(source);
-        g_free(text);
         return FALSE;
     }
 
-    g_free(text);
     *source_path_out = source;
     return TRUE;
 }
@@ -108,11 +101,10 @@ static gboolean ensure_saved_source(EditorTab *tab, char **source_path_out) {
  * @brief Build output dir for source.
  */
 static char *build_output_dir_for_source(const char *source_path) {
-    char *dir = g_path_get_dirname(source_path);
+    g_autofree char *dir = g_path_get_dirname(source_path);
     if (!dir) return NULL;
 
     char *output = g_build_filename(dir, LATEX_BUILD_DIR, NULL);
-    g_free(dir);
     if (g_mkdir_with_parents(output, 0700) != 0) {
         g_free(output);
         return NULL;
@@ -150,9 +142,9 @@ static gboolean run_latex(EditorTab *tab,
                           const char *source_path,
                           const char *working_dir,
                           const char *output_dir) {
-    char *stdout_text = NULL;
-    char *stderr_text = NULL;
-    GError *error = NULL;
+    g_autofree char *stdout_text = NULL;
+    g_autofree char *stderr_text = NULL;
+    g_autoptr(GError) error = NULL;
     int status = 0;
 
     char *argv[] = {
@@ -171,40 +163,33 @@ static gboolean run_latex(EditorTab *tab,
                               NULL, NULL, &stdout_text, &stderr_text,
                               &status, &error);
     if (!ok || status != 0) {
-        char *log = latex_log_message(command, stdout_text, stderr_text);
-        dialog_error(app_window_gtk(tab->win), "LaTeX render failed",
-                     error ? error->message : log);
-        g_free(log);
-        g_clear_error(&error);
-        g_free(stdout_text);
-        g_free(stderr_text);
+        g_autofree char *log = latex_log_message(command, stdout_text, stderr_text);
+        app_window_set_error_status(tab->win, "LaTeX render failed",
+                                    error ? error->message : log);
         return FALSE;
     }
 
-    g_free(stdout_text);
-    g_free(stderr_text);
     return TRUE;
 }
 
 /**
  * @brief Open pdf.
  */
-static void open_pdf(EditorTab *tab, const char *pdf_path) {
-    GError *error = NULL;
-    char *uri = g_filename_to_uri(pdf_path, NULL, &error);
+static gboolean open_pdf(EditorTab *tab, const char *pdf_path) {
+    g_autoptr(GError) error = NULL;
+    g_autofree char *uri = g_filename_to_uri(pdf_path, NULL, &error);
     if (!uri) {
-        dialog_error(app_window_gtk(tab->win), "Could not open rendered PDF",
-                     error ? error->message : "Invalid PDF path");
-        g_clear_error(&error);
-        return;
+        app_window_set_error_status(tab->win, "Could not open rendered PDF",
+                                    error ? error->message : "Invalid PDF path");
+        return FALSE;
     }
 
     if (!g_app_info_launch_default_for_uri(uri, NULL, &error)) {
-        dialog_error(app_window_gtk(tab->win), "Could not open rendered PDF",
-                     error ? error->message : "No default PDF application");
-        g_clear_error(&error);
+        app_window_set_error_status(tab->win, "Could not open rendered PDF",
+                                    error ? error->message : "No default PDF application");
+        return FALSE;
     }
-    g_free(uri);
+    return TRUE;
 }
 
 /**
@@ -213,59 +198,45 @@ static void open_pdf(EditorTab *tab, const char *pdf_path) {
 void editor_tab_render_latex(EditorTab *tab) {
     if (!tab || !tab->win) return;
     if (!editor_tab_is_latex(tab)) {
-        dialog_error(app_window_gtk(tab->win), "Not a LaTeX document",
-                     "Render is available for .tex/.latex files or LaTeX syntax.");
+        app_window_set_error_status(tab->win, "Not a LaTeX document",
+                                    "Render is available for .tex/.latex files or LaTeX syntax.");
         return;
     }
 
-    char *command = find_latex_command();
+    g_autofree char *command = find_latex_command();
     if (!command) {
-        dialog_error(app_window_gtk(tab->win), "LaTeX command not found",
-                     "Install pdflatex, xelatex, or lualatex, or set "
-                     "CLEAF_LATEX_COMMAND to the command path.");
+        app_window_set_error_status(tab->win, "LaTeX command not found",
+                                    "Install pdflatex, xelatex, or lualatex, or set "
+                                    "CLEAF_LATEX_COMMAND to the command path.");
         return;
     }
 
-    char *source_path = NULL;
+    g_autofree char *source_path = NULL;
     if (!ensure_saved_source(tab, &source_path)) {
-        g_free(command);
         return;
     }
 
-    char *output_dir = build_output_dir_for_source(source_path);
+    g_autofree char *output_dir = build_output_dir_for_source(source_path);
     if (!output_dir) {
-        dialog_error(app_window_gtk(tab->win), "Could not create build dir",
-                     "Cleaf could not create .cleaf-latex-build.");
-        g_free(command);
-        g_free(source_path);
+        app_window_set_error_status(tab->win, "Could not create build dir",
+                                    "Cleaf could not create .cleaf-latex-build.");
         return;
     }
 
-    char *working_dir = g_path_get_dirname(source_path);
+    g_autofree char *working_dir = g_path_get_dirname(source_path);
     if (!run_latex(tab, command, source_path, working_dir, output_dir)) {
-        g_free(command);
-        g_free(source_path);
-        g_free(working_dir);
-        g_free(output_dir);
         return;
     }
 
-    char *stem = basename_without_suffix(source_path);
-    char *pdf_name = g_strdup_printf("%s.pdf", stem);
-    char *pdf_path = g_build_filename(output_dir, pdf_name, NULL);
+    g_autofree char *stem = basename_without_suffix(source_path);
+    g_autofree char *pdf_name = g_strdup_printf("%s.pdf", stem);
+    g_autofree char *pdf_path = g_build_filename(output_dir, pdf_name, NULL);
     if (g_file_test(pdf_path, G_FILE_TEST_IS_REGULAR)) {
-        open_pdf(tab, pdf_path);
-        app_window_set_status(tab->win, "LaTeX rendered successfully.");
+        if (open_pdf(tab, pdf_path)) {
+            app_window_set_status(tab->win, "LaTeX rendered successfully.");
+        }
     } else {
-        dialog_error(app_window_gtk(tab->win), "Rendered PDF not found",
-                     "LaTeX finished, but Cleaf could not find the PDF output.");
+        app_window_set_error_status(tab->win, "Rendered PDF not found",
+                                    "LaTeX finished, but Cleaf could not find the PDF output.");
     }
-
-    g_free(pdf_path);
-    g_free(pdf_name);
-    g_free(stem);
-    g_free(command);
-    g_free(source_path);
-    g_free(working_dir);
-    g_free(output_dir);
 }

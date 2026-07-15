@@ -12,10 +12,9 @@
  * @brief Parse bool.
  */
 static gboolean parse_bool(GKeyFile *key_file, const char *key, gboolean fallback) {
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
     gboolean value = g_key_file_get_boolean(key_file, "Editor", key, &error);
     if (error) {
-        g_clear_error(&error);
         return fallback;
     }
     return value;
@@ -25,10 +24,9 @@ static gboolean parse_bool(GKeyFile *key_file, const char *key, gboolean fallbac
  * @brief Parse uint.
  */
 static guint parse_uint(GKeyFile *key_file, const char *key, guint fallback, guint min_value, guint max_value) {
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
     gint value = g_key_file_get_integer(key_file, "Editor", key, &error);
     if (error) {
-        g_clear_error(&error);
         return fallback;
     }
     if (value < (gint)min_value) return min_value;
@@ -72,19 +70,15 @@ char *cleaf_config_path(void) {
  */
 void cleaf_config_load(EditorWindow *win) {
     if (!win) return;
-    char *path = cleaf_config_path();
+    g_autofree char *path = cleaf_config_path();
     if (!path) return;
     if (!g_file_test(path, G_FILE_TEST_EXISTS)) {
-        g_free(path);
         return;
     }
 
-    GKeyFile *key_file = g_key_file_new();
-    GError *error = NULL;
+    g_autoptr(GKeyFile) key_file = g_key_file_new();
+    g_autoptr(GError) error = NULL;
     if (!g_key_file_load_from_file(key_file, path, G_KEY_FILE_NONE, &error)) {
-        g_clear_error(&error);
-        g_key_file_unref(key_file);
-        g_free(path);
         return;
     }
 
@@ -105,6 +99,7 @@ void cleaf_config_load(EditorWindow *win) {
     load_color(key_file, "topbar_foreground_color", &win->topbar_fg_color);
     load_color(key_file, "bottombar_background_color", &win->bottombar_bg_color);
     load_color(key_file, "bottombar_foreground_color", &win->bottombar_fg_color);
+    load_color(key_file, "status_error_color", &win->status_error_color);
     load_color(key_file, "button_background_color", &win->button_bg_color);
     load_color(key_file, "button_foreground_color", &win->button_fg_color);
     load_color(key_file, "button_hover_background_color", &win->button_hover_bg_color);
@@ -152,7 +147,6 @@ void cleaf_config_load(EditorWindow *win) {
     win->use_gtksourceview_highlighting = TRUE;
     win->use_yaml_style_overrides = parse_bool(key_file, "use_yaml_style_overrides", win->use_yaml_style_overrides);
 
-    g_key_file_unref(key_file);
     if (!win->codex_preview_bg_color) {
         win->codex_preview_bg_color = g_strdup(win->editor_bg_color);
     }
@@ -162,7 +156,6 @@ void cleaf_config_load(EditorWindow *win) {
     if (!win->codex_prompt_bg_color) {
         win->codex_prompt_bg_color = g_strdup(win->editor_bg_color);
     }
-    g_free(path);
 }
 
 /**
@@ -170,20 +163,17 @@ void cleaf_config_load(EditorWindow *win) {
  */
 void cleaf_config_save(EditorWindow *win) {
     if (!win) return;
-    char *path = cleaf_config_path();
+    g_autofree char *path = cleaf_config_path();
     if (!path) return;
-    char *dir = g_path_get_dirname(path);
+    g_autofree char *dir = g_path_get_dirname(path);
     if (!dir) {
-        g_free(path);
         return;
     }
     if (g_mkdir_with_parents(dir, 0700) != 0) {
-        g_free(dir);
-        g_free(path);
         return;
     }
 
-    GKeyFile *key_file = g_key_file_new();
+    g_autoptr(GKeyFile) key_file = g_key_file_new();
     save_color(key_file, "background_color", win->editor_bg_color);
     save_color(key_file, "foreground_color", win->editor_fg_color);
     save_color(key_file, "editor_gutter_background_color", win->editor_gutter_bg_color);
@@ -201,6 +191,7 @@ void cleaf_config_save(EditorWindow *win) {
     save_color(key_file, "topbar_foreground_color", win->topbar_fg_color);
     save_color(key_file, "bottombar_background_color", win->bottombar_bg_color);
     save_color(key_file, "bottombar_foreground_color", win->bottombar_fg_color);
+    save_color(key_file, "status_error_color", win->status_error_color);
     save_color(key_file, "button_background_color", win->button_bg_color);
     save_color(key_file, "button_foreground_color", win->button_fg_color);
     save_color(key_file, "button_hover_background_color", win->button_hover_bg_color);
@@ -248,12 +239,8 @@ void cleaf_config_save(EditorWindow *win) {
     g_key_file_set_boolean(key_file, "Editor", "use_yaml_style_overrides", win->use_yaml_style_overrides);
 
     gsize length = 0u;
-    char *data = g_key_file_to_data(key_file, &length, NULL);
+    g_autofree char *data = g_key_file_to_data(key_file, &length, NULL);
     if (data) {
         (void)g_file_set_contents(path, data, (gssize)length, NULL);
-        g_free(data);
     }
-    g_key_file_unref(key_file);
-    g_free(dir);
-    g_free(path);
 }

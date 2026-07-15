@@ -9,6 +9,13 @@
 #include <gtk/gtk.h>
 
 /**
+ * @brief Dialog output.
+ */
+void dialog_output(GtkWindow *parent,
+                   const char *title,
+                   const char *heading,
+                   const char *body);
+/**
  * @brief Dialog error.
  */
 void dialog_error(GtkWindow *parent, const char *primary, const char *detail);

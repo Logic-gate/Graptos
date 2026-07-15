@@ -29,7 +29,7 @@ static void codex_status_changed(CodexClient *client,
     } else if (state == CODEX_CLIENT_FAILED) {
         char *message = g_strdup_printf("Codex unavailable: %s",
                                         detail ? detail : "unknown error");
-        app_window_set_status(win, message);
+        app_window_set_error_status(win, "Codex unavailable", message);
         g_free(message);
     }
 }
@@ -70,6 +70,7 @@ EditorWindow *app_window_new(GtkApplication *application) {
     win->topbar_fg_color = g_strdup("#d4d4d4");
     win->bottombar_bg_color = g_strdup("#181a1f");
     win->bottombar_fg_color = g_strdup("#d4d4d4");
+    win->status_error_color = g_strdup("#ff6b6b");
     win->button_bg_color = g_strdup("#181a1f");
     win->button_fg_color = g_strdup("#d4d4d4");
     win->button_hover_bg_color = g_strdup("#2a2e3d");
@@ -229,6 +230,8 @@ void app_window_free(EditorWindow *win) {
     if (win->project_roots) g_ptr_array_free(win->project_roots, TRUE);
     if (win->locked_paths) g_hash_table_destroy(win->locked_paths);
     if (win->git_file_status) g_hash_table_destroy(win->git_file_status);
+    g_free(win->status_error_title);
+    g_free(win->status_error_detail);
     g_free(win->editor_bg_color);
     g_free(win->editor_fg_color);
     g_free(win->editor_gutter_bg_color);
@@ -246,6 +249,7 @@ void app_window_free(EditorWindow *win) {
     g_free(win->topbar_fg_color);
     g_free(win->bottombar_bg_color);
     g_free(win->bottombar_fg_color);
+    g_free(win->status_error_color);
     g_free(win->button_bg_color);
     g_free(win->button_fg_color);
     g_free(win->button_hover_bg_color);

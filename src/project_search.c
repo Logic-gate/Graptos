@@ -207,14 +207,12 @@ static void project_scan_dir(ProjectSearch *state,
                                                        depth + 1u);
         } else if (syntax_path_is_indexable(state->win->syntaxes, path) &&
                    readable_small_file(path)) {
-            char *text = NULL;
+            g_autofree char *text = NULL;
             gsize len = 0u;
-            GError *error = NULL;
+            g_autoptr(GError) error = NULL;
             if (g_file_get_contents(path, &text, &len, &error) && text) {
                 scan_text_for_matches(state, path, text, query);
             }
-            g_clear_error(&error);
-            g_free(text);
         }
         g_free(path);
         if (state->matches->len >= PROJECT_SEARCH_MAX_RESULTS) break;
@@ -296,23 +294,19 @@ static char *replace_literal(const char *text,
 static guint replace_in_file(const char *path,
                              const char *find,
                              const char *replace) {
-    char *text = NULL;
+    g_autofree char *text = NULL;
     gsize len = 0u;
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
     guint count = 0u;
     if (!g_file_get_contents(path, &text, &len, &error)) {
-        g_clear_error(&error);
         return 0u;
     }
-    char *updated = replace_literal(text, find, replace, &count);
+    g_autofree char *updated = replace_literal(text, find, replace, &count);
     if (count > 0u) {
         if (!g_file_set_contents(path, updated, -1, &error)) {
-            g_clear_error(&error);
             count = 0u;
         }
     }
-    g_free(updated);
-    g_free(text);
     return count;
 }
 

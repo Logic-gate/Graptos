@@ -140,8 +140,8 @@ static gboolean run_argv(const char * const *argv,
     if (!argv || !argv[0] || !result) return FALSE;
     memset(result, 0, sizeof(*result));
 
-    GError *error = NULL;
-    GSubprocess *proc = g_subprocess_newv(argv,
+    g_autoptr(GError) error = NULL;
+    g_autoptr(GSubprocess) proc = g_subprocess_newv(argv,
         G_SUBPROCESS_FLAGS_STDIN_PIPE
         | G_SUBPROCESS_FLAGS_STDOUT_PIPE
         | G_SUBPROCESS_FLAGS_STDERR_PIPE,
@@ -151,20 +151,19 @@ static gboolean run_argv(const char * const *argv,
         result->kind = CLEAF_GIT_ERROR_GIT_MISSING;
         result->err = g_strdup(error ? error->message : "Could not start git.");
         result->message = g_strdup(git_error_title(result->kind));
-        g_clear_error(&error);
         return FALSE;
     }
 
-    char *out = NULL;
-    char *err = NULL;
+    g_autofree char *out = NULL;
+    g_autofree char *err = NULL;
     gboolean ok = g_subprocess_communicate_utf8(proc,
                                                 stdin_text,
                                                 NULL,
                                                 &out,
                                                 &err,
                                                 &error);
-    result->out = out ? out : g_strdup("");
-    result->err = err ? err : g_strdup("");
+    result->out = out ? g_steal_pointer(&out) : g_strdup("");
+    result->err = err ? g_steal_pointer(&err) : g_strdup("");
     /*
      * Git can emit very large diffs or hook output.  Keep result buffers bounded
      * before they are copied into dialogs/tabs so a failed command cannot make
@@ -177,8 +176,6 @@ static gboolean run_argv(const char * const *argv,
         result->exit_code = 1;
         result->kind = classify_git_error(result->out, error ? error->message : result->err);
         result->message = g_strdup(error ? error->message : git_error_title(result->kind));
-        g_clear_error(&error);
-        g_object_unref(proc);
         return FALSE;
     }
 
@@ -186,13 +183,11 @@ static gboolean run_argv(const char * const *argv,
     if (result->exit_code == 0) {
         result->kind = CLEAF_GIT_ERROR_NONE;
         result->message = g_strdup("Git command completed.");
-        g_object_unref(proc);
         return TRUE;
     }
 
     result->kind = classify_git_error(result->out, result->err);
     result->message = g_strdup(git_error_title(result->kind));
-    g_object_unref(proc);
     return FALSE;
 }
 
@@ -423,4 +418,3 @@ void cleaf_git_refresh_and_rebuild(EditorWindow *win) {
     cleaf_git_refresh_all(win);
     project_tree_refresh(win);
 }
-

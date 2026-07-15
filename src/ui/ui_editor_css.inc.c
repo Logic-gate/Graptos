@@ -43,6 +43,7 @@ void cleaf_apply_editor_css(const char *editor_bg_color,
                             const char *topbar_fg_color,
                             const char *bottombar_bg_color,
                             const char *bottombar_fg_color,
+                            const char *status_error_color,
                             const char *button_bg_color,
                             const char *button_fg_color,
                             const char *button_hover_bg_color,
@@ -125,6 +126,8 @@ void cleaf_apply_editor_css(const char *editor_bg_color,
         (bottombar_bg_color && bottombar_bg_color[0] == '#') ? bottombar_bg_color : effective_bg;
     const char *effective_bottombar_fg =
         (bottombar_fg_color && bottombar_fg_color[0] == '#') ? bottombar_fg_color : effective_fg;
+    const char *effective_status_error =
+        (status_error_color && status_error_color[0] == '#') ? status_error_color : "#ff6b6b";
     const char *effective_button_bg =
         (button_bg_color && button_bg_color[0] == '#') ? button_bg_color : effective_bg;
     const char *effective_button_fg =
@@ -290,6 +293,8 @@ void cleaf_apply_editor_css(const char *editor_bg_color,
     append_bg_rule(css, ".cleaf-bottom", effective_bottombar_bg);
     append_fg_rule(css, ".cleaf-bottom", effective_bottombar_fg);
     append_fg_rule(css, ".cleaf-bottom label", effective_bottombar_fg);
+    append_fg_rule(css, ".cleaf-bottom label.cleaf-status-error", effective_status_error);
+    append_fg_rule(css, "label.cleaf-status-error", effective_status_error);
     append_fg_rule(css, ".cleaf-root", effective_fg);
     append_fg_rule(css, ".cleaf-root label", effective_fg);
     g_string_append_printf(css,

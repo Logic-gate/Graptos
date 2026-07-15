@@ -26,6 +26,7 @@ void app_window_apply_css(EditorWindow *win) {
                            win->tab_active_fg_color,
                            win->topbar_bg_color, win->topbar_fg_color,
                            win->bottombar_bg_color, win->bottombar_fg_color,
+                           win->status_error_color,
                            win->button_bg_color, win->button_fg_color,
                            win->button_hover_bg_color,
                            win->button_active_bg_color,

@@ -137,7 +137,9 @@ void action_git_credentials(GtkWidget *widget, gpointer user_data) {
     char *helper = NULL;
     char *err = credential_dialog(win, &protocol, &host, &username, &secret, &helper);
     if (err) {
-        if (g_strcmp0(err, "cancelled") != 0) dialog_error(app_window_gtk(win), "Git credentials", err);
+        if (g_strcmp0(err, "cancelled") != 0) {
+            app_window_set_error_status(win, "Git credentials", err);
+        }
         g_free(err);
         g_free(protocol); g_free(host); g_free(username); g_free(secret); g_free(helper);
         return;
@@ -186,7 +188,8 @@ void action_git_run(GtkWidget *widget, gpointer user_data) {
     EditorWindow *win = user_data;
     char *repo = current_repo(win, NULL);
     if (!repo) {
-        dialog_error(app_window_gtk(win), "Git command failed", "No Git repository is active.");
+        app_window_set_error_status(win, "Git command failed",
+                                    "No Git repository is active.");
         return;
     }
 
@@ -206,7 +209,8 @@ void action_git_run(GtkWidget *widget, gpointer user_data) {
     char **parsed = NULL;
     GError *parse_error = NULL;
     if (!g_shell_parse_argv(args, &argc, &parsed, &parse_error)) {
-        dialog_error(app_window_gtk(win), "Git command parse failed", parse_error ? parse_error->message : "Could not parse arguments.");
+        app_window_set_error_status(win, "Git command parse failed",
+                                    parse_error ? parse_error->message : "Could not parse arguments.");
         g_clear_error(&parse_error);
         g_free(args);
         g_free(repo);

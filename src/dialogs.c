@@ -17,8 +17,12 @@ static GtkWidget *dialog_window_new(GtkWindow *parent,
     gtk_widget_add_css_class(window, "cleaf-window");
     gtk_window_set_title(GTK_WINDOW(window), title ? title : "Cleaf");
     gtk_window_set_default_size(GTK_WINDOW(window), width, height);
+    gtk_window_set_resizable(GTK_WINDOW(window), TRUE);
     gtk_window_set_modal(GTK_WINDOW(window), TRUE);
-    if (parent) gtk_window_set_transient_for(GTK_WINDOW(window), parent);
+    if (parent) {
+        gtk_window_set_transient_for(GTK_WINDOW(window), parent);
+        gtk_window_set_destroy_with_parent(GTK_WINDOW(window), TRUE);
+    }
     return window;
 }
 
@@ -54,25 +58,43 @@ static GtkWidget *button_row_new(void) {
 }
 
 /**
- * @brief Show message.
+ * @brief Dialog output.
  */
-static void show_message(GtkWindow *parent,
-                         const char *title,
-                         const char *primary,
-                         const char *detail) {
-    GtkWidget *window = dialog_window_new(parent, title, 420, 160);
+void dialog_output(GtkWindow *parent,
+                   const char *title,
+                   const char *heading,
+                   const char *body) {
+    GtkWidget *window = dialog_window_new(parent, title ? title : "Cleaf",
+                                          760, 520);
     GtkWidget *box = dialog_content_new(window);
-    gtk_box_append(GTK_BOX(box), dialog_label_new(primary, TRUE));
-    if (detail && detail[0] != '\0') {
-        gtk_box_append(GTK_BOX(box), dialog_label_new(detail, FALSE));
-    }
+
+    GtkWidget *label = dialog_label_new(heading ? heading : title, TRUE);
+    gtk_box_append(GTK_BOX(box), label);
+
+    GtkTextBuffer *buffer = gtk_text_buffer_new(NULL);
+    gtk_text_buffer_set_text(buffer, body ? body : "", -1);
+    GtkWidget *view = gtk_text_view_new_with_buffer(buffer);
+    g_object_unref(buffer);
+    gtk_text_view_set_editable(GTK_TEXT_VIEW(view), FALSE);
+    gtk_text_view_set_cursor_visible(GTK_TEXT_VIEW(view), FALSE);
+    gtk_text_view_set_monospace(GTK_TEXT_VIEW(view), TRUE);
+    gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(view), GTK_WRAP_NONE);
+
+    GtkWidget *scrolled = gtk_scrolled_window_new();
+    gtk_widget_set_vexpand(scrolled, TRUE);
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled),
+                                   GTK_POLICY_AUTOMATIC,
+                                   GTK_POLICY_AUTOMATIC);
+    gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolled), view);
+    gtk_box_append(GTK_BOX(box), scrolled);
 
     GtkWidget *row = button_row_new();
-    GtkWidget *ok = cleaf_flat_button_new("Close", NULL,
-                                          G_CALLBACK(cleaf_modal_window_respond),
-                                          GINT_TO_POINTER(GTK_RESPONSE_CLOSE));
-    gtk_box_append(GTK_BOX(row), ok);
+    GtkWidget *close = cleaf_flat_button_new("Close", NULL,
+        G_CALLBACK(cleaf_modal_window_respond),
+        GINT_TO_POINTER(GTK_RESPONSE_CLOSE));
+    gtk_box_append(GTK_BOX(row), close);
     gtk_box_append(GTK_BOX(box), row);
+
     (void)cleaf_modal_window_run(GTK_WINDOW(window), GTK_RESPONSE_CLOSE);
     cleaf_widget_destroy(window);
 }
@@ -81,15 +103,17 @@ static void show_message(GtkWindow *parent,
  * @brief Dialog error.
  */
 void dialog_error(GtkWindow *parent, const char *primary, const char *detail) {
-    show_message(parent, "Error", primary ? primary : "Error", detail);
+    dialog_output(parent, "Error", primary ? primary : "Error", detail);
 }
 
 /**
  * @brief Dialog info.
  */
 void dialog_info(GtkWindow *parent, const char *primary, const char *detail) {
-    show_message(parent, "Information",
-                 primary ? primary : "Information", detail);
+    dialog_output(parent,
+                  "Information",
+                  primary ? primary : "Information",
+                  detail && detail[0] ? detail : primary);
 }
 
 /**

@@ -207,12 +207,11 @@ static void parse_rule_field(SyntaxRule *rule, const char *key, const char *valu
  */
 static gboolean compile_syntax_rule(SyntaxRule *rule, const char *filename) {
     if (!rule || !rule->pattern || rule->pattern[0] == '\0') return FALSE;
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
     rule->regex = g_regex_new(rule->pattern, G_REGEX_MULTILINE | G_REGEX_OPTIMIZE, 0, &error);
     if (!rule->regex) {
         g_warning("Invalid regex in %s (%s): %s", filename ? filename : "syntax file",
                   rule->name ? rule->name : "unnamed", error ? error->message : "unknown error");
-        g_clear_error(&error);
         return FALSE;
     }
     if (!rule->name) rule->name = g_strdup("rule");
@@ -433,35 +432,30 @@ static gboolean compile_syntax_rules(SyntaxDef *syntax, const char *path) {
  * @brief Load syntax file.
  */
 static SyntaxDef *load_syntax_file(const char *path) {
-    char *contents = NULL;
+    g_autofree char *contents = NULL;
     gsize length = 0u;
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
     if (!g_file_get_contents(path, &contents, &length, &error)) {
         g_warning("Could not read syntax file %s: %s", path,
                   error ? error->message : "unknown error");
-        g_clear_error(&error);
         return NULL;
     }
 
     SyntaxDef *syntax = syntax_def_new_default();
     gboolean in_rules = FALSE;
     SyntaxRule *current_rule = NULL;
-    char *block_list_key = NULL;
-    char **lines = g_strsplit(contents, "\n", -1);
+    g_autofree char *block_list_key = NULL;
+    g_auto(GStrv) lines = g_strsplit(contents, "\n", -1);
     for (guint i = 0u; syntax && lines && lines[i]; i++) {
-        char *raw = g_strdup(lines[i]);
+        g_autofree char *raw = g_strdup(lines[i]);
         if (!raw) continue;
         g_strchomp(raw);
         char *line = g_strstrip(raw);
         if (line[0] != '\0' && line[0] != '#') {
             parse_syntax_line(syntax, line, &in_rules, &current_rule, &block_list_key);
         }
-        g_free(raw);
     }
 
-    g_clear_pointer(&block_list_key, g_free);
-    g_strfreev(lines);
-    g_free(contents);
     if (!syntax) return NULL;
 
     if (!compile_syntax_rules(syntax, path)) {

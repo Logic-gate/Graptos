@@ -304,23 +304,22 @@ static const char *effective_colour(const char *value, const char *fallback) {
 static GtkSourceStyleScheme *source_yaml_override_scheme_for_tab(EditorTab *tab) {
     if (!tab || !tab->win) return NULL;
 
-    char *dir = yaml_override_style_dir();
+    g_autofree char *dir = yaml_override_style_dir();
     if (!dir) return source_style_scheme_for_window(tab->win);
     if (g_mkdir_with_parents(dir, 0700) != 0) {
-        g_free(dir);
         return source_style_scheme_for_window(tab->win);
     }
 
     gboolean dark = colour_is_dark(tab->win->editor_bg_color);
     const char *syntax_name = (tab->active_syntax && tab->active_syntax->name) ?
         tab->active_syntax->name : "plain";
-    char *slug = style_slug_from_syntax_name(syntax_name);
-    char *id = g_strdup_printf("cleaf-config-%s-%s-%s",
-                               dark ? "dark" : "light",
-                               tab->win->use_yaml_style_overrides ? "yaml" : "plain",
-                               slug ? slug : "plain");
-    char *filename = g_strdup_printf("%s.xml", id);
-    char *path = g_build_filename(dir, filename, NULL);
+    g_autofree char *slug = style_slug_from_syntax_name(syntax_name);
+    g_autofree char *id = g_strdup_printf("cleaf-config-%s-%s-%s",
+                                          dark ? "dark" : "light",
+                                          tab->win->use_yaml_style_overrides ? "yaml" : "plain",
+                                          slug ? slug : "plain");
+    g_autofree char *filename = g_strdup_printf("%s.xml", id);
+    g_autofree char *path = g_build_filename(dir, filename, NULL);
 
     const char *fg = effective_colour(tab->win->editor_fg_color,
                                       dark ? "#d4d4d4" : "#202124");
@@ -337,7 +336,7 @@ static GtkSourceStyleScheme *source_yaml_override_scheme_for_tab(EditorTab *tab)
                                                 dark ? "#ffffff" : "#111827");
     const char *cursor = effective_colour(tab->win->editor_cursor_color, fg);
 
-    GString *xml = g_string_new(NULL);
+    g_autoptr(GString) xml = g_string_new(NULL);
     g_string_append(xml, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
     const char *parent_id = source_parent_scheme_id_for_window(tab->win);
     g_string_append_printf(xml,
@@ -367,35 +366,25 @@ static GtkSourceStyleScheme *source_yaml_override_scheme_for_tab(EditorTab *tab)
 
     if (tab->win->use_yaml_style_overrides && tab->active_syntax &&
         tab->active_syntax->rules) {
-        GHashTable *seen = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+        g_autoptr(GHashTable) seen = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
         for (guint i = 0u; i < tab->active_syntax->rules->len; i++) {
             SyntaxRule *rule = g_ptr_array_index(tab->active_syntax->rules, i);
             if (!rule || !rule->color || rule->color[0] == '\0') continue;
-            GPtrArray *style_names = gtksource_styles_for_yaml_rule(rule->name);
+            g_autoptr(GPtrArray) style_names = gtksource_styles_for_yaml_rule(rule->name);
             for (guint j = 0u; style_names && j < style_names->len; j++) {
                 const char *style_name = g_ptr_array_index(style_names, j);
                 if (!style_name || g_hash_table_contains(seen, style_name)) continue;
                 g_hash_table_add(seen, g_strdup(style_name));
                 append_style_from_rule(xml, style_name, rule);
             }
-            if (style_names) g_ptr_array_free(style_names, TRUE);
         }
-        g_hash_table_unref(seen);
     }
     g_string_append(xml, "</style-scheme>\n");
 
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
     if (!g_file_set_contents(path, xml->str, (gssize)xml->len, &error)) {
-        g_clear_error(&error);
-        g_string_free(xml, TRUE);
-        g_free(path);
-        g_free(filename);
-        g_free(id);
-        g_free(slug);
-        g_free(dir);
         return source_style_scheme_for_window(tab->win);
     }
-    g_string_free(xml, TRUE);
 
     GtkSourceStyleSchemeManager *manager = gtk_source_style_scheme_manager_get_default();
     GtkSourceStyleScheme *scheme = NULL;
@@ -413,11 +402,6 @@ static GtkSourceStyleScheme *source_yaml_override_scheme_for_tab(EditorTab *tab)
         gtk_source_style_scheme_manager_force_rescan(manager);
         scheme = gtk_source_style_scheme_manager_get_scheme(manager, id);
     }
-    g_free(path);
-    g_free(filename);
-    g_free(id);
-    g_free(slug);
-    g_free(dir);
     return scheme ? scheme : source_style_scheme_for_window(tab->win);
 }
 
