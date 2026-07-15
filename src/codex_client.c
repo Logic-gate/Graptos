@@ -99,7 +99,7 @@ static gboolean codex_client_write(CodexClient *client, char *message) {
         g_free(message);
         return FALSE; /**< False. */
     }
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
     gboolean written = g_output_stream_write_all(client->input,
                                                    message,
                                                    strlen(message),
@@ -110,7 +110,6 @@ static gboolean codex_client_write(CodexClient *client, char *message) {
     if (!written) {
         codex_client_set_state(client, CODEX_CLIENT_FAILED,
                                error ? error->message : "write failed");
-        g_clear_error(&error);
     }
     return written; /**< Written. */
 }
@@ -511,16 +510,15 @@ static void codex_client_line_ready(GObject *source,
                                     GAsyncResult *result,
                                     gpointer user_data) {
     CodexClient *client = user_data;
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
     gsize length = 0u;
-    char *line = g_data_input_stream_read_line_finish(G_DATA_INPUT_STREAM(source),
-                                                       result, &length, &error);
+    g_autofree char *line = g_data_input_stream_read_line_finish(G_DATA_INPUT_STREAM(source),
+                                                                 result, &length, &error);
     if (!line) {
         if (!g_error_matches(error, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
             codex_client_set_state(client, CODEX_CLIENT_FAILED,
                                    error ? error->message : "Codex exited");
         }
-        g_clear_error(&error);
         codex_client_unref(client);
         return;
     }
@@ -529,10 +527,7 @@ static void codex_client_line_ready(GObject *source,
     if (codex_protocol_parse(line, &root, &error)) {
         codex_client_handle_message(client, root);
         json_node_free(root);
-    } else {
-        g_clear_error(&error);
     }
-    g_free(line);
     if (!client->disposing) codex_client_read_next(client);
     codex_client_unref(client);
 }
@@ -683,19 +678,17 @@ void codex_client_start(CodexClient *client, const char *cwd) {
     client->cwd = g_strdup(cwd ? cwd : ".");
     client->cancellable = g_cancellable_new();
 
-    GError *error = NULL;
-    GSubprocessLauncher *launcher = g_subprocess_launcher_new(
+    g_autoptr(GError) error = NULL;
+    g_autoptr(GSubprocessLauncher) launcher = g_subprocess_launcher_new(
         G_SUBPROCESS_FLAGS_STDIN_PIPE |
         G_SUBPROCESS_FLAGS_STDOUT_PIPE |
         G_SUBPROCESS_FLAGS_STDERR_SILENCE);
     client->process = g_subprocess_launcher_spawn(launcher, &error,
                                                    "codex", "app-server",
                                                    "--stdio", NULL);
-    g_object_unref(launcher);
     if (!client->process) {
         codex_client_set_state(client, CODEX_CLIENT_FAILED,
                                error ? error->message : "could not start Codex");
-        g_clear_error(&error);
         return;
     }
     client->input = g_object_ref(g_subprocess_get_stdin_pipe(client->process));

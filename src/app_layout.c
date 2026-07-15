@@ -484,6 +484,21 @@ GtkWidget *build_tool_panel(EditorWindow *win) {
 }
 
 /**
+ * @brief On status label clicked.
+ */
+static void on_status_label_clicked(GtkGestureClick *gesture,
+                                    int n_press,
+                                    double x,
+                                    double y,
+                                    gpointer user_data) {
+    (void)gesture;
+    (void)n_press;
+    (void)x;
+    (void)y;
+    app_window_show_status_error(user_data);
+}
+
+/**
  * @brief Build bottom bar.
  */
 GtkWidget *build_bottom_bar(EditorWindow *win) {
@@ -495,6 +510,11 @@ GtkWidget *build_bottom_bar(EditorWindow *win) {
     gtk_label_set_ellipsize(GTK_LABEL(win->status_label), PANGO_ELLIPSIZE_END);
     gtk_widget_add_css_class(win->status_label, "cleaf-status");
     gtk_widget_set_size_request(win->status_label, 180, -1);
+    GtkGesture *status_click = gtk_gesture_click_new();
+    g_signal_connect(status_click, "pressed",
+                     G_CALLBACK(on_status_label_clicked), win);
+    gtk_widget_add_controller(win->status_label,
+                              GTK_EVENT_CONTROLLER(status_click));
     gtk_box_append(GTK_BOX(bottom), win->status_label);
 
     gtk_box_append(GTK_BOX(bottom), tool_button_new("Find", "Open find panel (Ctrl+F)", G_CALLBACK(action_show_find), win));

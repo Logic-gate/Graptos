@@ -54,18 +54,16 @@ static gboolean read_small_file(const char *path, char **out_text) {
     if (stat(path, &st) != 0) return FALSE;
     if (!S_ISREG(st.st_mode)) return FALSE;
     if (st.st_size < 0 || (guint64)st.st_size > (guint64)CLEAF_INDEX_MAX_FILE_BYTES) return FALSE;
-    char *text = NULL;
+    g_autofree char *text = NULL;
     gsize len = 0u;
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
     if (!g_file_get_contents(path, &text, &len, &error)) {
-        g_clear_error(&error);
         return FALSE;
     }
     if (!g_utf8_validate(text, (gssize)len, NULL)) {
-        g_free(text);
         return FALSE;
     }
-    *out_text = text;
+    *out_text = g_steal_pointer(&text);
     return TRUE;
 }
 
@@ -242,4 +240,3 @@ static char *find_in_projects(EditorWindow *win, const char *basename) {
     g_hash_table_destroy(seen);
     return found;
 }
-

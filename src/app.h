@@ -11,7 +11,7 @@
 #include "syntax.h"
 
 #ifndef APP_VERSION
-#define APP_VERSION "0.16.3"
+#define APP_VERSION "0.16.8"
 #endif
 
 /**
@@ -33,6 +33,8 @@ typedef struct _EditorWindow {
     GHashTable *locked_paths; /**< Locked paths. */
     GHashTable *git_file_status; /**< short Git marker. */
     GtkWidget *status_label; /**< Status label. */
+    char *status_error_title; /**< Latest status error title. */
+    char *status_error_detail; /**< Latest status error detail. */
     GtkWidget *syntax_combo; /**< Syntax combo. */
     GtkWidget *indent_status_label; /**< Indent status label. */
     GtkWidget *indent_dropdown; /**< Indent dropdown. */
@@ -81,6 +83,7 @@ typedef struct _EditorWindow {
     char *topbar_fg_color; /**< Topbar fg color. */
     char *bottombar_bg_color; /**< Bottombar bg color. */
     char *bottombar_fg_color; /**< Bottombar fg color. */
+    char *status_error_color; /**< Status error color. */
     char *button_bg_color; /**< Button bg color. */
     char *button_fg_color; /**< Button fg color. */
     char *button_hover_bg_color; /**< Button hover bg color. */
@@ -163,6 +166,20 @@ gboolean app_window_close_all_tabs(EditorWindow *win);
  * @brief App window set status.
  */
 void app_window_set_status(EditorWindow *win, const char *text);
+/**
+ * @brief App window set error status.
+ */
+void app_window_set_error_status(EditorWindow *win,
+                                 const char *short_text,
+                                 const char *detail);
+/**
+ * @brief App window clear error status.
+ */
+void app_window_clear_error_status(EditorWindow *win);
+/**
+ * @brief App window show status error.
+ */
+void app_window_show_status_error(EditorWindow *win);
 /**
  * @brief App window is file locked.
  */

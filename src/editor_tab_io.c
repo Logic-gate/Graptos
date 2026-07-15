@@ -36,18 +36,15 @@ gboolean write_all_fd(int fd, const char *data, gsize len) {
 gboolean write_text_atomic(const char *path, const char *text, GError **error) {
     if (!path || path[0] == '\0' || !text) return FALSE;
 
-    char *dir = g_path_get_dirname(path);
-    if (!dir) {
-        g_free(dir);
-        return FALSE;
-    }
+    g_autofree char *dir = g_path_get_dirname(path);
+    if (!dir) return FALSE;
 
     struct stat st;
     mode_t mode = 0644u;
     if (stat(path, &st) == 0) mode = (mode_t)(st.st_mode & 0777u);
 
     gboolean ok = FALSE;
-    char *tmp_path = NULL;
+    g_autofree char *tmp_path = NULL;
     int fd = -1;
     for (guint attempt = 0u; attempt < 100u; attempt++) {
         g_free(tmp_path);
@@ -59,8 +56,6 @@ gboolean write_text_atomic(const char *path, const char *text, GError **error) {
 
     if (fd < 0) {
         g_set_error(error, G_FILE_ERROR, g_file_error_from_errno(errno), "Could not create temporary save file: %s", g_strerror(errno));
-        g_free(tmp_path);
-        g_free(dir);
         return FALSE;
     }
 
@@ -87,8 +82,6 @@ gboolean write_text_atomic(const char *path, const char *text, GError **error) {
         ok = TRUE;
     }
 
-    g_free(tmp_path);
-    g_free(dir);
     return ok;
 }
 
@@ -100,22 +93,18 @@ char *autosave_path_for_tab(EditorTab *tab) {
     if (!tab) return NULL;
     const char *cache = g_get_user_cache_dir();
     if (!cache) return NULL;
-    char *dir = g_build_filename(cache, "cleaf", "autosave", NULL);
+    g_autofree char *dir = g_build_filename(cache, "cleaf", "autosave", NULL);
     if (g_mkdir_with_parents(dir, 0700) != 0) {
-        g_free(dir);
         return NULL;
     }
-    char *name = NULL;
+    g_autofree char *name = NULL;
     if (tab->file_path) {
         guint hash = g_str_hash(tab->file_path);
         name = g_strdup_printf("%08x.autosave", hash);
     } else {
         name = g_strdup_printf("untitled-%p.autosave", (void *)tab);
     }
-    char *path = g_build_filename(dir, name, NULL);
-    g_free(name);
-    g_free(dir);
-    return path;
+    return g_build_filename(dir, name, NULL);
 }
 
 
@@ -125,11 +114,10 @@ char *autosave_path_for_tab(EditorTab *tab) {
  */
 static void cleanup_legacy_tilde_backup(const char *path) {
     if (!path || path[0] == '\0') return;
-    char *legacy = g_strdup_printf("%s~", path);
+    g_autofree char *legacy = g_strdup_printf("%s~", path);
     if (legacy && g_file_test(legacy, G_FILE_TEST_IS_REGULAR)) {
         (void)g_unlink(legacy);
     }
-    g_free(legacy);
 }
 
 /**
@@ -137,29 +125,28 @@ static void cleanup_legacy_tilde_backup(const char *path) {
  */
 gboolean editor_tab_load_file(EditorTab *tab, const char *path) {
     if (!tab || !path) return FALSE;
-    char *contents = NULL;
+    g_autofree char *contents = NULL;
     gsize length = 0;
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
     if (!g_file_get_contents(path, &contents, &length, &error)) {
-        dialog_error(app_window_gtk(tab->win), "Could not open file", error ? error->message : path);
-        g_clear_error(&error);
+        app_window_set_error_status(tab->win, "Could not open file",
+                                    error ? error->message : path);
         return FALSE;
     }
     if (length > (gsize)G_MAXINT) {
-        g_free(contents);
-        dialog_error(app_window_gtk(tab->win), "File too large", "This build refuses to load files larger than GTK's text-buffer insertion limit.");
+        app_window_set_error_status(tab->win, "File too large",
+                                    "This build refuses to load files larger than GTK's text-buffer insertion limit.");
         return FALSE;
     }
     if (!g_utf8_validate(contents, (gssize)length, NULL)) {
-        g_free(contents);
-        dialog_error(app_window_gtk(tab->win), "Unsupported encoding", "Cleaf currently opens UTF-8 text files only. Convert the file to UTF-8 first.");
+        app_window_set_error_status(tab->win, "Unsupported encoding",
+                                    "Cleaf currently opens UTF-8 text files only. Convert the file to UTF-8 first.");
         return FALSE;
     }
 
     tab->applying_change = TRUE;
     gtk_text_buffer_set_text(tab->buffer, contents, (gint)length);
     tab->applying_change = FALSE;
-    g_free(contents);
     g_free(tab->file_path);
     tab->file_path = g_canonicalize_filename(path, NULL);
     cleanup_legacy_tilde_backup(tab->file_path);
@@ -185,25 +172,19 @@ gboolean editor_tab_load_file(EditorTab *tab, const char *path) {
 gboolean write_backup_if_needed(EditorTab *tab, const char *path) {
     if (!tab || !tab->backup_enabled || !path || !g_file_test(path, G_FILE_TEST_EXISTS)) return TRUE;
 
-    char *old = NULL;
+    g_autofree char *old = NULL;
     gsize len = 0;
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
     if (!g_file_get_contents(path, &old, &len, &error)) {
-        g_clear_error(&error);
         return TRUE;
     }
 
-    char *dir = g_path_get_dirname(path);
-    char *base = g_path_get_basename(path);
-    char *backup_dir = g_build_filename(dir, ".cleaf-backups", NULL);
+    g_autofree char *dir = g_path_get_dirname(path);
+    g_autofree char *base = g_path_get_basename(path);
+    g_autofree char *backup_dir = g_build_filename(dir, ".cleaf-backups", NULL);
     if (g_mkdir_with_parents(backup_dir, 0700) != 0) {
-        char *msg = g_strdup_printf("Could not create backup folder %s: %s", backup_dir, g_strerror(errno));
-        dialog_error(app_window_gtk(tab->win), "Backup failed", msg);
-        g_free(msg);
-        g_free(backup_dir);
-        g_free(base);
-        g_free(dir);
-        g_free(old);
+        g_autofree char *msg = g_strdup_printf("Could not create backup folder %s: %s", backup_dir, g_strerror(errno));
+        app_window_set_error_status(tab->win, "Backup failed", msg);
         return FALSE;
     }
 
@@ -214,23 +195,15 @@ gboolean write_backup_if_needed(EditorTab *tab, const char *path) {
     if (tmv) strftime(stamp, sizeof(stamp), "%Y%m%d-%H%M%S", tmv);
     else g_snprintf(stamp, sizeof(stamp), "backup");
 
-    char *backup_name = g_strdup_printf("%s.%s~", base ? base : "file", stamp);
-    char *backup_path = g_build_filename(backup_dir, backup_name, NULL);
+    g_autofree char *backup_name = g_strdup_printf("%s.%s~", base ? base : "file", stamp);
+    g_autofree char *backup_path = g_build_filename(backup_dir, backup_name, NULL);
     (void)len;
     gboolean ok = write_text_atomic(backup_path, old, &error);
     if (!ok) {
-        char *msg = g_strdup_printf("Could not write backup %s: %s", backup_path, error ? error->message : "unknown error");
-        dialog_error(app_window_gtk(tab->win), "Backup failed", msg);
-        g_free(msg);
-        g_clear_error(&error);
+        g_autofree char *msg = g_strdup_printf("Could not write backup %s: %s", backup_path, error ? error->message : "unknown error");
+        app_window_set_error_status(tab->win, "Backup failed", msg);
     }
 
-    g_free(backup_path);
-    g_free(backup_name);
-    g_free(backup_dir);
-    g_free(base);
-    g_free(dir);
-    g_free(old);
     return ok;
 }
 
@@ -246,26 +219,22 @@ gboolean save_to_path(EditorTab *tab, const char *path) {
      * operation that can free or replace tab->file_path; otherwise the tab
      * title can be rebuilt from freed memory and appear as mojibake.
      */
-    char *stable_path = g_strdup(path);
+    g_autofree char *stable_path = g_strdup(path);
     if (!stable_path) return FALSE;
 
     if (!write_backup_if_needed(tab, stable_path)) {
-        g_free(stable_path);
         return FALSE;
     }
-    char *text = buffer_text(tab);
-    GError *error = NULL;
+    g_autofree char *text = buffer_text(tab);
+    g_autoptr(GError) error = NULL;
     gboolean ok = write_text_atomic(stable_path, text, &error);
-    g_free(text);
     if (!ok) {
-        dialog_error(app_window_gtk(tab->win), "Could not save file", error ? error->message : stable_path);
-        g_clear_error(&error);
-        g_free(stable_path);
+        app_window_set_error_status(tab->win, "Could not save file",
+                                    error ? error->message : stable_path);
         return FALSE;
     }
     g_free(tab->file_path);
     tab->file_path = g_canonicalize_filename(stable_path, NULL);
-    g_free(stable_path);
     cleanup_legacy_tilde_backup(tab->file_path);
     tab->modified = FALSE;
     tab->manual_syntax_override = FALSE;
@@ -294,13 +263,11 @@ gboolean editor_tab_save(EditorTab *tab, gboolean force_dialog) {
         return save_to_path(tab, tab->file_path);
     }
 
-    char *filename = cleaf_save_file_dialog(app_window_gtk(tab->win),
-                                            "Save File");
+    g_autofree char *filename = cleaf_save_file_dialog(app_window_gtk(tab->win),
+                                                       "Save File");
     if (!filename) return FALSE;
 
-    gboolean ok = save_to_path(tab, filename);
-    g_free(filename);
-    return ok;
+    return save_to_path(tab, filename);
 }
 
 
@@ -319,8 +286,8 @@ static GtkWidget *close_dialog_button(const char *label, int response) {
 gboolean editor_tab_confirm_close(EditorTab *tab) {
     if (!tab || !tab->modified) return TRUE;
 
-    char *base = editor_tab_basename(tab);
-    char *title = g_strdup_printf("Save changes to %s?", base);
+    g_autofree char *base = editor_tab_basename(tab);
+    g_autofree char *title = g_strdup_printf("Save changes to %s?", base);
 
     GtkWidget *dialog = gtk_window_new();
     gtk_widget_add_css_class(dialog, "cleaf-window");
@@ -358,8 +325,6 @@ gboolean editor_tab_confirm_close(EditorTab *tab) {
     int response = cleaf_modal_window_run(GTK_WINDOW(dialog),
                                           GTK_RESPONSE_CANCEL);
     cleaf_widget_destroy(dialog);
-    g_free(title);
-    g_free(base);
 
     if (response == GTK_RESPONSE_ACCEPT) return editor_tab_save(tab, FALSE);
     if (response == GTK_RESPONSE_REJECT) return TRUE;
@@ -374,21 +339,17 @@ gboolean editor_tab_auto_save(EditorTab *tab) {
     if (!tab || !tab->modified) return TRUE;
     if (tab->file_path) return save_to_path(tab, tab->file_path);
 
-    char *path = autosave_path_for_tab(tab);
+    g_autofree char *path = autosave_path_for_tab(tab);
     if (!path) return FALSE;
-    char *text = buffer_text(tab);
-    GError *error = NULL;
+    g_autofree char *text = buffer_text(tab);
+    g_autoptr(GError) error = NULL;
     gboolean ok = write_text_atomic(path, text, &error);
     if (!ok) {
-        dialog_error(app_window_gtk(tab->win), "Auto-save failed", error ? error->message : path);
-        g_clear_error(&error);
+        app_window_set_error_status(tab->win, "Auto-save failed",
+                                    error ? error->message : path);
     } else if (tab->win) {
-        char *status = g_strdup_printf("Auto-saved unsaved buffer to %s", path);
+        g_autofree char *status = g_strdup_printf("Auto-saved unsaved buffer to %s", path);
         app_window_set_status(tab->win, status);
-        g_free(status);
     }
-    g_free(text);
-    g_free(path);
     return ok;
 }
-

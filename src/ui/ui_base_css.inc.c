@@ -110,6 +110,7 @@ void cleaf_apply_css(void) {
         ".cleaf-switch-row { padding: 0 1px; }"
         ".cleaf-switch-label { opacity: 0.82; font-size: 8.5pt; padding: 0 2px; }"
         ".cleaf-status { opacity: 0.85; padding: 3px 6px; }"
+        ".cleaf-status-error { font-weight: 700; }"
         ".cleaf-codex-panel {"
         "  border-left: 1px solid alpha(currentColor, 0.18);"
         "  padding: 8px;"

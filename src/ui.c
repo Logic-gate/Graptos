@@ -107,13 +107,11 @@ static void file_dialog_finish(GtkFileDialog *dialog,
     FileDialogState *state = user_data;
     if (!state) return;
 
-    GError *error = NULL;
-    GFile *file = finish_func(dialog, result, &error);
+    g_autoptr(GError) error = NULL;
+    g_autoptr(GFile) file = finish_func(dialog, result, &error);
     if (file) {
         state->path = g_file_get_path(file);
-        g_object_unref(file);
     }
-    g_clear_error(&error);
     if (state->loop) g_main_loop_quit(state->loop);
 }
 

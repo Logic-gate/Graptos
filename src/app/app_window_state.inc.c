@@ -15,8 +15,50 @@ GtkWindow *app_window_gtk(EditorWindow *win) {
 void app_window_set_status(EditorWindow *win, const char *text) {
     if (!win || !win->status_label) return;
 
+    app_window_clear_error_status(win);
     // Empty string keeps the status label valid without showing stale text.
     gtk_label_set_text(GTK_LABEL(win->status_label), text ? text : "");
+}
+
+/**
+ * @brief App window clear error status.
+ */
+void app_window_clear_error_status(EditorWindow *win) {
+    if (!win) return;
+    g_clear_pointer(&win->status_error_title, g_free);
+    g_clear_pointer(&win->status_error_detail, g_free);
+    if (win->status_label) {
+        gtk_widget_remove_css_class(win->status_label, "cleaf-status-error");
+        gtk_widget_set_tooltip_text(win->status_label, NULL);
+    }
+}
+
+/**
+ * @brief App window set error status.
+ */
+void app_window_set_error_status(EditorWindow *win,
+                                 const char *short_text,
+                                 const char *detail) {
+    if (!win || !win->status_label) return;
+
+    g_clear_pointer(&win->status_error_title, g_free);
+    g_clear_pointer(&win->status_error_detail, g_free);
+    win->status_error_title = g_strdup(short_text && short_text[0] ? short_text : "Error");
+    win->status_error_detail = g_strdup(detail && detail[0] ? detail : win->status_error_title);
+
+    gtk_label_set_text(GTK_LABEL(win->status_label), win->status_error_title);
+    gtk_widget_add_css_class(win->status_label, "cleaf-status-error");
+    gtk_widget_set_tooltip_text(win->status_label, "Click to show error details");
+}
+
+/**
+ * @brief App window show status error.
+ */
+void app_window_show_status_error(EditorWindow *win) {
+    if (!win || !win->status_error_detail) return;
+    dialog_error(app_window_gtk(win),
+                 win->status_error_title ? win->status_error_title : "Error",
+                 win->status_error_detail);
 }
 
 

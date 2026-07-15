@@ -134,8 +134,8 @@ void choose_color_for_slot(EditorWindow *win,
 
     GdkRGBA parsed;
     if (!gdk_rgba_parse(&parsed, value)) {
-        dialog_error(app_window_gtk(win), "Invalid colour",
-                     "Use a valid GTK colour, such as #1E1E1E.");
+        app_window_set_error_status(win, "Invalid colour",
+                                    "Use a valid GTK colour, such as #1E1E1E.");
         g_free(value);
         return;
     }
@@ -234,6 +234,7 @@ void action_reset_all_backgrounds(GtkWidget *widget, gpointer user_data) {
     g_clear_pointer(&win->topbar_fg_color, g_free);
     g_clear_pointer(&win->bottombar_bg_color, g_free);
     g_clear_pointer(&win->bottombar_fg_color, g_free);
+    g_clear_pointer(&win->status_error_color, g_free);
     g_clear_pointer(&win->button_bg_color, g_free);
     g_clear_pointer(&win->button_fg_color, g_free);
     g_clear_pointer(&win->button_hover_bg_color, g_free);
@@ -269,5 +270,3 @@ void action_reset_all_backgrounds(GtkWidget *widget, gpointer user_data) {
     apply_preferences_to_all_tabs(win);
     cleaf_config_save(win);
 }
-
-
