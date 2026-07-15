@@ -1,11 +1,22 @@
+/**
+ * @file src/syntax_highlight.c
+ * @brief Legacy syntax tag application helpers.
+ */
+
 #include "syntax.h"
 
 #include <string.h>
 
+/**
+ * @brief Tag name for rule.
+ */
 static char *tag_name_for_rule(const SyntaxRule *rule) {
     return g_strdup_printf("cleaf-syntax-%p", (const void *)rule);
 }
 
+/**
+ * @brief Ensure rule tag.
+ */
 static GtkTextTag *ensure_rule_tag(GtkTextBuffer *buffer, const SyntaxRule *rule) {
     if (!buffer || !rule) return NULL;
     char *name = tag_name_for_rule(rule);
@@ -23,6 +34,9 @@ static GtkTextTag *ensure_rule_tag(GtkTextBuffer *buffer, const SyntaxRule *rule
     return tag;
 }
 
+/**
+ * @brief Syntax iter range for lines.
+ */
 static void syntax_iter_range_for_lines(GtkTextBuffer *buffer, guint start_line, guint end_line, GtkTextIter *start, GtkTextIter *end) {
     if (!buffer || !start || !end) return;
 
@@ -44,6 +58,9 @@ static void syntax_iter_range_for_lines(GtkTextBuffer *buffer, guint start_line,
     }
 }
 
+/**
+ * @brief Syntax clear range.
+ */
 void syntax_clear_range(GtkTextBuffer *buffer, GPtrArray *syntaxes, guint start_line, guint end_line) {
     if (!buffer || !syntaxes) return;
     GtkTextIter start;
@@ -63,12 +80,18 @@ void syntax_clear_range(GtkTextBuffer *buffer, GPtrArray *syntaxes, guint start_
     }
 }
 
+/**
+ * @brief Syntax clear.
+ */
 void syntax_clear(GtkTextBuffer *buffer, GPtrArray *syntaxes) {
     if (!buffer) return;
     gint lines = gtk_text_buffer_get_line_count(buffer);
     syntax_clear_range(buffer, syntaxes, 0u, lines > 0 ? (guint)lines - 1u : 0u);
 }
 
+/**
+ * @brief Syntax apply range.
+ */
 void syntax_apply_range(GtkTextBuffer *buffer, GPtrArray *syntaxes, SyntaxDef *active_syntax, guint start_line, guint end_line) {
     if (!buffer) return;
 
@@ -113,6 +136,9 @@ void syntax_apply_range(GtkTextBuffer *buffer, GPtrArray *syntaxes, SyntaxDef *a
     g_free(text);
 }
 
+/**
+ * @brief Syntax apply.
+ */
 void syntax_apply(GtkTextBuffer *buffer, GPtrArray *syntaxes, SyntaxDef *active_syntax) {
     if (!buffer) return;
 

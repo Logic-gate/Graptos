@@ -1,20 +1,37 @@
+/**
+ * @file src/editor_tab_preview.c
+ * @brief Cleaf editor tab preview module.
+ */
+
 #include "editor_tab_private.h"
 
 #include <stdarg.h>
 #include <string.h>
 
+/**
+ * @brief Preview max bytes macro.
+ */
 #define PREVIEW_MAX_BYTES (2u * 1024u * 1024u)
 
+/**
+ * @brief Editor tab preview type definition.
+ */
 typedef struct {
-    GtkTextBuffer *buffer;
-    GtkTextIter iter;
+    GtkTextBuffer *buffer; /**< Buffer. */
+    GtkTextIter iter; /**< Iter. */
 } PreviewWriter;
 
+/**
+ * @brief Editor tab preview type definition.
+ */
 typedef struct {
-    GtkWidget *scrolled;
-    gdouble value;
+    GtkWidget *scrolled; /**< Scrolled. */
+    gdouble value; /**< Value. */
 } PreviewScrollRestore;
 
+/**
+ * @brief Preview restore scroll cb.
+ */
 static gboolean preview_restore_scroll_cb(gpointer user_data) {
     PreviewScrollRestore *restore = user_data;
     if (!restore || !restore->scrolled) {
@@ -33,6 +50,9 @@ static gboolean preview_restore_scroll_cb(gpointer user_data) {
     return G_SOURCE_REMOVE;
 }
 
+/**
+ * @brief Preview restore scroll later.
+ */
 static void preview_restore_scroll_later(GtkWidget *scrolled, gdouble value) {
     if (!scrolled) return;
     PreviewScrollRestore *restore = g_new0(PreviewScrollRestore, 1);
@@ -41,34 +61,55 @@ static void preview_restore_scroll_later(GtkWidget *scrolled, gdouble value) {
     g_idle_add_full(G_PRIORITY_LOW, preview_restore_scroll_cb, restore, NULL);
 }
 
+/**
+ * @brief Str has prefix.
+ */
 static gboolean str_has_prefix(const char *text, const char *prefix) {
     return text && prefix && g_str_has_prefix(text, prefix);
 }
 
+/**
+ * @brief Syntax name is.
+ */
 static gboolean syntax_name_is(EditorTab *tab, const char *name) {
     const char *syntax = NULL;
     if (tab && tab->active_syntax) syntax = tab->active_syntax->name;
     return syntax && name && g_ascii_strcasecmp(syntax, name) == 0;
 }
 
+/**
+ * @brief Path has suffix.
+ */
 static gboolean path_has_suffix(EditorTab *tab, const char *suffix) {
     return tab && tab->file_path && suffix && g_str_has_suffix(tab->file_path, suffix);
 }
 
+/**
+ * @brief Preview is markdown.
+ */
 static gboolean preview_is_markdown(EditorTab *tab) {
     return syntax_name_is(tab, "Markdown") || path_has_suffix(tab, ".md") ||
            path_has_suffix(tab, ".markdown");
 }
 
+/**
+ * @brief Editor tab is latex.
+ */
 gboolean editor_tab_is_latex(EditorTab *tab) {
     return syntax_name_is(tab, "LaTeX") || syntax_name_is(tab, "Tex") ||
            path_has_suffix(tab, ".tex") || path_has_suffix(tab, ".latex");
 }
 
+/**
+ * @brief Preview is supported.
+ */
 gboolean preview_is_supported(EditorTab *tab) {
     return preview_is_markdown(tab) || editor_tab_is_latex(tab);
 }
 
+/**
+ * @brief Ensure tag.
+ */
 static void ensure_tag(GtkTextBuffer *buffer,
                        const char *name,
                        const char *first_property,
@@ -85,6 +126,9 @@ static void ensure_tag(GtkTextBuffer *buffer,
     g_object_unref(tag);
 }
 
+/**
+ * @brief Preview ensure tags.
+ */
 void preview_ensure_tags(EditorTab *tab) {
     if (!tab || !tab->preview_buffer) return;
     GtkTextBuffer *buffer = tab->preview_buffer;
@@ -106,15 +150,24 @@ void preview_ensure_tags(EditorTab *tab) {
                "foreground", "#4EC9B0", NULL);
 }
 
+/**
+ * @brief Writer init.
+ */
 static void writer_init(PreviewWriter *writer, GtkTextBuffer *buffer) {
     writer->buffer = buffer;
     gtk_text_buffer_get_end_iter(buffer, &writer->iter);
 }
 
+/**
+ * @brief Writer insert.
+ */
 static void writer_insert(PreviewWriter *writer, const char *text) {
     gtk_text_buffer_insert(writer->buffer, &writer->iter, text ? text : "", -1);
 }
 
+/**
+ * @brief Writer insert tag.
+ */
 static void writer_insert_tag(PreviewWriter *writer,
                               const char *text,
                               const char *tag) {
@@ -130,6 +183,9 @@ static void writer_insert_tag(PreviewWriter *writer,
     gtk_text_buffer_apply_tag_by_name(writer->buffer, tag, &start, &end);
 }
 
+/**
+ * @brief Line without prefix.
+ */
 static char *line_without_prefix(const char *line, guint count) {
     const char *p = line ? line : "";
     while (*p == ' ' || *p == '\t') p++;
@@ -141,6 +197,9 @@ static char *line_without_prefix(const char *line, guint count) {
     return g_strdup(p);
 }
 
+/**
+ * @brief Render markdown inline.
+ */
 static void render_markdown_inline(PreviewWriter *writer, const char *line) {
     const char *p = line ? line : "";
     while (*p != '\0') {
@@ -182,6 +241,9 @@ static void render_markdown_inline(PreviewWriter *writer, const char *line) {
     }
 }
 
+/**
+ * @brief Render markdown line.
+ */
 static void render_markdown_line(PreviewWriter *writer,
                                  const char *line,
                                  gboolean *in_code) {
@@ -224,6 +286,9 @@ static void render_markdown_line(PreviewWriter *writer,
     }
 }
 
+/**
+ * @brief Preview render markdown.
+ */
 void preview_render_markdown(EditorTab *tab, const char *text) {
     PreviewWriter writer;
     writer_init(&writer, tab->preview_buffer);
@@ -235,6 +300,9 @@ void preview_render_markdown(EditorTab *tab, const char *text) {
     g_strfreev(lines);
 }
 
+/**
+ * @brief Latex arg.
+ */
 static char *latex_arg(const char *line, const char *command) {
     const char *start = strstr(line ? line : "", command);
     if (!start) return NULL;
@@ -245,11 +313,17 @@ static char *latex_arg(const char *line, const char *command) {
     return g_strndup(start + 1, (gsize)(end - start - 1));
 }
 
+/**
+ * @brief Latex is math line.
+ */
 static gboolean latex_is_math_line(const char *line) {
     return str_has_prefix(line, "$$") || str_has_prefix(line, "\\[") ||
            str_has_prefix(line, "\\(") || strchr(line ? line : "", '$');
 }
 
+/**
+ * @brief Render latex line.
+ */
 static void render_latex_line(PreviewWriter *writer, const char *line) {
     char *text = NULL;
     if ((text = latex_arg(line, "\\section"))) {
@@ -275,6 +349,9 @@ static void render_latex_line(PreviewWriter *writer, const char *line) {
     g_free(text);
 }
 
+/**
+ * @brief Preview render latex.
+ */
 void preview_render_latex(EditorTab *tab, const char *text) {
     PreviewWriter writer;
     writer_init(&writer, tab->preview_buffer);
@@ -285,6 +362,9 @@ void preview_render_latex(EditorTab *tab, const char *text) {
     g_strfreev(lines);
 }
 
+/**
+ * @brief Editor tab update preview.
+ */
 void editor_tab_update_preview(EditorTab *tab) {
     if (!tab || !tab->preview_buffer || !tab->win) return;
     if (!tab->win->preview_enabled || !preview_is_supported(tab)) {

@@ -1,10 +1,21 @@
+/**
+ * @file src/editor_tab_undo.c
+ * @brief Cleaf editor tab undo module.
+ */
+
 #include "editor_tab_private.h"
 
+/**
+ * @brief Clear stack.
+ */
 void clear_stack(GPtrArray *stack) {
     if (stack) g_ptr_array_set_size(stack, 0);
 }
 
 
+/**
+ * @brief Push limited.
+ */
 void push_limited(GPtrArray *stack, char *state) {
     if (!stack || !state) return;
     g_ptr_array_add(stack, state);
@@ -12,6 +23,9 @@ void push_limited(GPtrArray *stack, char *state) {
 }
 
 
+/**
+ * @brief Pop stack.
+ */
 char *pop_stack(GPtrArray *stack) {
     if (!stack || stack->len == 0u) return NULL;
     char *state = g_ptr_array_index(stack, stack->len - 1u);
@@ -20,6 +34,9 @@ char *pop_stack(GPtrArray *stack) {
 }
 
 
+/**
+ * @brief Reset undo state.
+ */
 void reset_undo_state(EditorTab *tab) {
     if (!tab) return;
     clear_stack(tab->undo_stack);
@@ -33,6 +50,9 @@ void reset_undo_state(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Editor tab undo.
+ */
 void editor_tab_undo(EditorTab *tab) {
     if (!tab) return;
     char *prev = pop_stack(tab->undo_stack);
@@ -54,6 +74,9 @@ void editor_tab_undo(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Editor tab redo.
+ */
 void editor_tab_redo(EditorTab *tab) {
     if (!tab) return;
     char *next = pop_stack(tab->redo_stack);

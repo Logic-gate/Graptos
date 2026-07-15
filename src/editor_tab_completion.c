@@ -1,7 +1,18 @@
+/**
+ * @file src/editor_tab_completion.c
+ * @brief Cleaf editor tab completion module.
+ */
+
 #include "editor_tab_private.h"
 
+/**
+ * @brief Completion add row with detail.
+ */
 static void completion_add_row_with_detail(EditorTab *tab, const char *word, const char *detail);
 
+/**
+ * @brief Completion contains.
+ */
 static gboolean completion_contains(GPtrArray *items, const char *word) {
     if (!items || !word) return FALSE;
     for (guint i = 0u; i < items->len; i++) {
@@ -11,6 +22,9 @@ static gboolean completion_contains(GPtrArray *items, const char *word) {
     return FALSE;
 }
 
+/**
+ * @brief Completion copy candidates.
+ */
 static void completion_copy_candidates(GPtrArray *dst, GPtrArray *src) {
     if (!dst || !src) return;
     for (guint i = 0u; i < src->len; i++) {
@@ -21,6 +35,9 @@ static void completion_copy_candidates(GPtrArray *dst, GPtrArray *src) {
     }
 }
 
+/**
+ * @brief Completion merge imports.
+ */
 static void completion_merge_imports(GPtrArray *dst, GPtrArray *imports) {
     if (!dst || !imports) return;
     for (guint i = 0u; i < imports->len; i++) {
@@ -32,6 +49,9 @@ static void completion_merge_imports(GPtrArray *dst, GPtrArray *imports) {
     }
 }
 
+/**
+ * @brief Completion merge indexed.
+ */
 static void completion_merge_indexed(EditorTab *tab, GPtrArray *dst,
                                      const char *prefix) {
     if (!tab || !dst || !prefix) return;
@@ -47,6 +67,9 @@ static void completion_merge_indexed(EditorTab *tab, GPtrArray *dst,
     g_ptr_array_free(indexed, TRUE);
 }
 
+/**
+ * @brief Completion build candidates.
+ */
 static GPtrArray *completion_build_candidates(EditorTab *tab,
                                               const char *prefix,
                                               gboolean import_context,
@@ -68,6 +91,9 @@ static GPtrArray *completion_build_candidates(EditorTab *tab,
     return items;
 }
 
+/**
+ * @brief Completion line has word boundary.
+ */
 static gboolean completion_line_has_word_boundary(const char *line,
                                                  const char *word) {
     if (!line || !word || word[0] == '\0') return FALSE;
@@ -85,6 +111,9 @@ static gboolean completion_line_has_word_boundary(const char *line,
     return FALSE;
 }
 
+/**
+ * @brief Completion line looks like definition.
+ */
 static gboolean completion_line_looks_like_definition(const char *trim,
                                                      const char *word) {
     if (!trim || !word || !completion_line_has_word_boundary(trim, word)) {
@@ -102,6 +131,9 @@ static gboolean completion_line_looks_like_definition(const char *trim,
     return FALSE;
 }
 
+/**
+ * @brief Completion clean comment line.
+ */
 static char *completion_clean_comment_line(const char *line) {
     if (!line) return NULL;
     char *copy = g_strdup(line);
@@ -129,6 +161,9 @@ static char *completion_clean_comment_line(const char *line) {
     return out;
 }
 
+/**
+ * @brief Completion detail from current buffer.
+ */
 static char *completion_detail_from_current_buffer(EditorTab *tab,
                                                    const char *word) {
     if (!tab || !word || word[0] == '\0') return NULL;
@@ -174,6 +209,9 @@ static char *completion_detail_from_current_buffer(EditorTab *tab,
     return detail;
 }
 
+/**
+ * @brief Completion update popup size.
+ */
 static void completion_update_popup_size(EditorTab *tab,
                                          guint row_count,
                                          gboolean has_details) {
@@ -189,6 +227,9 @@ static void completion_update_popup_size(EditorTab *tab,
                                                    : GTK_POLICY_NEVER);
 }
 
+/**
+ * @brief Completion populate rows.
+ */
 static void completion_populate_rows(EditorTab *tab, GPtrArray *candidates) {
     completion_clear_rows(tab);
     if (!candidates) {
@@ -210,6 +251,9 @@ static void completion_populate_rows(EditorTab *tab, GPtrArray *candidates) {
                                  has_details);
 }
 
+/**
+ * @brief Completion place popover.
+ */
 static void completion_place_popover(EditorTab *tab, GtkTextIter *cursor,
                                      gboolean manual) {
     if (!tab || !tab->text_view || !tab->popover_parent ||
@@ -242,11 +286,17 @@ static void completion_place_popover(EditorTab *tab, GtkTextIter *cursor,
         GTK_LIST_BOX(tab->completion_list), first);
 }
 
+/**
+ * @brief Completion is visible.
+ */
 gboolean completion_is_visible(EditorTab *tab) {
     return tab && tab->completion_popover &&
            gtk_widget_get_visible(tab->completion_popover);
 }
 
+/**
+ * @brief Editor tab hide completion.
+ */
 void editor_tab_hide_completion(EditorTab *tab) {
     if (!tab) return;
     if (tab->completion_timeout != 0u) {
@@ -257,11 +307,17 @@ void editor_tab_hide_completion(EditorTab *tab) {
     g_clear_pointer(&tab->completion_prefix, g_free);
 }
 
+/**
+ * @brief Completion clear rows.
+ */
 void completion_clear_rows(EditorTab *tab) {
     if (!tab || !tab->completion_list) return;
     cleaf_list_box_clear(tab->completion_list);
 }
 
+/**
+ * @brief Completion insert word.
+ */
 void completion_insert_word(EditorTab *tab, const char *word) {
     if (!tab || tab->locked || !word || word[0] == '\0') return;
 
@@ -283,6 +339,9 @@ void completion_insert_word(EditorTab *tab, const char *word) {
     editor_tab_hide_completion(tab);
 }
 
+/**
+ * @brief Completion row activated.
+ */
 void completion_row_activated(GtkListBox *box, GtkListBoxRow *row,
                               gpointer user_data) {
     (void)box;
@@ -292,6 +351,9 @@ void completion_row_activated(GtkListBox *box, GtkListBoxRow *row,
     completion_insert_word(tab, word);
 }
 
+/**
+ * @brief Completion add row with detail.
+ */
 static void completion_add_row_with_detail(EditorTab *tab,
                                            const char *word,
                                            const char *detail) {
@@ -328,10 +390,16 @@ static void completion_add_row_with_detail(EditorTab *tab,
     gtk_list_box_insert(GTK_LIST_BOX(tab->completion_list), row, -1);
 }
 
+/**
+ * @brief Completion add row.
+ */
 void completion_add_row(EditorTab *tab, const char *word) {
     completion_add_row_with_detail(tab, word, NULL);
 }
 
+/**
+ * @brief Editor tab show completion.
+ */
 void editor_tab_show_completion(EditorTab *tab, gboolean manual) {
     if (!tab || !tab->autocomplete_enabled) return;
     if (!manual && !editor_tab_live_features_allowed(tab)) return;
@@ -373,6 +441,9 @@ void editor_tab_show_completion(EditorTab *tab, gboolean manual) {
     completion_place_popover(tab, &cursor, manual);
 }
 
+/**
+ * @brief Completion timeout cb.
+ */
 gboolean completion_timeout_cb(gpointer user_data) {
     EditorTab *tab = user_data;
     if (!tab) return G_SOURCE_REMOVE;
@@ -381,6 +452,9 @@ gboolean completion_timeout_cb(gpointer user_data) {
     return G_SOURCE_REMOVE;
 }
 
+/**
+ * @brief Editor tab schedule completion.
+ */
 void editor_tab_schedule_completion(EditorTab *tab) {
     if (!tab || !tab->autocomplete_enabled || !tab->buffer) return;
     cleaf_source_cancel(&tab->completion_timeout);
@@ -403,6 +477,9 @@ void editor_tab_schedule_completion(EditorTab *tab) {
                                                NULL);
 }
 
+/**
+ * @brief Completion accept selected.
+ */
 void completion_accept_selected(EditorTab *tab) {
     if (!tab || !tab->completion_list) return;
     GtkListBox *list = GTK_LIST_BOX(tab->completion_list);
@@ -413,6 +490,9 @@ void completion_accept_selected(EditorTab *tab) {
     completion_insert_word(tab, word);
 }
 
+/**
+ * @brief Completion select delta.
+ */
 void completion_select_delta(EditorTab *tab, int delta) {
     if (!tab || !tab->completion_list) return;
     GtkListBox *list = GTK_LIST_BOX(tab->completion_list);

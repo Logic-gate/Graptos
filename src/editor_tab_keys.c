@@ -1,6 +1,14 @@
+/**
+ * @file src/editor_tab_keys.c
+ * @brief Cleaf editor tab keys module.
+ */
+
 #include "editor_tab_private.h"
 
 
+/**
+ * @brief Text between iters.
+ */
 static char *text_between_iters(GtkTextBuffer *buffer,
                                 const GtkTextIter *start,
                                 const GtkTextIter *end) {
@@ -8,6 +16,9 @@ static char *text_between_iters(GtkTextBuffer *buffer,
     return gtk_text_buffer_get_text(buffer, start, end, FALSE);
 }
 
+/**
+ * @brief Line leading indent.
+ */
 static char *line_leading_indent(const char *line) {
     if (!line) return g_strdup("");
     const char *p = line;
@@ -15,12 +26,18 @@ static char *line_leading_indent(const char *line) {
     return g_strndup(line, (gsize)(p - line));
 }
 
+/**
+ * @brief Trimmed copy.
+ */
 static char *trimmed_copy(const char *text) {
     char *copy = g_strdup(text ? text : "");
     if (!copy) return NULL;
     return g_strstrip(copy);
 }
 
+/**
+ * @brief Syntax has suffix token.
+ */
 static gboolean syntax_has_suffix_token(GPtrArray *tokens,
                                         const char *text,
                                         const char *fallback) {
@@ -35,6 +52,9 @@ static gboolean syntax_has_suffix_token(GPtrArray *tokens,
     return fallback && g_str_has_suffix(text, fallback);
 }
 
+/**
+ * @brief Syntax has prefix token.
+ */
 static gboolean syntax_has_prefix_token(GPtrArray *tokens,
                                         const char *text,
                                         const char *fallback) {
@@ -49,6 +69,9 @@ static gboolean syntax_has_prefix_token(GPtrArray *tokens,
     return fallback && g_str_has_prefix(text, fallback);
 }
 
+/**
+ * @brief First indent opener.
+ */
 static const char *first_indent_opener(EditorTab *tab) {
     if (tab && tab->active_syntax && tab->active_syntax->indent_openers &&
         tab->active_syntax->indent_openers->len > 0u) {
@@ -58,6 +81,9 @@ static const char *first_indent_opener(EditorTab *tab) {
     return "{";
 }
 
+/**
+ * @brief First indent closer.
+ */
 static const char *first_indent_closer(EditorTab *tab) {
     if (tab && tab->active_syntax && tab->active_syntax->indent_closers &&
         tab->active_syntax->indent_closers->len > 0u) {
@@ -67,10 +93,16 @@ static const char *first_indent_closer(EditorTab *tab) {
     return "}";
 }
 
+/**
+ * @brief Auto indent enabled.
+ */
 static gboolean auto_indent_enabled(EditorTab *tab) {
     return !tab || !tab->active_syntax || tab->active_syntax->auto_indent;
 }
 
+/**
+ * @brief Insert block newline.
+ */
 static void insert_block_newline(EditorTab *tab,
                                  GtkTextIter *iter,
                                  const char *base_indent,
@@ -91,6 +123,9 @@ static void insert_block_newline(EditorTab *tab,
     gtk_text_buffer_delete_mark(buffer, cursor_mark);
 }
 
+/**
+ * @brief Line before has adjacent indent pair.
+ */
 static gboolean line_before_has_adjacent_indent_pair(EditorTab *tab,
                                                      const char *trimmed_before) {
     if (!tab || !trimmed_before) return FALSE;
@@ -110,6 +145,9 @@ static gboolean line_before_has_adjacent_indent_pair(EditorTab *tab,
     return result;
 }
 
+/**
+ * @brief Handle return key.
+ */
 static gboolean handle_return_key(EditorTab *tab) {
     if (!tab || tab->locked || !tab->buffer || !auto_indent_enabled(tab)) return FALSE;
 
@@ -163,27 +201,60 @@ static gboolean handle_return_key(EditorTab *tab) {
     return TRUE;
 }
 
+/**
+ * @brief Menu undo.
+ */
 void menu_undo(GtkWidget *w, gpointer data) { (void)w; editor_tab_undo(data); }
 
+/**
+ * @brief Menu redo.
+ */
 void menu_redo(GtkWidget *w, gpointer data) { (void)w; editor_tab_redo(data); }
 
+/**
+ * @brief Menu cut.
+ */
 void menu_cut(GtkWidget *w, gpointer data) { (void)w; editor_tab_cut_clipboard(data); }
 
+/**
+ * @brief Menu copy.
+ */
 void menu_copy(GtkWidget *w, gpointer data) { (void)w; editor_tab_copy_clipboard(data); }
 
+/**
+ * @brief Menu paste.
+ */
 void menu_paste(GtkWidget *w, gpointer data) { (void)w; editor_tab_paste_clipboard(data); }
 
+/**
+ * @brief Menu select all.
+ */
 void menu_select_all(GtkWidget *w, gpointer data) { (void)w; editor_tab_select_all(data); }
 
+/**
+ * @brief Menu cut line.
+ */
 void menu_cut_line(GtkWidget *w, gpointer data) { (void)w; editor_tab_cut_line(data); }
 
+/**
+ * @brief Menu paste line.
+ */
 void menu_paste_line(GtkWidget *w, gpointer data) { (void)w; editor_tab_paste_cut_line(data); }
 
+/**
+ * @brief Menu comment.
+ */
 void menu_comment(GtkWidget *w, gpointer data) { (void)w; editor_tab_toggle_comment(data); }
 
+/**
+ * @brief Menu complete.
+ */
 void menu_complete(GtkWidget *w, gpointer data) { (void)w; editor_tab_show_completion(data, TRUE); }
 
 
+/**
+ * @brief Tab unit.
+ */
 char *tab_unit(EditorTab *tab) {
     if (!tab || !tab->insert_spaces) return g_strdup("\t");
     guint width = tab->tab_width == 0u ? 4u : tab->tab_width;
@@ -192,6 +263,9 @@ char *tab_unit(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Selection line bounds.
+ */
 void selection_line_bounds(EditorTab *tab, int *start_line_out, int *end_line_out, gboolean *has_selection_out) {
     GtkTextIter start;
     GtkTextIter end;
@@ -210,6 +284,9 @@ void selection_line_bounds(EditorTab *tab, int *start_line_out, int *end_line_ou
 }
 
 
+/**
+ * @brief Insert tab or indent.
+ */
 void insert_tab_or_indent(EditorTab *tab) {
     if (!tab || tab->locked) return;
     char *unit = tab_unit(tab);
@@ -238,6 +315,9 @@ void insert_tab_or_indent(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Unindent line.
+ */
 void unindent_line(EditorTab *tab, int line) {
     if (!tab || tab->locked || line < 0) return;
     GtkTextIter start;
@@ -261,6 +341,9 @@ void unindent_line(EditorTab *tab, int line) {
 }
 
 
+/**
+ * @brief Unindent selection or line.
+ */
 void unindent_selection_or_line(EditorTab *tab) {
     if (!tab || tab->locked) return;
     int start_line = 0;
@@ -275,6 +358,9 @@ void unindent_selection_or_line(EditorTab *tab) {
 }
 
 
+/**
+ * @brief On text view key pressed.
+ */
 gboolean on_text_view_key_pressed(GtkEventControllerKey *controller,
                                   guint keyval, guint keycode,
                                   GdkModifierType state,
@@ -328,6 +414,9 @@ gboolean on_text_view_key_pressed(GtkEventControllerKey *controller,
 }
 
 
+/**
+ * @brief On text view key released.
+ */
 void on_text_view_key_released(GtkEventControllerKey *controller,
                                 guint keyval, guint keycode,
                                 GdkModifierType state, gpointer user_data) {
@@ -336,11 +425,9 @@ void on_text_view_key_released(GtkEventControllerKey *controller,
     (void)state;
     EditorTab *tab = user_data;
     if (!tab) return;
-    guint key = gdk_keyval_to_lower(keyval);
     if (keyval == GDK_KEY_Alt_L || keyval == GDK_KEY_Alt_R) {
         tab->inspect_reference_active = FALSE;
         if (!tab->hover_pointer_inside) hide_hover_preview(tab);
     }
 }
-
 

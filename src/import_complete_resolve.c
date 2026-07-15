@@ -1,3 +1,8 @@
+/**
+ * @file src/import_complete_resolve.c
+ * @brief Import path and member resolution helpers.
+ */
+
 #include "import_complete_private.h"
 #include "app.h"
 #include "project.h"
@@ -5,6 +10,9 @@
 #include <glob.h>
 #include <string.h>
 
+/**
+ * @brief Name is safe.
+ */
 static gboolean name_is_safe(const char *name) {
     if (!name || name[0] == '\0') return FALSE;
     if (strlen(name) > CLEAF_IMPORT_MAX_NAME) return FALSE;
@@ -16,12 +24,18 @@ static gboolean name_is_safe(const char *name) {
     return TRUE;
 }
 
+/**
+ * @brief Prefix matches.
+ */
 static gboolean prefix_matches(const char *word, const char *prefix) {
     if (!word || !prefix) return FALSE;
     if (prefix[0] == '\0') return TRUE;
     return g_ascii_strncasecmp(word, prefix, strlen(prefix)) == 0;
 }
 
+/**
+ * @brief Add candidate.
+ */
 static void add_candidate(GPtrArray *out,
                           GHashTable *seen,
                           const char *word,
@@ -35,11 +49,17 @@ static void add_candidate(GPtrArray *out,
     g_hash_table_add(seen, g_strdup(word));
     g_ptr_array_add(out, g_strdup(word));
 }
+/**
+ * @brief Tab directory.
+ */
 static char *tab_directory(EditorTab *tab) {
     if (tab && tab->file_path) return g_path_get_dirname(tab->file_path);
     return g_get_current_dir();
 }
 
+/**
+ * @brief Add root.
+ */
 static void add_root(GPtrArray *roots, const char *path) {
     if (!roots || !path || path[0] == '\0') return;
     char *expanded = NULL;
@@ -69,6 +89,9 @@ static void add_root(GPtrArray *roots, const char *path) {
     }
 }
 
+/**
+ * @brief Add env roots.
+ */
 static void add_env_roots(GPtrArray *roots, const char *env_name) {
     const char *value = g_getenv(env_name);
     if (!value || value[0] == '\0') return;
@@ -77,6 +100,9 @@ static void add_env_roots(GPtrArray *roots, const char *env_name) {
     g_strfreev(parts);
 }
 
+/**
+ * @brief Collect roots.
+ */
 static void collect_roots(EditorTab *tab, GPtrArray *roots) {
     SyntaxDef *syntax = tab ? tab->active_syntax : NULL;
     char *dir = tab_directory(tab);
@@ -137,6 +163,9 @@ static void collect_roots(EditorTab *tab, GPtrArray *roots) {
     g_free(dir);
 }
 
+/**
+ * @brief Suffix allowed.
+ */
 static gboolean suffix_allowed(SyntaxDef *syntax, const char *name) {
     if (!syntax || !syntax->import_extensions ||
         syntax->import_extensions->len == 0u) {
@@ -149,6 +178,9 @@ static gboolean suffix_allowed(SyntaxDef *syntax, const char *name) {
     return FALSE;
 }
 
+/**
+ * @brief Strip suffix.
+ */
 static char *strip_suffix(SyntaxDef *syntax, const char *name) {
     if (!syntax || !syntax->import_strip_extensions) return g_strdup(name);
     if (!syntax->import_extensions) return g_strdup(name);
@@ -161,6 +193,9 @@ static char *strip_suffix(SyntaxDef *syntax, const char *name) {
     return g_strdup(name);
 }
 
+/**
+ * @brief Module fragment.
+ */
 static char *module_fragment(SyntaxDef *syntax, const char *module) {
     if (!module) return g_strdup("");
     char *out = g_strdup(module);
@@ -170,6 +205,9 @@ static char *module_fragment(SyntaxDef *syntax, const char *module) {
     return out;
 }
 
+/**
+ * @brief Scan dir.
+ */
 static void scan_dir(GPtrArray *out, GHashTable *seen, SyntaxDef *syntax,
                      const char *dir, const char *prefix,
                      guint max_results) {
@@ -202,6 +240,9 @@ static void scan_dir(GPtrArray *out, GHashTable *seen, SyntaxDef *syntax,
     g_dir_close(gdir);
 }
 
+/**
+ * @brief Collect module candidates.
+ */
 static void collect_module_candidates(EditorTab *tab, ImportParse *ctx,
                                       GPtrArray *out, GHashTable *seen,
                                       guint max_results) {
@@ -219,6 +260,9 @@ static void collect_module_candidates(EditorTab *tab, ImportParse *ctx,
     g_ptr_array_free(roots, TRUE);
 }
 
+/**
+ * @brief Add identifier.
+ */
 static void add_identifier(GPtrArray *out, GHashTable *seen, const char *word,
                            const char *prefix, guint max_results) {
     if (!word) return;
@@ -226,6 +270,9 @@ static void add_identifier(GPtrArray *out, GHashTable *seen, const char *word,
     add_candidate(out, seen, word, prefix, max_results);
 }
 
+/**
+ * @brief Scan quoted identifier list.
+ */
 static void scan_quoted_identifier_list(GPtrArray *out, GHashTable *seen,
                                         const char *line, const char *prefix,
                                         guint max_results) {
@@ -248,6 +295,9 @@ static void scan_quoted_identifier_list(GPtrArray *out, GHashTable *seen,
     }
 }
 
+/**
+ * @brief Scan text symbols.
+ */
 static void scan_text_symbols(GPtrArray *out, GHashTable *seen,
                               const char *text, const char *prefix,
                               guint max_results) {
@@ -289,6 +339,9 @@ static void scan_text_symbols(GPtrArray *out, GHashTable *seen,
     }
 }
 
+/**
+ * @brief Scan symbol file.
+ */
 static void scan_symbol_file(GPtrArray *out, GHashTable *seen,
                              const char *path, const char *prefix,
                              guint max_results) {
@@ -301,6 +354,9 @@ static void scan_symbol_file(GPtrArray *out, GHashTable *seen,
     g_free(text);
 }
 
+/**
+ * @brief Collect static members.
+ */
 static void collect_static_members(SyntaxDef *syntax, GPtrArray *out,
                                    GHashTable *seen, const char *module,
                                    const char *prefix, guint max_results) {
@@ -323,6 +379,9 @@ static void collect_static_members(SyntaxDef *syntax, GPtrArray *out,
     }
 }
 
+/**
+ * @brief Collect member candidates.
+ */
 static void collect_member_candidates(EditorTab *tab, ImportParse *ctx,
                                       GPtrArray *out, GHashTable *seen,
                                       guint max_results) {
@@ -364,6 +423,9 @@ static void collect_member_candidates(EditorTab *tab, ImportParse *ctx,
     g_ptr_array_free(roots, TRUE);
 }
 
+/**
+ * @brief Import collect candidates.
+ */
 void import_collect_candidates(EditorTab *tab,
                                ImportParse *ctx,
                                GPtrArray *out,

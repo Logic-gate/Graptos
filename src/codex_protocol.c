@@ -1,5 +1,13 @@
+/**
+ * @file src/codex_protocol.c
+ * @brief Codex JSON line protocol helpers.
+ */
+
 #include "codex_protocol.h"
 
+/**
+ * @brief Codex protocol message.
+ */
 static char *codex_protocol_message(gboolean has_id,
                                     guint64 id,
                                     const char *method,
@@ -33,16 +41,25 @@ static char *codex_protocol_message(gboolean has_id,
     return line;
 }
 
+/**
+ * @brief Codex protocol request.
+ */
 char *codex_protocol_request(guint64 id,
                              const char *method,
                              JsonNode *params) {
     return codex_protocol_message(TRUE, id, method, params);
 }
 
+/**
+ * @brief Codex protocol notification.
+ */
 char *codex_protocol_notification(const char *method, JsonNode *params) {
     return codex_protocol_message(FALSE, 0u, method, params);
 }
 
+/**
+ * @brief Codex protocol response.
+ */
 char *codex_protocol_response(guint64 id, JsonNode *result) {
     JsonBuilder *builder = json_builder_new();
     json_builder_begin_object(builder);
@@ -63,12 +80,18 @@ char *codex_protocol_response(guint64 id, JsonNode *result) {
     return line;
 }
 
+/**
+ * @brief Codex protocol object params.
+ */
 JsonNode *codex_protocol_object_params(void) {
     JsonNode *node = json_node_new(JSON_NODE_OBJECT);
     json_node_take_object(node, json_object_new());
     return node;
 }
 
+/**
+ * @brief Codex protocol parse.
+ */
 gboolean codex_protocol_parse(const char *line,
                               JsonNode **root_out,
                               GError **error) {

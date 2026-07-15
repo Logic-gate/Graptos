@@ -1,3 +1,8 @@
+/**
+ * @file src/ui.c
+ * @brief Shared GTK utility helpers and compatibility wrappers.
+ */
+
 #include "ui.h"
 
 /*
@@ -7,15 +12,21 @@
  * the window close signal.
  */
 typedef struct {
-    GMainLoop *loop;
-    int response;
+    GMainLoop *loop; /**< Loop. */
+    int response; /**< Response. */
 } ModalRunState;
 
+/**
+ * @brief Ui type definition.
+ */
 typedef struct {
-    GMainLoop *loop;
-    char *path;
+    GMainLoop *loop; /**< Loop. */
+    char *path; /**< Path. */
 } FileDialogState;
 
+/**
+ * @brief Modal close cb.
+ */
 static gboolean modal_close_cb(GtkWindow *window, gpointer user_data) {
     (void)window;
     ModalRunState *state = user_data;
@@ -25,6 +36,9 @@ static gboolean modal_close_cb(GtkWindow *window, gpointer user_data) {
     return TRUE;
 }
 
+/**
+ * @brief Cleaf set all margins.
+ */
 void cleaf_set_all_margins(GtkWidget *widget, int margin) {
     if (!widget) return;
     gtk_widget_set_margin_start(widget, margin);
@@ -33,6 +47,9 @@ void cleaf_set_all_margins(GtkWidget *widget, int margin) {
     gtk_widget_set_margin_bottom(widget, margin);
 }
 
+/**
+ * @brief Cleaf modal window run.
+ */
 int cleaf_modal_window_run(GtkWindow *window, int default_response) {
     if (!window) return GTK_RESPONSE_NONE;
 
@@ -60,6 +77,9 @@ int cleaf_modal_window_run(GtkWindow *window, int default_response) {
     return state.response;
 }
 
+/**
+ * @brief Cleaf modal window respond.
+ */
 void cleaf_modal_window_respond(GtkWidget *widget, gpointer user_data) {
     int response = GPOINTER_TO_INT(user_data);
     GtkRoot *root = widget ? gtk_widget_get_root(widget) : NULL;
@@ -97,24 +117,36 @@ static void file_dialog_finish(GtkFileDialog *dialog,
     if (state->loop) g_main_loop_quit(state->loop);
 }
 
+/**
+ * @brief Open finish cb.
+ */
 static void open_finish_cb(GObject *source, GAsyncResult *result,
                            gpointer user_data) {
     file_dialog_finish(GTK_FILE_DIALOG(source), result, user_data,
                        gtk_file_dialog_open_finish);
 }
 
+/**
+ * @brief Save finish cb.
+ */
 static void save_finish_cb(GObject *source, GAsyncResult *result,
                            gpointer user_data) {
     file_dialog_finish(GTK_FILE_DIALOG(source), result, user_data,
                        gtk_file_dialog_save_finish);
 }
 
+/**
+ * @brief Folder finish cb.
+ */
 static void folder_finish_cb(GObject *source, GAsyncResult *result,
                              gpointer user_data) {
     file_dialog_finish(GTK_FILE_DIALOG(source), result, user_data,
                        gtk_file_dialog_select_folder_finish);
 }
 
+/**
+ * @brief Run file dialog.
+ */
 static char *run_file_dialog(GtkWindow *parent,
                              const char *title,
                              void (*start_func)(GtkFileDialog *,
@@ -138,21 +170,33 @@ static char *run_file_dialog(GtkWindow *parent,
     return state.path;
 }
 
+/**
+ * @brief Cleaf open file dialog.
+ */
 char *cleaf_open_file_dialog(GtkWindow *parent, const char *title) {
     return run_file_dialog(parent, title ? title : "Open File",
                            gtk_file_dialog_open, open_finish_cb);
 }
 
+/**
+ * @brief Cleaf save file dialog.
+ */
 char *cleaf_save_file_dialog(GtkWindow *parent, const char *title) {
     return run_file_dialog(parent, title ? title : "Save File",
                            gtk_file_dialog_save, save_finish_cb);
 }
 
+/**
+ * @brief Cleaf select folder dialog.
+ */
 char *cleaf_select_folder_dialog(GtkWindow *parent, const char *title) {
     return run_file_dialog(parent, title ? title : "Open Folder",
                            gtk_file_dialog_select_folder, folder_finish_cb);
 }
 
+/**
+ * @brief Cleaf source cancel.
+ */
 void cleaf_source_cancel(guint *source_id) {
     if (!source_id || *source_id == 0u) return;
 
@@ -197,10 +241,16 @@ void cleaf_widget_destroy(GtkWidget *widget) {
     }
 }
 
+/**
+ * @brief Cleaf box append.
+ */
 void cleaf_box_append(GtkWidget *box, GtkWidget *child) {
     if (box && child) gtk_box_append(GTK_BOX(box), child);
 }
 
+/**
+ * @brief Cleaf box prepend.
+ */
 void cleaf_box_prepend(GtkWidget *box, GtkWidget *child) {
     if (box && child) gtk_box_prepend(GTK_BOX(box), child);
 }
@@ -217,6 +267,9 @@ void cleaf_popover_attach(GtkWidget *popover, GtkWidget *parent) {
     gtk_widget_set_parent(popover, parent);
 }
 
+/**
+ * @brief Cleaf popover show.
+ */
 void cleaf_popover_show(GtkWidget *popover) {
     if (!popover || !GTK_IS_POPOVER(popover)) return;
 
@@ -228,12 +281,15 @@ void cleaf_popover_show(GtkWidget *popover) {
      * not have an allocation.  The next user event/timer can show it normally.
      */
     if (!gtk_widget_get_realized(parent) || !gtk_widget_get_mapped(parent)) return;
-    if (gtk_widget_get_allocated_width(parent) <= 0 ||
-        gtk_widget_get_allocated_height(parent) <= 0) return;
+    if (gtk_widget_get_width(parent) <= 0 ||
+        gtk_widget_get_height(parent) <= 0) return;
 
     gtk_popover_popup(GTK_POPOVER(popover));
 }
 
+/**
+ * @brief Cleaf popover hide.
+ */
 void cleaf_popover_hide(GtkWidget *popover) {
     if (popover && GTK_IS_POPOVER(popover) &&
         gtk_widget_get_parent(popover) && gtk_widget_get_visible(popover)) {
@@ -241,6 +297,9 @@ void cleaf_popover_hide(GtkWidget *popover) {
     }
 }
 
+/**
+ * @brief Cleaf list box clear.
+ */
 void cleaf_list_box_clear(GtkWidget *list_box) {
     if (!list_box || !GTK_IS_LIST_BOX(list_box)) return;
 
@@ -252,6 +311,9 @@ void cleaf_list_box_clear(GtkWidget *list_box) {
     }
 }
 
+/**
+ * @brief Cleaf button new.
+ */
 GtkWidget *cleaf_button_new(const char *label, const char *tooltip,
                             GCallback callback, gpointer data) {
     GtkWidget *button = gtk_button_new_with_label(label ? label : "");
@@ -260,6 +322,9 @@ GtkWidget *cleaf_button_new(const char *label, const char *tooltip,
     return button;
 }
 
+/**
+ * @brief Cleaf flat button new.
+ */
 GtkWidget *cleaf_flat_button_new(const char *label, const char *tooltip,
                                  GCallback callback, gpointer data) {
     GtkWidget *button = cleaf_button_new(label, tooltip, callback, data);
@@ -267,6 +332,9 @@ GtkWidget *cleaf_flat_button_new(const char *label, const char *tooltip,
     return button;
 }
 
+/**
+ * @brief Cleaf separator new.
+ */
 GtkWidget *cleaf_separator_new(void) {
     GtkWidget *sep = gtk_separator_new(GTK_ORIENTATION_VERTICAL);
     gtk_widget_set_margin_start(sep, 4);

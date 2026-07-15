@@ -1,3 +1,8 @@
+/**
+ * @file src/app_actions.c
+ * @brief Application action implementation composition unit.
+ */
+
 #include "app_private.h"
 
 #include <string.h>

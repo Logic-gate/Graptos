@@ -1,7 +1,15 @@
+/**
+ * @file src/app_layout.c
+ * @brief Top, bottom, and tool panel layout construction.
+ */
+
 #include "app_private.h"
 
 #include <string.h>
 
+/**
+ * @brief Menu small label.
+ */
 GtkWidget *menu_small_label(const char *text) {
     GtkWidget *label = gtk_label_new(text ? text : "");
     gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
@@ -10,6 +18,9 @@ GtkWidget *menu_small_label(const char *text) {
 }
 
 
+/**
+ * @brief Build top bar.
+ */
 GtkWidget *build_top_bar(EditorWindow *win) {
     GtkWidget *top = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
     gtk_widget_add_css_class(top, "cleaf-top");
@@ -32,6 +43,9 @@ GtkWidget *build_top_bar(EditorWindow *win) {
 }
 
 
+/**
+ * @brief Build search panel.
+ */
 GtkWidget *build_search_panel(EditorWindow *win) {
     win->search_revealer = gtk_revealer_new();
     gtk_revealer_set_transition_type(GTK_REVEALER(win->search_revealer), GTK_REVEALER_TRANSITION_TYPE_SLIDE_UP);
@@ -71,6 +85,9 @@ GtkWidget *build_search_panel(EditorWindow *win) {
 }
 
 
+/**
+ * @brief Tool button new.
+ */
 static GtkWidget *tool_button_new(const char *label,
                                   const char *tooltip,
                                   GCallback callback,
@@ -78,12 +95,18 @@ static GtkWidget *tool_button_new(const char *label,
     return cleaf_flat_button_new(label, tooltip, callback, data);
 }
 
+/**
+ * @brief Action toggle codex panel.
+ */
 void action_toggle_codex_panel(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
     if (win) codex_panel_toggle(win->codex_panel);
 }
 
+/**
+ * @brief Tool title new.
+ */
 static GtkWidget *tool_title_new(const char *title) {
     GtkWidget *label = gtk_label_new(title ? title : "");
     gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
@@ -91,6 +114,9 @@ static GtkWidget *tool_title_new(const char *title) {
     return label;
 }
 
+/**
+ * @brief Tool panel reset widget pointers.
+ */
 static void tool_panel_reset_widget_pointers(EditorWindow *win) {
     if (!win) return;
     win->syntax_combo = NULL;
@@ -104,6 +130,9 @@ static void tool_panel_reset_widget_pointers(EditorWindow *win) {
     win->syntax_override_button = NULL;
 }
 
+/**
+ * @brief Tool panel clear.
+ */
 static void tool_panel_clear(EditorWindow *win) {
     if (!win || !win->tool_panel) return;
     tool_panel_reset_widget_pointers(win);
@@ -115,6 +144,9 @@ static void tool_panel_clear(EditorWindow *win) {
     }
 }
 
+/**
+ * @brief Tool panel begin.
+ */
 static void tool_panel_begin(EditorWindow *win, const char *title) {
     if (!win || !win->tool_panel) return;
     tool_panel_clear(win);
@@ -122,6 +154,9 @@ static void tool_panel_begin(EditorWindow *win, const char *title) {
     gtk_box_append(GTK_BOX(win->tool_panel), cleaf_separator_new());
 }
 
+/**
+ * @brief Hide tool panel.
+ */
 static void hide_tool_panel(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -130,6 +165,9 @@ static void hide_tool_panel(GtkWidget *widget, gpointer user_data) {
     }
 }
 
+/**
+ * @brief Tool panel show ready.
+ */
 static void tool_panel_show_ready(EditorWindow *win) {
     if (!win || !win->tool_panel || !win->tool_revealer) return;
     GtkWidget *spacer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -139,6 +177,9 @@ static void tool_panel_show_ready(EditorWindow *win) {
     gtk_revealer_set_reveal_child(GTK_REVEALER(win->tool_revealer), TRUE);
 }
 
+/**
+ * @brief Tool switch new.
+ */
 static GtkWidget *tool_switch_new(const char *label_text,
                                   gboolean active,
                                   GCallback notify_cb,
@@ -163,6 +204,9 @@ static GtkWidget *tool_switch_new(const char *label_text,
     return row;
 }
 
+/**
+ * @brief On indent dropdown changed.
+ */
 static void on_indent_dropdown_changed(GtkDropDown *drop_down,
                                        GParamSpec *pspec,
                                        gpointer user_data) {
@@ -188,6 +232,9 @@ static void on_indent_dropdown_changed(GtkDropDown *drop_down,
     }
 }
 
+/**
+ * @brief On autocomplete switch changed.
+ */
 static void on_autocomplete_switch_changed(GtkSwitch *sw,
                                            GParamSpec *pspec,
                                            gpointer user_data) {
@@ -199,6 +246,9 @@ static void on_autocomplete_switch_changed(GtkSwitch *sw,
     cleaf_config_save(win);
 }
 
+/**
+ * @brief On autosave switch changed.
+ */
 static void on_autosave_switch_changed(GtkSwitch *sw,
                                        GParamSpec *pspec,
                                        gpointer user_data) {
@@ -210,6 +260,9 @@ static void on_autosave_switch_changed(GtkSwitch *sw,
     cleaf_config_save(win);
 }
 
+/**
+ * @brief On backup switch changed.
+ */
 static void on_backup_switch_changed(GtkSwitch *sw,
                                      GParamSpec *pspec,
                                      gpointer user_data) {
@@ -221,6 +274,9 @@ static void on_backup_switch_changed(GtkSwitch *sw,
     cleaf_config_save(win);
 }
 
+/**
+ * @brief On minimap switch changed.
+ */
 static void on_minimap_switch_changed(GtkSwitch *sw,
                                       GParamSpec *pspec,
                                       gpointer user_data) {
@@ -232,6 +288,9 @@ static void on_minimap_switch_changed(GtkSwitch *sw,
     cleaf_config_save(win);
 }
 
+/**
+ * @brief On preview switch changed.
+ */
 static void on_preview_switch_changed(GtkSwitch *sw,
                                       GParamSpec *pspec,
                                       gpointer user_data) {
@@ -243,6 +302,9 @@ static void on_preview_switch_changed(GtkSwitch *sw,
     cleaf_config_save(win);
 }
 
+/**
+ * @brief On yaml override switch changed.
+ */
 static void on_yaml_override_switch_changed(GtkSwitch *sw,
                                             GParamSpec *pspec,
                                             gpointer user_data) {
@@ -265,6 +327,9 @@ static void on_yaml_override_switch_changed(GtkSwitch *sw,
     cleaf_config_save(win);
 }
 
+/**
+ * @brief Show file tools.
+ */
 static void show_file_tools(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -276,6 +341,9 @@ static void show_file_tools(GtkWidget *widget, gpointer user_data) {
     tool_panel_show_ready(win);
 }
 
+/**
+ * @brief Show edit tools.
+ */
 static void show_edit_tools(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -287,6 +355,9 @@ static void show_edit_tools(GtkWidget *widget, gpointer user_data) {
     tool_panel_show_ready(win);
 }
 
+/**
+ * @brief Show indent tools.
+ */
 static void show_indent_tools(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -304,6 +375,9 @@ static void show_indent_tools(GtkWidget *widget, gpointer user_data) {
     tool_panel_show_ready(win);
 }
 
+/**
+ * @brief Show syntax tools.
+ */
 static void show_syntax_tools(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -324,6 +398,9 @@ static void show_syntax_tools(GtkWidget *widget, gpointer user_data) {
     tool_panel_show_ready(win);
 }
 
+/**
+ * @brief Show intelligence tools.
+ */
 static void show_intelligence_tools(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -336,6 +413,9 @@ static void show_intelligence_tools(GtkWidget *widget, gpointer user_data) {
     tool_panel_show_ready(win);
 }
 
+/**
+ * @brief Show safety tools.
+ */
 static void show_safety_tools(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -348,6 +428,9 @@ static void show_safety_tools(GtkWidget *widget, gpointer user_data) {
 }
 
 
+/**
+ * @brief Show git tools.
+ */
 static void show_git_tools(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -367,6 +450,9 @@ static void show_git_tools(GtkWidget *widget, gpointer user_data) {
     tool_panel_show_ready(win);
 }
 
+/**
+ * @brief Show view tools.
+ */
 static void show_view_tools(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
@@ -381,6 +467,9 @@ static void show_view_tools(GtkWidget *widget, gpointer user_data) {
     tool_panel_show_ready(win);
 }
 
+/**
+ * @brief Build tool panel.
+ */
 GtkWidget *build_tool_panel(EditorWindow *win) {
     win->tool_revealer = gtk_revealer_new();
     gtk_revealer_set_transition_type(GTK_REVEALER(win->tool_revealer), GTK_REVEALER_TRANSITION_TYPE_SLIDE_UP);
@@ -394,6 +483,9 @@ GtkWidget *build_tool_panel(EditorWindow *win) {
     return win->tool_revealer;
 }
 
+/**
+ * @brief Build bottom bar.
+ */
 GtkWidget *build_bottom_bar(EditorWindow *win) {
     GtkWidget *bottom = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
     gtk_widget_add_css_class(bottom, "cleaf-bottom");

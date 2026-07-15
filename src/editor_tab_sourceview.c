@@ -1,5 +1,13 @@
+/**
+ * @file src/editor_tab_sourceview.c
+ * @brief Cleaf editor tab sourceview module.
+ */
+
 #include "editor_tab_private.h"
 
+/**
+ * @brief Source language id for syntax.
+ */
 static const char *source_language_id_for_syntax(SyntaxDef *syntax) {
     if (!syntax || !syntax->name) return NULL;
     if (g_ascii_strcasecmp(syntax->name, "C") == 0) return "c";
@@ -25,6 +33,9 @@ static const char *source_language_id_for_syntax(SyntaxDef *syntax) {
     return NULL;
 }
 
+/**
+ * @brief Source language for tab.
+ */
 static GtkSourceLanguage *source_language_for_tab(EditorTab *tab) {
     GtkSourceLanguageManager *manager = gtk_source_language_manager_get_default();
     if (!manager || !tab) return NULL;
@@ -42,6 +53,9 @@ static GtkSourceLanguage *source_language_for_tab(EditorTab *tab) {
     return language;
 }
 
+/**
+ * @brief Colour is dark.
+ */
 static gboolean colour_is_dark(const char *colour) {
     GdkRGBA rgba;
     if (!colour || !gdk_rgba_parse(&rgba, colour)) return TRUE;
@@ -51,6 +65,9 @@ static gboolean colour_is_dark(const char *colour) {
     return luminance < 0.50;
 }
 
+/**
+ * @brief Source style scheme for window.
+ */
 static GtkSourceStyleScheme *source_style_scheme_for_window(EditorWindow *win) {
     GtkSourceStyleSchemeManager *manager =
         gtk_source_style_scheme_manager_get_default();
@@ -72,6 +89,9 @@ static GtkSourceStyleScheme *source_style_scheme_for_window(EditorWindow *win) {
 }
 
 
+/**
+ * @brief Source parent scheme id for window.
+ */
 static const char *source_parent_scheme_id_for_window(EditorWindow *win) {
     GtkSourceStyleSchemeManager *manager =
         gtk_source_style_scheme_manager_get_default();
@@ -91,6 +111,9 @@ static const char *source_parent_scheme_id_for_window(EditorWindow *win) {
     return preferred[0];
 }
 
+/**
+ * @brief String contains ci.
+ */
 static gboolean string_contains_ci(const char *text, const char *needle) {
     if (!text || !needle || needle[0] == '\0') return FALSE;
     char *lower_text = g_ascii_strdown(text, -1);
@@ -101,6 +124,9 @@ static gboolean string_contains_ci(const char *text, const char *needle) {
     return found;
 }
 
+/**
+ * @brief Style names add.
+ */
 static void style_names_add(GPtrArray *names, const char *name) {
     if (!names || !name || name[0] == '\0') return;
     for (guint i = 0u; i < names->len; i++) {
@@ -217,12 +243,18 @@ static GPtrArray *gtksource_styles_for_yaml_rule(const char *rule_name) {
     return names;
 }
 
+/**
+ * @brief Append xml escaped.
+ */
 static void append_xml_escaped(GString *out, const char *text) {
     char *escaped = g_markup_escape_text(text ? text : "", -1);
     g_string_append(out, escaped ? escaped : "");
     g_free(escaped);
 }
 
+/**
+ * @brief Append style from rule.
+ */
 static void append_style_from_rule(GString *xml, const char *style_name, SyntaxRule *rule) {
     if (!xml || !style_name || !rule || !rule->color || rule->color[0] == '\0') return;
     g_string_append(xml, "  <style name=\"");
@@ -247,6 +279,9 @@ static char *yaml_override_style_dir(void) {
     return g_build_filename(base, "cleaf", "gtksourceview", "styles", NULL);
 }
 
+/**
+ * @brief Style slug from syntax name.
+ */
 static char *style_slug_from_syntax_name(const char *name) {
     char *lower = g_ascii_strdown(name && name[0] ? name : "plain", -1);
     if (!lower) return g_strdup("plain");
@@ -256,10 +291,16 @@ static char *style_slug_from_syntax_name(const char *name) {
     return lower;
 }
 
+/**
+ * @brief Effective colour.
+ */
 static const char *effective_colour(const char *value, const char *fallback) {
     return (value && value[0] == '#') ? value : fallback;
 }
 
+/**
+ * @brief Source yaml override scheme for tab.
+ */
 static GtkSourceStyleScheme *source_yaml_override_scheme_for_tab(EditorTab *tab) {
     if (!tab || !tab->win) return NULL;
 
@@ -380,6 +421,9 @@ static GtkSourceStyleScheme *source_yaml_override_scheme_for_tab(EditorTab *tab)
     return scheme ? scheme : source_style_scheme_for_window(tab->win);
 }
 
+/**
+ * @brief Clear cleaf transient tags.
+ */
 static void clear_cleaf_transient_tags(EditorTab *tab) {
     if (!tab || !tab->buffer) return;
     syntax_clear(tab->buffer, tab->win ? tab->win->syntaxes : NULL);

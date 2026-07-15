@@ -1,14 +1,25 @@
+/**
+ * @file src/import_complete.c
+ * @brief Import completion public API and candidate collection.
+ */
+
 #include "import_complete_private.h"
 
 #include <string.h>
 
 
+/**
+ * @brief Compare strings.
+ */
 static gint compare_strings(gconstpointer a, gconstpointer b) {
     const char *sa = *(char * const *)a;
     const char *sb = *(char * const *)b;
     return g_ascii_strcasecmp(sa ? sa : "", sb ? sb : "");
 }
 
+/**
+ * @brief Text line before cursor.
+ */
 static char *text_line_before_cursor(EditorTab *tab) {
     if (!tab || !tab->buffer) return NULL;
     GtkTextIter cursor;
@@ -19,6 +30,9 @@ static char *text_line_before_cursor(EditorTab *tab) {
     return gtk_text_buffer_get_text(tab->buffer, &start, &cursor, FALSE);
 }
 
+/**
+ * @brief List has word.
+ */
 static gboolean list_has_word(GPtrArray *list, const char *line,
                               char **after_out) {
     if (!list || !line) return FALSE;
@@ -38,6 +52,9 @@ static gboolean list_has_word(GPtrArray *list, const char *line,
     return FALSE;
 }
 
+/**
+ * @brief Split path token.
+ */
 static void split_path_token(ImportParse *ctx, gboolean dot_modules) {
     const char *token = ctx->token ? ctx->token : "";
     const char *sep = strrchr(token, '/');
@@ -51,6 +68,9 @@ static void split_path_token(ImportParse *ctx, gboolean dot_modules) {
     ctx->base_part = g_strdup(sep + 1);
 }
 
+/**
+ * @brief Strip quote tail.
+ */
 static char *strip_quote_tail(const char *text) {
     if (!text) return g_strdup("");
     char *out = g_strdup(text);
@@ -63,6 +83,9 @@ static char *strip_quote_tail(const char *text) {
     return g_strstrip(out);
 }
 
+/**
+ * @brief Parse include line.
+ */
 static gboolean parse_include_line(const char *line, ImportParse *ctx) {
     const char *p = strstr(line, "#include");
     if (!p) return FALSE;
@@ -88,6 +111,9 @@ static gboolean parse_include_line(const char *line, ImportParse *ctx) {
     return TRUE;
 }
 
+/**
+ * @brief Find keyword span.
+ */
 static const char *find_keyword_span(const char *line, GPtrArray *keywords,
                                      const char **kw_start_out) {
     if (!line || !keywords) return NULL;
@@ -110,6 +136,9 @@ static const char *find_keyword_span(const char *line, GPtrArray *keywords,
     return NULL;
 }
 
+/**
+ * @brief Parse quoted import.
+ */
 static gboolean parse_quoted_import(const char *line, SyntaxDef *syntax,
                                     ImportParse *ctx) {
     if (!line || !syntax) return FALSE;
@@ -134,6 +163,9 @@ static gboolean parse_quoted_import(const char *line, SyntaxDef *syntax,
     return TRUE;
 }
 
+/**
+ * @brief Parse member import.
+ */
 static gboolean parse_member_import(const char *line, SyntaxDef *syntax,
                                     ImportParse *ctx) {
     char *after_from = NULL;
@@ -174,6 +206,9 @@ static gboolean parse_member_import(const char *line, SyntaxDef *syntax,
     return TRUE;
 }
 
+/**
+ * @brief Parse module import.
+ */
 static gboolean parse_module_import(const char *line, SyntaxDef *syntax,
                                     ImportParse *ctx) {
     char *after = NULL;
@@ -194,6 +229,9 @@ static gboolean parse_module_import(const char *line, SyntaxDef *syntax,
     return TRUE;
 }
 
+/**
+ * @brief Import parse clear.
+ */
 void import_parse_clear(ImportParse *ctx) {
     if (!ctx) return;
     g_free(ctx->module);
@@ -203,6 +241,9 @@ void import_parse_clear(ImportParse *ctx) {
     memset(ctx, 0, sizeof(*ctx));
 }
 
+/**
+ * @brief Import parse current line.
+ */
 gboolean import_parse_current_line(EditorTab *tab, ImportParse *ctx) {
     if (!tab || !ctx) return FALSE;
     SyntaxDef *syntax = tab->active_syntax;
@@ -218,6 +259,9 @@ gboolean import_parse_current_line(EditorTab *tab, ImportParse *ctx) {
 }
 
 
+/**
+ * @brief Import completion tab is import context.
+ */
 gboolean import_completion_tab_is_import_context(EditorTab *tab) {
     ImportParse ctx = {0};
     gboolean ok = import_parse_current_line(tab, &ctx);
@@ -225,6 +269,9 @@ gboolean import_completion_tab_is_import_context(EditorTab *tab) {
     return ok;
 }
 
+/**
+ * @brief Import completion candidates for tab.
+ */
 GPtrArray *import_completion_candidates_for_tab(EditorTab *tab,
                                                 const char *prefix,
                                                 guint max_results) {

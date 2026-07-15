@@ -1,12 +1,23 @@
+/**
+ * @file src/syntax_loader.c
+ * @brief YAML-like syntax definition loader.
+ */
+
 #include "syntax_private.h"
 
 #include <errno.h>
 #include <string.h>
 
 #ifndef DATADIR
+/**
+ * @brief Datadir macro.
+ */
 #define DATADIR "/usr/local/share/cleaf"
 #endif
 
+/**
+ * @brief Trim dup.
+ */
 static char *trim_dup(const char *text) {
     if (!text) return g_strdup("");
     char *copy = g_strdup(text);
@@ -14,6 +25,9 @@ static char *trim_dup(const char *text) {
     return g_strstrip(copy);
 }
 
+/**
+ * @brief Unquote value.
+ */
 static char *unquote_value(const char *value) {
     char *s = trim_dup(value);
     if (!s) return NULL;
@@ -27,6 +41,9 @@ static char *unquote_value(const char *value) {
     return s;
 }
 
+/**
+ * @brief Parse bool value.
+ */
 static gboolean parse_bool_value(const char *value) {
     char *s = trim_dup(value);
     if (!s) return FALSE;
@@ -37,6 +54,9 @@ static gboolean parse_bool_value(const char *value) {
     return result;
 }
 
+/**
+ * @brief Split key value.
+ */
 static gboolean split_key_value(const char *line, char **key_out, char **value_out) {
     const char *colon = strchr(line, ':');
     if (!colon) return FALSE;
@@ -54,6 +74,9 @@ static gboolean split_key_value(const char *line, char **key_out, char **value_o
     return TRUE;
 }
 
+/**
+ * @brief Parse string list.
+ */
 static void parse_string_list(GPtrArray *out, const char *value, gboolean dot_prefix) {
     if (!out || !value) return;
     char *s = trim_dup(value);
@@ -82,6 +105,9 @@ static void parse_string_list(GPtrArray *out, const char *value, gboolean dot_pr
 }
 
 
+/**
+ * @brief Syntax pair new from spec.
+ */
 static SyntaxPair *syntax_pair_new_from_spec(const char *spec) {
     if (!spec) return NULL;
     const char *sep = strstr(spec, "=>");
@@ -113,6 +139,9 @@ static SyntaxPair *syntax_pair_new_from_spec(const char *spec) {
     return pair;
 }
 
+/**
+ * @brief Parse pair list.
+ */
 static void parse_pair_list(GPtrArray *out, const char *value) {
     if (!out || !value) return;
     GPtrArray *items = g_ptr_array_new_with_free_func(g_free);
@@ -126,21 +155,33 @@ static void parse_pair_list(GPtrArray *out, const char *value) {
     g_ptr_array_free(items, TRUE);
 }
 
+/**
+ * @brief Parse extensions.
+ */
 static void parse_extensions(SyntaxDef *syntax, const char *value) {
     if (!syntax) return;
     parse_string_list(syntax->extensions, value, TRUE);
 }
 
+/**
+ * @brief Parse completions.
+ */
 static void parse_completions(SyntaxDef *syntax, const char *value) {
     if (!syntax) return;
     parse_string_list(syntax->completions, value, FALSE);
 }
 
+/**
+ * @brief Parse filenames.
+ */
 static void parse_filenames(SyntaxDef *syntax, const char *value) {
     if (!syntax) return;
     parse_string_list(syntax->filenames, value, FALSE);
 }
 
+/**
+ * @brief Parse rule field.
+ */
 static void parse_rule_field(SyntaxRule *rule, const char *key, const char *value) {
     if (!rule || !key || !value) return;
     if (g_ascii_strcasecmp(key, "name") == 0) {
@@ -161,6 +202,9 @@ static void parse_rule_field(SyntaxRule *rule, const char *key, const char *valu
     }
 }
 
+/**
+ * @brief Compile syntax rule.
+ */
 static gboolean compile_syntax_rule(SyntaxRule *rule, const char *filename) {
     if (!rule || !rule->pattern || rule->pattern[0] == '\0') return FALSE;
     GError *error = NULL;
@@ -177,6 +221,9 @@ static gboolean compile_syntax_rule(SyntaxRule *rule, const char *filename) {
 }
 
 
+/**
+ * @brief Parse rule line.
+ */
 static void parse_rule_line(SyntaxDef *syntax, char *line,
                             SyntaxRule **current_rule) {
     if (g_str_has_prefix(line, "-")) {
@@ -195,6 +242,9 @@ static void parse_rule_line(SyntaxDef *syntax, char *line,
     g_free(value);
 }
 
+/**
+ * @brief Parse top level field.
+ */
 static void parse_top_level_field(SyntaxDef *syntax,
                                   const char *key,
                                   const char *value) {
@@ -268,6 +318,9 @@ static void parse_top_level_field(SyntaxDef *syntax,
     }
 }
 
+/**
+ * @brief Top level key accepts block list.
+ */
 static gboolean top_level_key_accepts_block_list(const char *key) {
     if (!key) return FALSE;
     return g_ascii_strcasecmp(key, "extensions") == 0 ||
@@ -297,6 +350,9 @@ static gboolean top_level_key_accepts_block_list(const char *key) {
            g_ascii_strcasecmp(key, "indent_closers") == 0;
 }
 
+/**
+ * @brief Parse top level line.
+ */
 static void parse_top_level_line(SyntaxDef *syntax, const char *line,
                                  char **block_list_key) {
     char *key = NULL;
@@ -317,6 +373,9 @@ static void parse_top_level_line(SyntaxDef *syntax, const char *line,
     g_free(value);
 }
 
+/**
+ * @brief Parse syntax line.
+ */
 static void parse_syntax_line(SyntaxDef *syntax, char *line,
                               gboolean *in_rules,
                               SyntaxRule **current_rule,
@@ -354,6 +413,9 @@ static void parse_syntax_line(SyntaxDef *syntax, char *line,
     parse_top_level_line(syntax, line, block_list_key);
 }
 
+/**
+ * @brief Compile syntax rules.
+ */
 static gboolean compile_syntax_rules(SyntaxDef *syntax, const char *path) {
     if (!syntax->name || !syntax->rules || syntax->rules->len == 0u) {
         return FALSE;
@@ -367,6 +429,9 @@ static gboolean compile_syntax_rules(SyntaxDef *syntax, const char *path) {
     return syntax->rules->len > 0u;
 }
 
+/**
+ * @brief Load syntax file.
+ */
 static SyntaxDef *load_syntax_file(const char *path) {
     char *contents = NULL;
     gsize length = 0u;
@@ -407,12 +472,18 @@ static SyntaxDef *load_syntax_file(const char *path) {
 }
 
 
+/**
+ * @brief Syntax name compare.
+ */
 static gint syntax_name_compare(gconstpointer a, gconstpointer b) {
     const SyntaxDef *sa = *(SyntaxDef * const *)a;
     const SyntaxDef *sb = *(SyntaxDef * const *)b;
     return g_ascii_strcasecmp(sa && sa->name ? sa->name : "", sb && sb->name ? sb->name : "");
 }
 
+/**
+ * @brief Load syntax dir.
+ */
 static void load_syntax_dir(GPtrArray *syntaxes, const char *dir_path) {
     if (!syntaxes || !dir_path) return;
     GDir *dir = g_dir_open(dir_path, 0, NULL);
@@ -428,6 +499,9 @@ static void load_syntax_dir(GPtrArray *syntaxes, const char *dir_path) {
     g_dir_close(dir);
 }
 
+/**
+ * @brief Syntax load all.
+ */
 GPtrArray *syntax_load_all(void) {
     GPtrArray *syntaxes = g_ptr_array_new_with_free_func(syntax_def_free);
     if (!syntaxes) return NULL;

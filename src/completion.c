@@ -1,19 +1,36 @@
+/**
+ * @file src/completion.c
+ * @brief Text completion candidate extraction helpers.
+ */
+
 #include "completion.h"
 
 #include <string.h>
 
+/**
+ * @brief Ascii word start.
+ */
 static gboolean ascii_word_start(unsigned char ch) {
     return g_ascii_isalpha((gchar)ch) || ch == '_';
 }
 
+/**
+ * @brief Ascii word char.
+ */
 static gboolean ascii_word_char(unsigned char ch) {
     return g_ascii_isalnum((gchar)ch) || ch == '_';
 }
 
+/**
+ * @brief Completion is word char.
+ */
 gboolean completion_is_word_char(gunichar ch) {
     return g_unichar_isalnum(ch) || ch == (gunichar)'_';
 }
 
+/**
+ * @brief Completion prefix at cursor.
+ */
 char *completion_prefix_at_cursor(GtkTextBuffer *buffer, GtkTextIter *prefix_start, GtkTextIter *cursor) {
     if (!buffer) return NULL;
 
@@ -36,6 +53,9 @@ char *completion_prefix_at_cursor(GtkTextBuffer *buffer, GtkTextIter *prefix_sta
     return gtk_text_buffer_get_text(buffer, &start, &iter, FALSE);
 }
 
+/**
+ * @brief Candidate matches.
+ */
 static gboolean candidate_matches(const char *word, const char *prefix) {
     if (!word || !prefix || prefix[0] == '\0') return FALSE;
     gsize prefix_len = strlen(prefix);
@@ -44,6 +64,9 @@ static gboolean candidate_matches(const char *word, const char *prefix) {
     return strncmp(word, prefix, prefix_len) == 0;
 }
 
+/**
+ * @brief Candidate exists.
+ */
 static gboolean candidate_exists(GPtrArray *out, const char *word) {
     if (!out || !word) return FALSE;
     for (guint i = 0; i < out->len; i++) {
@@ -53,6 +76,9 @@ static gboolean candidate_exists(GPtrArray *out, const char *word) {
     return FALSE;
 }
 
+/**
+ * @brief Completion candidates add.
+ */
 void completion_candidates_add(GPtrArray *out, const char *word, const char *prefix, guint max_results) {
     if (!out || !word || !prefix) return;
     if (out->len >= max_results) return;
@@ -61,6 +87,9 @@ void completion_candidates_add(GPtrArray *out, const char *word, const char *pre
     g_ptr_array_add(out, g_strdup(word));
 }
 
+/**
+ * @brief Collect words from text.
+ */
 static void collect_words_from_text(GPtrArray *out, const char *text, const char *prefix, guint max_results) {
     if (!out || !text || !prefix) return;
 
@@ -85,6 +114,9 @@ static void collect_words_from_text(GPtrArray *out, const char *text, const char
     }
 }
 
+/**
+ * @brief Collect syntax completions.
+ */
 static void collect_syntax_completions(GPtrArray *out, SyntaxDef *syntax, const char *prefix, guint max_results) {
     if (!out || !syntax || !prefix) return;
 
@@ -104,6 +136,9 @@ static void collect_syntax_completions(GPtrArray *out, SyntaxDef *syntax, const 
     }
 }
 
+/**
+ * @brief Collect buffer words.
+ */
 static void collect_buffer_words(GPtrArray *out, GtkTextBuffer *buffer, const char *prefix, guint max_results) {
     if (!out || !buffer || !prefix) return;
     GtkTextIter start;
@@ -118,12 +153,18 @@ static void collect_buffer_words(GPtrArray *out, GtkTextBuffer *buffer, const ch
     g_free(text);
 }
 
+/**
+ * @brief Compare candidate words.
+ */
 static gint compare_candidate_words(gconstpointer a, gconstpointer b) {
     const char *sa = *(char * const *)a;
     const char *sb = *(char * const *)b;
     return g_ascii_strcasecmp(sa ? sa : "", sb ? sb : "");
 }
 
+/**
+ * @brief Completion candidates new.
+ */
 GPtrArray *completion_candidates_new(GtkTextBuffer *buffer, SyntaxDef *syntax, const char *prefix, guint max_results) {
     if (max_results == 0u) max_results = CLEAF_COMPLETION_DEFAULT_MAX_RESULTS;
     GPtrArray *out = g_ptr_array_new_with_free_func(g_free);

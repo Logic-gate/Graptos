@@ -1,5 +1,13 @@
+/**
+ * @file src/syntax_diagnostics.c
+ * @brief Syntax registry diagnostic text generation.
+ */
+
 #include "syntax.h"
 
+/**
+ * @brief Syntax diagnostics.
+ */
 char *syntax_diagnostics(GPtrArray *syntaxes) {
     GString *out = g_string_new("Loaded syntax definitions:\n");
     if (!out) return g_strdup("No diagnostic data.");

@@ -1,8 +1,16 @@
+/**
+ * @file src/main.c
+ * @brief Cleaf application entry point.
+ */
+
 #include "app.h"
 #include "project.h"
 
 #include <string.h>
 
+/**
+ * @brief Cleaf sanitize gtk im module.
+ */
 static void cleaf_sanitize_gtk_im_module(void) {
     const char *keep = g_getenv("CLEAF_KEEP_GTK_IM_MODULE");
     const char *module = g_getenv("GTK_IM_MODULE");
@@ -11,6 +19,9 @@ static void cleaf_sanitize_gtk_im_module(void) {
     if (g_strcmp0(module, "xim") == 0) g_unsetenv("GTK_IM_MODULE");
 }
 
+/**
+ * @brief Cleaf enable debug logging.
+ */
 static void cleaf_enable_debug_logging(void) {
 #ifdef CLEAF_DEBUG
     if (!g_getenv("G_MESSAGES_DEBUG")) g_setenv("G_MESSAGES_DEBUG", "all", TRUE);
@@ -24,6 +35,9 @@ static void cleaf_enable_debug_logging(void) {
 #endif
 }
 
+/**
+ * @brief Open path.
+ */
 static void open_path(EditorWindow *win, const char *path) {
     if (!win || !path || path[0] == '\0') return;
 
@@ -38,6 +52,9 @@ static void open_path(EditorWindow *win, const char *path) {
     }
 }
 
+/**
+ * @brief Open files.
+ */
 static void open_files(EditorWindow *win, GFile **files, gint n_files) {
     if (!win || !files || n_files <= 0) return;
 
@@ -48,11 +65,17 @@ static void open_files(EditorWindow *win, GFile **files, gint n_files) {
     }
 }
 
+/**
+ * @brief On activate.
+ */
 static void on_activate(GtkApplication *application, gpointer user_data) {
     (void)user_data;
     (void)app_window_new(application);
 }
 
+/**
+ * @brief On open.
+ */
 static void on_open(GtkApplication *application,
                     GFile **files,
                     gint n_files,
@@ -64,6 +87,9 @@ static void on_open(GtkApplication *application,
     open_files(win, files, n_files);
 }
 
+/**
+ * @brief Main.
+ */
 int main(int argc, char **argv) {
     cleaf_sanitize_gtk_im_module();
     cleaf_enable_debug_logging();

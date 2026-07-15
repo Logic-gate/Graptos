@@ -1,5 +1,13 @@
+/**
+ * @file src/editor_tab_edit.c
+ * @brief Cleaf editor tab edit module.
+ */
+
 #include "editor_tab_private.h"
 
+/**
+ * @brief Editor tab cut clipboard.
+ */
 void editor_tab_cut_clipboard(EditorTab *tab) {
     if (!tab || tab->locked) return;
     GdkClipboard *clipboard = gtk_widget_get_clipboard(tab->text_view);
@@ -7,6 +15,9 @@ void editor_tab_cut_clipboard(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Editor tab copy clipboard.
+ */
 void editor_tab_copy_clipboard(EditorTab *tab) {
     if (!tab) return;
     GdkClipboard *clipboard = gtk_widget_get_clipboard(tab->text_view);
@@ -14,6 +25,9 @@ void editor_tab_copy_clipboard(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Editor tab paste clipboard.
+ */
 void editor_tab_paste_clipboard(EditorTab *tab) {
     if (!tab || tab->locked) return;
     GdkClipboard *clipboard = gtk_widget_get_clipboard(tab->text_view);
@@ -21,6 +35,9 @@ void editor_tab_paste_clipboard(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Editor tab select all.
+ */
 void editor_tab_select_all(EditorTab *tab) {
     if (!tab) return;
     GtkTextIter start;
@@ -30,6 +47,9 @@ void editor_tab_select_all(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Editor tab cut line.
+ */
 void editor_tab_cut_line(EditorTab *tab) {
     if (!tab || tab->locked) return;
     GtkTextIter iter;
@@ -48,6 +68,9 @@ void editor_tab_cut_line(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Editor tab paste cut line.
+ */
 void editor_tab_paste_cut_line(EditorTab *tab) {
     if (!tab || tab->locked || !tab->kill_buffer) return;
     GtkTextIter iter;
@@ -57,6 +80,9 @@ void editor_tab_paste_cut_line(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Select match.
+ */
 gboolean select_match(EditorTab *tab, GtkTextIter *start, GtkTextIter *end) {
     if (!tab || !start || !end) return FALSE;
     gtk_text_buffer_select_range(tab->buffer, start, end);
@@ -65,6 +91,9 @@ gboolean select_match(EditorTab *tab, GtkTextIter *start, GtkTextIter *end) {
 }
 
 
+/**
+ * @brief Editor tab find.
+ */
 void editor_tab_find(EditorTab *tab, const char *query, gboolean backwards) {
     if (!tab || !query || query[0] == '\0') return;
     g_free(tab->search_text);
@@ -103,6 +132,9 @@ void editor_tab_find(EditorTab *tab, const char *query, gboolean backwards) {
 }
 
 
+/**
+ * @brief Editor tab replace current.
+ */
 void editor_tab_replace_current(EditorTab *tab, const char *find, const char *replace) {
     if (!tab || tab->locked || !find || find[0] == '\0' || !replace) return;
     GtkTextIter start;
@@ -121,6 +153,9 @@ void editor_tab_replace_current(EditorTab *tab, const char *find, const char *re
 }
 
 
+/**
+ * @brief Editor tab replace all.
+ */
 void editor_tab_replace_all(EditorTab *tab, const char *find, const char *replace) {
     if (!tab || tab->locked || !find || find[0] == '\0' || !replace) return;
     GtkTextIter search_from;
@@ -146,6 +181,9 @@ void editor_tab_replace_all(EditorTab *tab, const char *find, const char *replac
 }
 
 
+/**
+ * @brief Editor tab toggle comment.
+ */
 void editor_tab_toggle_comment(EditorTab *tab) {
     if (!tab || tab->locked) return;
     const char *comment = "#";
@@ -201,6 +239,9 @@ void editor_tab_toggle_comment(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Editor tab go to line.
+ */
 void editor_tab_go_to_line(EditorTab *tab) {
     if (!tab) return;
     char *line_text = dialog_prompt_text(app_window_gtk(tab->win), "Go to Line", "Line:", NULL);
@@ -220,6 +261,9 @@ void editor_tab_go_to_line(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Editor tab justify paragraph.
+ */
 void editor_tab_justify_paragraph(EditorTab *tab) {
     if (!tab || tab->locked) return;
     GtkTextIter insert;

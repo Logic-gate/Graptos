@@ -1,3 +1,8 @@
+/**
+ * @file src/ui_css.c
+ * @brief Static and dynamic CSS provider implementation.
+ */
+
 #include "ui.h"
 
 #include <glib.h>

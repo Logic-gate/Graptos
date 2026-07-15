@@ -1,8 +1,16 @@
+/**
+ * @file src/config.c
+ * @brief Persistent Cleaf configuration loading and saving.
+ */
+
 #include "config.h"
 
 #include <errno.h>
 #include <string.h>
 
+/**
+ * @brief Parse bool.
+ */
 static gboolean parse_bool(GKeyFile *key_file, const char *key, gboolean fallback) {
     GError *error = NULL;
     gboolean value = g_key_file_get_boolean(key_file, "Editor", key, &error);
@@ -13,6 +21,9 @@ static gboolean parse_bool(GKeyFile *key_file, const char *key, gboolean fallbac
     return value;
 }
 
+/**
+ * @brief Parse uint.
+ */
 static guint parse_uint(GKeyFile *key_file, const char *key, guint fallback, guint min_value, guint max_value) {
     GError *error = NULL;
     gint value = g_key_file_get_integer(key_file, "Editor", key, &error);
@@ -25,6 +36,9 @@ static guint parse_uint(GKeyFile *key_file, const char *key, guint fallback, gui
     return (guint)value;
 }
 
+/**
+ * @brief Load color.
+ */
 static void load_color(GKeyFile *key_file, const char *key, char **slot) {
     if (!key_file || !key || !slot) return;
     char *value = g_key_file_get_string(key_file, "Editor", key, NULL);
@@ -36,17 +50,26 @@ static void load_color(GKeyFile *key_file, const char *key, char **slot) {
     g_free(value);
 }
 
+/**
+ * @brief Save color.
+ */
 static void save_color(GKeyFile *key_file, const char *key, const char *value) {
     if (!key_file || !key || !value || value[0] == '\0') return;
     g_key_file_set_string(key_file, "Editor", key, value);
 }
 
+/**
+ * @brief Cleaf config path.
+ */
 char *cleaf_config_path(void) {
     const char *base = g_get_user_config_dir();
     if (!base || base[0] == '\0') return NULL;
     return g_build_filename(base, "cleaf", "config.ini", NULL);
 }
 
+/**
+ * @brief Cleaf config load.
+ */
 void cleaf_config_load(EditorWindow *win) {
     if (!win) return;
     char *path = cleaf_config_path();
@@ -142,6 +165,9 @@ void cleaf_config_load(EditorWindow *win) {
     g_free(path);
 }
 
+/**
+ * @brief Cleaf config save.
+ */
 void cleaf_config_save(EditorWindow *win) {
     if (!win) return;
     char *path = cleaf_config_path();

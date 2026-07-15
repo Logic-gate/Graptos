@@ -1,10 +1,21 @@
+/**
+ * @file src/editor_tab_latex.c
+ * @brief Cleaf editor tab latex module.
+ */
+
 #include "editor_tab_private.h"
 
 #include <ctype.h>
 #include <sys/stat.h>
 
+/**
+ * @brief Latex build dir macro.
+ */
 #define LATEX_BUILD_DIR ".cleaf-latex-build"
 
+/**
+ * @brief Has space.
+ */
 static gboolean has_space(const char *text) {
     const unsigned char *p = (const unsigned char *)text;
     while (p && *p != '\0') {
@@ -14,6 +25,9 @@ static gboolean has_space(const char *text) {
     return FALSE;
 }
 
+/**
+ * @brief Find latex command.
+ */
 static char *find_latex_command(void) {
     const char *env = g_getenv("CLEAF_LATEX_COMMAND");
     if (env && env[0] != '\0' && !has_space(env)) return g_strdup(env);
@@ -35,6 +49,9 @@ static char *find_latex_command(void) {
     return NULL;
 }
 
+/**
+ * @brief Basename without suffix.
+ */
 static char *basename_without_suffix(const char *path) {
     char *base = g_path_get_basename(path ? path : "document.tex");
     char *dot = base ? strrchr(base, '.') : NULL;
@@ -46,6 +63,9 @@ static char *basename_without_suffix(const char *path) {
     return base;
 }
 
+/**
+ * @brief Ensure saved source.
+ */
 static gboolean ensure_saved_source(EditorTab *tab, char **source_path_out) {
     if (!tab || !source_path_out) return FALSE;
 
@@ -84,6 +104,9 @@ static gboolean ensure_saved_source(EditorTab *tab, char **source_path_out) {
     return TRUE;
 }
 
+/**
+ * @brief Build output dir for source.
+ */
 static char *build_output_dir_for_source(const char *source_path) {
     char *dir = g_path_get_dirname(source_path);
     if (!dir) return NULL;
@@ -97,6 +120,9 @@ static char *build_output_dir_for_source(const char *source_path) {
     return output;
 }
 
+/**
+ * @brief Latex log message.
+ */
 static char *latex_log_message(const char *command,
                                const char *stdout_text,
                                const char *stderr_text) {
@@ -116,6 +142,9 @@ static char *latex_log_message(const char *command,
     return g_string_free(msg, FALSE);
 }
 
+/**
+ * @brief Run latex.
+ */
 static gboolean run_latex(EditorTab *tab,
                           const char *command,
                           const char *source_path,
@@ -157,6 +186,9 @@ static gboolean run_latex(EditorTab *tab,
     return TRUE;
 }
 
+/**
+ * @brief Open pdf.
+ */
 static void open_pdf(EditorTab *tab, const char *pdf_path) {
     GError *error = NULL;
     char *uri = g_filename_to_uri(pdf_path, NULL, &error);
@@ -175,6 +207,9 @@ static void open_pdf(EditorTab *tab, const char *pdf_path) {
     g_free(uri);
 }
 
+/**
+ * @brief Editor tab render latex.
+ */
 void editor_tab_render_latex(EditorTab *tab) {
     if (!tab || !tab->win) return;
     if (!editor_tab_is_latex(tab)) {

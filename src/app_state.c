@@ -1,8 +1,16 @@
+/**
+ * @file src/app_state.c
+ * @brief Application preference, policy, and timer state helpers.
+ */
+
 #include "app_private.h"
 
 #include <string.h>
 
 
+/**
+ * @brief App window apply css.
+ */
 void app_window_apply_css(EditorWindow *win) {
     if (!win) return;
     cleaf_apply_editor_css(win->editor_bg_color, win->editor_fg_color,
@@ -52,11 +60,17 @@ void app_window_apply_css(EditorWindow *win) {
                            win->use_system_interface_font);
 }
 
+/**
+ * @brief Set switch active safely.
+ */
 static void set_switch_active_safely(GtkWidget *widget, gboolean active) {
     if (!widget || !GTK_IS_SWITCH(widget)) return;
     gtk_switch_set_active(GTK_SWITCH(widget), active);
 }
 
+/**
+ * @brief Update indent dropdown.
+ */
 static void update_indent_dropdown(EditorWindow *win) {
     if (!win || !win->indent_dropdown || !GTK_IS_DROP_DOWN(win->indent_dropdown)) return;
 
@@ -67,6 +81,9 @@ static void update_indent_dropdown(EditorWindow *win) {
     gtk_drop_down_set_selected(GTK_DROP_DOWN(win->indent_dropdown), selected);
 }
 
+/**
+ * @brief Update policy buttons.
+ */
 void update_policy_buttons(EditorWindow *win) {
     if (!win) return;
 
@@ -92,6 +109,9 @@ void update_policy_buttons(EditorWindow *win) {
 }
 
 
+/**
+ * @brief Apply tab policy to all tabs.
+ */
 void apply_tab_policy_to_all_tabs(EditorWindow *win) {
     if (!win || !win->notebook) return;
     gint pages = gtk_notebook_get_n_pages(GTK_NOTEBOOK(win->notebook));
@@ -109,6 +129,9 @@ void apply_tab_policy_to_all_tabs(EditorWindow *win) {
 }
 
 
+/**
+ * @brief Apply preferences to all tabs.
+ */
 void apply_preferences_to_all_tabs(EditorWindow *win) {
     if (!win || !win->notebook) return;
     app_window_apply_css(win);
@@ -128,6 +151,9 @@ void apply_preferences_to_all_tabs(EditorWindow *win) {
 }
 
 
+/**
+ * @brief Auto save timeout cb.
+ */
 gboolean auto_save_timeout_cb(gpointer user_data) {
     EditorWindow *win = user_data;
     if (!win || !win->auto_save_enabled || !win->notebook) return G_SOURCE_CONTINUE;
@@ -147,6 +173,9 @@ gboolean auto_save_timeout_cb(gpointer user_data) {
 }
 
 
+/**
+ * @brief Restart auto save timer.
+ */
 void restart_auto_save_timer(EditorWindow *win) {
     if (!win) return;
     if (win->auto_save_timeout != 0u) {

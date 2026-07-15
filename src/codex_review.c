@@ -1,3 +1,8 @@
+/**
+ * @file src/codex_review.c
+ * @brief Codex diff review tab helpers.
+ */
+
 #include "codex_review.h"
 
 #include <gio/gio.h>
@@ -6,6 +11,9 @@
 #include "editor_tab.h"
 #include "git.h"
 
+/**
+ * @brief Review diff syntax.
+ */
 static SyntaxDef *review_diff_syntax(EditorWindow *win) {
     if (!win || !win->syntaxes) return NULL;
     for (guint i = 0u; i < win->syntaxes->len; i++) {
@@ -16,6 +24,9 @@ static SyntaxDef *review_diff_syntax(EditorWindow *win) {
     return NULL;
 }
 
+/**
+ * @brief Codex review open diff.
+ */
 void codex_review_open_diff(EditorWindow *win, const char *diff) {
     if (!win || !diff) return;
     EditorTab *tab = editor_tab_new(win);
@@ -34,6 +45,9 @@ void codex_review_open_diff(EditorWindow *win, const char *diff) {
     }
 }
 
+/**
+ * @brief Run reverse apply.
+ */
 static gboolean run_reverse_apply(const char *cwd,
                                   const char *diff,
                                   gboolean check,
@@ -67,6 +81,9 @@ static gboolean run_reverse_apply(const char *cwd,
     return success;
 }
 
+/**
+ * @brief Codex review revert.
+ */
 gboolean codex_review_revert(EditorWindow *win,
                              const char *diff,
                              GError **error) {

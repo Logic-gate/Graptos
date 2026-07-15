@@ -1,5 +1,13 @@
+/**
+ * @file src/editor_tab_gutter.c
+ * @brief Cleaf editor tab gutter module.
+ */
+
 #include "editor_tab_private.h"
 
+/**
+ * @brief Decimal digits.
+ */
 int decimal_digits(int value) {
     int digits = 1;
     while (value >= 10) {
@@ -10,6 +18,9 @@ int decimal_digits(int value) {
 }
 
 
+/**
+ * @brief Update gutter width.
+ */
 void update_gutter_width(EditorTab *tab) {
     if (!tab || !tab->buffer || !tab->gutter) return;
     if (!gtk_widget_get_visible(tab->gutter)) return;
@@ -25,6 +36,9 @@ void update_gutter_width(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Gutter draw background.
+ */
 static void gutter_draw_background(GtkWidget *widget, cairo_t *cr,
                                    gint width, gint height) {
     (void)widget;
@@ -37,6 +51,9 @@ static void gutter_draw_background(GtkWidget *widget, cairo_t *cr,
     cairo_fill(cr);
 }
 
+/**
+ * @brief Gutter draw line number.
+ */
 static void gutter_draw_line_number(cairo_t *cr, PangoLayout *layout,
                                     gint gutter_width, gint draw_y,
                                     gint line_height, int line_no,
@@ -65,6 +82,9 @@ static void gutter_draw_line_number(cairo_t *cr, PangoLayout *layout,
     g_free(num);
 }
 
+/**
+ * @brief On gutter draw.
+ */
 void on_gutter_draw(GtkDrawingArea *area, cairo_t *cr, int draw_width,
                     int draw_height, gpointer user_data) {
     GtkWidget *widget = GTK_WIDGET(area);
@@ -113,6 +133,9 @@ void on_gutter_draw(GtkDrawingArea *area, cairo_t *cr, int draw_width,
 }
 
 
+/**
+ * @brief Sync minimap scroll.
+ */
 static void sync_minimap_scroll(EditorTab *tab, GtkAdjustment *main_adj) {
     if (!tab || !tab->minimap_scrolled || !main_adj) return;
     GtkAdjustment *mini_adj = gtk_scrolled_window_get_vadjustment(
@@ -135,6 +158,9 @@ static void sync_minimap_scroll(EditorTab *tab, GtkAdjustment *main_adj) {
     gtk_adjustment_set_value(mini_adj, ratio * mini_max);
 }
 
+/**
+ * @brief On vadjustment value changed.
+ */
 void on_vadjustment_value_changed(GtkAdjustment *adjustment, gpointer user_data) {
     EditorTab *tab = user_data;
     if (tab && tab->gutter) gtk_widget_queue_draw(tab->gutter);
@@ -145,6 +171,9 @@ void on_vadjustment_value_changed(GtkAdjustment *adjustment, gpointer user_data)
 }
 
 
+/**
+ * @brief Ensure match tag.
+ */
 void ensure_match_tag(EditorTab *tab) {
     if (!tab || !tab->buffer) return;
     const char *bg = tab->win && tab->win->search_match_bg_color ?
@@ -166,16 +195,25 @@ void ensure_match_tag(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Ensure minimap match tag.
+ */
 void ensure_minimap_match_tag(EditorTab *tab) {
     (void)tab;
 }
 
 
+/**
+ * @brief Clear minimap matches.
+ */
 void clear_minimap_matches(EditorTab *tab) {
     if (tab && tab->minimap_view) gtk_widget_queue_draw(tab->minimap_view);
 }
 
 
+/**
+ * @brief Clear selection matches.
+ */
 void clear_selection_matches(EditorTab *tab) {
     if (!tab || !tab->buffer) return;
     if (tab->selection_matches_active) {
@@ -192,6 +230,9 @@ void clear_selection_matches(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Apply minimap match.
+ */
 void apply_minimap_match(EditorTab *tab, GtkTextIter *start, GtkTextIter *end) {
     (void)start;
     (void)end;
@@ -199,6 +240,9 @@ void apply_minimap_match(EditorTab *tab, GtkTextIter *start, GtkTextIter *end) {
 }
 
 
+/**
+ * @brief Update selection matches.
+ */
 void update_selection_matches(EditorTab *tab) {
     if (!tab || !tab->buffer) return;
     ensure_match_tag(tab);
@@ -238,6 +282,9 @@ void update_selection_matches(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Selection match timeout cb.
+ */
 gboolean selection_match_timeout_cb(gpointer user_data) {
     EditorTab *tab = user_data;
     if (!tab) return G_SOURCE_REMOVE;
@@ -247,6 +294,9 @@ gboolean selection_match_timeout_cb(gpointer user_data) {
 }
 
 
+/**
+ * @brief Editor tab schedule selection matches.
+ */
 void editor_tab_schedule_selection_matches(EditorTab *tab) {
     if (!tab || !tab->buffer) return;
     cleaf_source_cancel(&tab->selection_match_timeout);
@@ -277,6 +327,9 @@ void editor_tab_schedule_selection_matches(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Update minimap text.
+ */
 void update_minimap_text(EditorTab *tab) {
     if (!tab || !tab->minimap_view || tab->minimap_updating) return;
     if (!tab->win || !tab->win->minimap_enabled) return;
@@ -291,6 +344,9 @@ void update_minimap_text(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Minimap line is comment.
+ */
 static gboolean minimap_line_is_comment(const char *text) {
     if (!text) return FALSE;
     while (*text == ' ' || *text == '\t') text++;
@@ -298,16 +354,25 @@ static gboolean minimap_line_is_comment(const char *text) {
            g_str_has_prefix(text, "*") || g_str_has_prefix(text, "#");
 }
 
+/**
+ * @brief Minimap line has string.
+ */
 static gboolean minimap_line_has_string(const char *text) {
     return text && (strchr(text, '"') || strchr(text, '\''));
 }
 
+/**
+ * @brief Minimap line is preprocessor.
+ */
 static gboolean minimap_line_is_preprocessor(const char *text) {
     if (!text) return FALSE;
     while (*text == ' ' || *text == '\t') text++;
     return text[0] == '#';
 }
 
+/**
+ * @brief Minimap set line colour.
+ */
 static void minimap_set_line_colour(cairo_t *cr, const char *line) {
     if (minimap_line_is_preprocessor(line)) {
         cairo_set_source_rgb(cr, 0.77, 0.53, 0.78);
@@ -320,6 +385,9 @@ static void minimap_set_line_colour(cairo_t *cr, const char *line) {
     }
 }
 
+/**
+ * @brief On minimap draw.
+ */
 void on_minimap_draw(GtkDrawingArea *area, cairo_t *cr, int width,
                      int height, gpointer user_data) {
     (void)area;
@@ -382,6 +450,9 @@ void on_minimap_draw(GtkDrawingArea *area, cairo_t *cr, int width,
 }
 
 
+/**
+ * @brief On minimap click.
+ */
 void on_minimap_click(GtkGestureClick *gesture, int n_press, double x,
                       double y, gpointer user_data) {
     (void)n_press;

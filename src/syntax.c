@@ -1,12 +1,23 @@
+/**
+ * @file src/syntax.c
+ * @brief Syntax definition model and lookup helpers.
+ */
+
 #include "syntax_private.h"
 
 #include <errno.h>
 #include <string.h>
 
 #ifndef DATADIR
+/**
+ * @brief Datadir macro.
+ */
 #define DATADIR "/usr/local/share/cleaf"
 #endif
 
+/**
+ * @brief Syntax pair free.
+ */
 void syntax_pair_free(gpointer data) {
     SyntaxPair *pair = data;
     if (!pair) return;
@@ -15,6 +26,9 @@ void syntax_pair_free(gpointer data) {
     g_free(pair);
 }
 
+/**
+ * @brief Syntax rule free.
+ */
 void syntax_rule_free(gpointer data) {
     SyntaxRule *rule = data;
     if (!rule) return;
@@ -25,6 +39,9 @@ void syntax_rule_free(gpointer data) {
     g_free(rule);
 }
 
+/**
+ * @brief Syntax def free.
+ */
 void syntax_def_free(gpointer data) {
     SyntaxDef *syntax = data;
     if (!syntax) return;
@@ -55,6 +72,9 @@ void syntax_def_free(gpointer data) {
 }
 
 
+/**
+ * @brief Syntax def new default.
+ */
 SyntaxDef *syntax_def_new_default(void) {
     SyntaxDef *syntax = g_new0(SyntaxDef, 1);
     if (!syntax) return NULL;
@@ -88,6 +108,9 @@ SyntaxDef *syntax_def_new_default(void) {
     return syntax;
 }
 
+/**
+ * @brief Syntax by name.
+ */
 SyntaxDef *syntax_by_name(GPtrArray *syntaxes, const char *name) {
     if (!syntaxes || !name) return NULL;
     for (guint i = 0; i < syntaxes->len; i++) {
@@ -97,6 +120,9 @@ SyntaxDef *syntax_by_name(GPtrArray *syntaxes, const char *name) {
     return NULL;
 }
 
+/**
+ * @brief Syntax matches basename.
+ */
 static gboolean syntax_matches_basename(const SyntaxDef *syntax, const char *basename) {
     if (!syntax || !syntax->filenames || !basename) return FALSE;
     for (guint i = 0; i < syntax->filenames->len; i++) {
@@ -106,6 +132,9 @@ static gboolean syntax_matches_basename(const SyntaxDef *syntax, const char *bas
     return FALSE;
 }
 
+/**
+ * @brief Syntax matches extension.
+ */
 static gboolean syntax_matches_extension(const SyntaxDef *syntax, const char *path) {
     if (!syntax || !syntax->extensions || !path) return FALSE;
     const char *dot = strrchr(path, '.');
@@ -117,6 +146,9 @@ static gboolean syntax_matches_extension(const SyntaxDef *syntax, const char *pa
     return FALSE;
 }
 
+/**
+ * @brief Syntax for path.
+ */
 SyntaxDef *syntax_for_path(GPtrArray *syntaxes, const char *path) {
     if (!syntaxes || !path) return NULL;
     char *basename = g_path_get_basename(path);
@@ -141,11 +173,17 @@ SyntaxDef *syntax_for_path(GPtrArray *syntaxes, const char *path) {
     return NULL;
 }
 
+/**
+ * @brief Syntax path is indexable.
+ */
 gboolean syntax_path_is_indexable(GPtrArray *syntaxes, const char *path) {
     SyntaxDef *syntax = syntax_for_path(syntaxes, path);
     return syntax ? syntax->index_enabled : FALSE;
 }
 
+/**
+ * @brief Syntax icon for path.
+ */
 const char *syntax_icon_for_path(GPtrArray *syntaxes, const char *path, gboolean is_dir) {
     if (is_dir) return "DIR";
     SyntaxDef *syntax = syntax_for_path(syntaxes, path);
@@ -153,6 +191,9 @@ const char *syntax_icon_for_path(GPtrArray *syntaxes, const char *path, gboolean
     return "mime";
 }
 
+/**
+ * @brief Syntax language for path.
+ */
 const char *syntax_language_for_path(GPtrArray *syntaxes, const char *path) {
     if (!path) return "Buffer";
     SyntaxDef *syntax = syntax_for_path(syntaxes, path);
@@ -160,11 +201,17 @@ const char *syntax_language_for_path(GPtrArray *syntaxes, const char *path) {
     return "Text";
 }
 
+/**
+ * @brief Text has token.
+ */
 static gboolean text_has_token(const char *text, const char *token) {
     if (!text || !token) return FALSE;
     return g_strstr_len(text, 16384, token) != NULL;
 }
 
+/**
+ * @brief Syntax for content.
+ */
 SyntaxDef *syntax_for_content(GPtrArray *syntaxes, GtkTextBuffer *buffer) {
     if (!syntaxes || !buffer) return NULL;
     GtkTextIter start;

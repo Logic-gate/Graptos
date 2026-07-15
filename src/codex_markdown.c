@@ -1,9 +1,20 @@
+/**
+ * @file src/codex_markdown.c
+ * @brief Codex response markdown renderer.
+ */
+
 #include "codex_markdown.h"
 #include <stdarg.h>
 #include <string.h>
 
+/**
+ * @brief Codex markdown type definition.
+ */
 typedef struct { GtkTextBuffer *buffer; GtkTextIter iter; } Writer;
 
+/**
+ * @brief Tag ensure.
+ */
 static void tag_ensure(GtkTextBuffer *buffer, const char *name,
                        const char *first, ...) {
     GtkTextTagTable *table = gtk_text_buffer_get_tag_table(buffer);
@@ -17,6 +28,9 @@ static void tag_ensure(GtkTextBuffer *buffer, const char *name,
     g_object_unref(tag);
 }
 
+/**
+ * @brief Tags ensure.
+ */
 static void tags_ensure(GtkTextBuffer *buffer) {
     tag_ensure(buffer, "ai-h1", "weight", PANGO_WEIGHT_BOLD, "scale", 1.55,
                "foreground", "#89b4fa", "pixels-above-lines", 10, NULL);
@@ -34,10 +48,16 @@ static void tags_ensure(GtkTextBuffer *buffer) {
                "underline", PANGO_UNDERLINE_SINGLE, NULL);
 }
 
+/**
+ * @brief Put.
+ */
 static void put(Writer *writer, const char *text) {
     gtk_text_buffer_insert(writer->buffer, &writer->iter, text ? text : "", -1);
 }
 
+/**
+ * @brief Put tag.
+ */
 static void put_tag(Writer *writer, const char *text, const char *tag) {
     gint offset = gtk_text_iter_get_offset(&writer->iter);
     put(writer, text);
@@ -46,6 +66,9 @@ static void put_tag(Writer *writer, const char *text, const char *tag) {
     gtk_text_buffer_apply_tag_by_name(writer->buffer, tag, &start, &writer->iter);
 }
 
+/**
+ * @brief Inline render.
+ */
 static void inline_render(Writer *writer, const char *line) {
     const char *p = line ? line : "";
     while (*p) {
@@ -73,6 +96,9 @@ static void inline_render(Writer *writer, const char *line) {
     }
 }
 
+/**
+ * @brief Line render.
+ */
 static void line_render(Writer *writer, const char *line, gboolean *code) {
     if (g_str_has_prefix(line, "```") || g_str_has_prefix(line, "~~~")) {
         *code = !*code; return;
@@ -88,6 +114,9 @@ static void line_render(Writer *writer, const char *line, gboolean *code) {
     put(writer, "\n");
 }
 
+/**
+ * @brief Codex markdown render.
+ */
 void codex_markdown_render(GtkTextBuffer *buffer, const char *markdown) {
     if (!buffer) return;
     gtk_text_buffer_set_text(buffer, "", 0);

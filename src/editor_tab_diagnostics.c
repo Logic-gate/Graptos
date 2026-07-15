@@ -1,15 +1,29 @@
+/**
+ * @file src/editor_tab_diagnostics.c
+ * @brief Cleaf editor tab diagnostics module.
+ */
+
 #include "editor_tab_private.h"
 
+/**
+ * @brief Editor tab diagnostics type definition.
+ */
 typedef struct {
-    gunichar open_char;
-    gunichar close_char;
-    gint offset;
+    gunichar open_char; /**< Open char. */
+    gunichar close_char; /**< Close char. */
+    gint offset; /**< Offset. */
 } DiagnosticFrame;
 
+/**
+ * @brief Ptr array has entries.
+ */
 static gboolean ptr_array_has_entries(GPtrArray *array) {
     return array && array->len > 0u;
 }
 
+/**
+ * @brief Str ends with.
+ */
 static gboolean str_ends_with(const char *text, const char *suffix) {
     if (!text || !suffix) return FALSE;
     gsize text_len = strlen(text);
@@ -17,10 +31,16 @@ static gboolean str_ends_with(const char *text, const char *suffix) {
     return suffix_len <= text_len && strcmp(text + text_len - suffix_len, suffix) == 0;
 }
 
+/**
+ * @brief Str starts with.
+ */
 static gboolean str_starts_with(const char *text, const char *prefix) {
     return text && prefix && g_str_has_prefix(text, prefix);
 }
 
+/**
+ * @brief String list matches prefix.
+ */
 static gboolean string_list_matches_prefix(GPtrArray *items, const char *text) {
     if (!items || !text) return FALSE;
     for (guint i = 0u; i < items->len; i++) {
@@ -30,6 +50,9 @@ static gboolean string_list_matches_prefix(GPtrArray *items, const char *text) {
     return FALSE;
 }
 
+/**
+ * @brief String list matches suffix.
+ */
 static gboolean string_list_matches_suffix(GPtrArray *items, const char *text) {
     if (!items || !text) return FALSE;
     for (guint i = 0u; i < items->len; i++) {
@@ -39,6 +62,9 @@ static gboolean string_list_matches_suffix(GPtrArray *items, const char *text) {
     return FALSE;
 }
 
+/**
+ * @brief Strip inline line comment.
+ */
 static char *strip_inline_line_comment(const char *line, const char *comment) {
     if (!line) return g_strdup("");
     if (!comment || comment[0] == '\0') return g_strdup(line);
@@ -48,6 +74,9 @@ static char *strip_inline_line_comment(const char *line, const char *comment) {
     return g_strndup(line, (gsize)(hit - line));
 }
 
+/**
+ * @brief Line needs statement ender.
+ */
 static gboolean line_needs_statement_ender(SyntaxDef *syntax, const char *line) {
     if (!syntax || !ptr_array_has_entries(syntax->statement_required_enders) || !line) return FALSE;
 
@@ -69,6 +98,9 @@ static gboolean line_needs_statement_ender(SyntaxDef *syntax, const char *line) 
     return TRUE;
 }
 
+/**
+ * @brief Line missing required closer.
+ */
 static gboolean line_missing_required_closer(SyntaxDef *syntax, const char *line) {
     if (!syntax || !ptr_array_has_entries(syntax->line_close_pairs) || !line) return FALSE;
 
@@ -83,6 +115,9 @@ static gboolean line_missing_required_closer(SyntaxDef *syntax, const char *line
     return FALSE;
 }
 
+/**
+ * @brief Apply diagnostic line.
+ */
 static void apply_diagnostic_line(EditorTab *tab, gint line_no, guint *count) {
     if (!tab || !tab->buffer || line_no < 0) return;
     GtkTextIter start;
@@ -94,6 +129,9 @@ static void apply_diagnostic_line(EditorTab *tab, gint line_no, guint *count) {
     if (count) (*count)++;
 }
 
+/**
+ * @brief Apply diagnostic offset.
+ */
 static void apply_diagnostic_offset(EditorTab *tab, gint offset, guint *count) {
     if (!tab || !tab->buffer || offset < 0) return;
     GtkTextIter iter;
@@ -101,6 +139,9 @@ static void apply_diagnostic_offset(EditorTab *tab, gint offset, guint *count) {
     apply_diagnostic_line(tab, gtk_text_iter_get_line(&iter), count);
 }
 
+/**
+ * @brief Syntax pair is single char.
+ */
 static gboolean syntax_pair_is_single_char(SyntaxPair *pair,
                                            gunichar *open_char,
                                            gunichar *close_char) {
@@ -116,6 +157,9 @@ static gboolean syntax_pair_is_single_char(SyntaxPair *pair,
     return TRUE;
 }
 
+/**
+ * @brief Pair index for open.
+ */
 static gint pair_index_for_open(SyntaxDef *syntax, gunichar ch, gunichar *close_char) {
     if (!syntax || !syntax->close_pairs) return -1;
     for (guint i = 0u; i < syntax->close_pairs->len; i++) {
@@ -131,6 +175,9 @@ static gint pair_index_for_open(SyntaxDef *syntax, gunichar ch, gunichar *close_
     return -1;
 }
 
+/**
+ * @brief Is any close char.
+ */
 static gboolean is_any_close_char(SyntaxDef *syntax, gunichar ch) {
     if (!syntax || !syntax->close_pairs) return FALSE;
     for (guint i = 0u; i < syntax->close_pairs->len; i++) {
@@ -143,6 +190,9 @@ static gboolean is_any_close_char(SyntaxDef *syntax, gunichar ch) {
     return FALSE;
 }
 
+/**
+ * @brief Frame array push.
+ */
 static void frame_array_push(GArray *stack, gunichar open_char,
                              gunichar close_char, gint offset) {
     DiagnosticFrame frame;
@@ -152,6 +202,9 @@ static void frame_array_push(GArray *stack, gunichar open_char,
     g_array_append_val(stack, frame);
 }
 
+/**
+ * @brief Frame array pop if matches.
+ */
 static gboolean frame_array_pop_if_matches(GArray *stack, gunichar close_char) {
     if (!stack || stack->len == 0u) return FALSE;
     DiagnosticFrame frame = g_array_index(stack, DiagnosticFrame, stack->len - 1u);
@@ -160,6 +213,9 @@ static gboolean frame_array_pop_if_matches(GArray *stack, gunichar close_char) {
     return TRUE;
 }
 
+/**
+ * @brief Apply unbalanced pair diagnostics.
+ */
 static void apply_unbalanced_pair_diagnostics(EditorTab *tab,
                                               const char *text,
                                               guint *count) {
@@ -225,6 +281,9 @@ static void apply_unbalanced_pair_diagnostics(EditorTab *tab,
     g_array_free(stack, TRUE);
 }
 
+/**
+ * @brief Apply line diagnostics.
+ */
 static void apply_line_diagnostics(EditorTab *tab, guint *count) {
     if (!tab || !tab->buffer || !tab->active_syntax) return;
     SyntaxDef *syntax = tab->active_syntax;
@@ -247,13 +306,16 @@ static void apply_line_diagnostics(EditorTab *tab, guint *count) {
     }
 }
 
+/**
+ * @brief Ensure diagnostic tag.
+ */
 void ensure_diagnostic_tag(EditorTab *tab) {
     if (!tab || !tab->buffer) return;
     const char *bg = tab->win && tab->win->diagnostic_warning_bg_color ?
         tab->win->diagnostic_warning_bg_color : "#5f4b24";
     const char *fg = tab->win && tab->win->diagnostic_warning_fg_color ?
         tab->win->diagnostic_warning_fg_color : "#ffd166";
-    GdkRGBA underline = { 1.0, 0.70, 0.15, 1.0 };
+    GdkRGBA underline = { 1.0f, 0.70f, 0.15f, 1.0f };
     if (fg && fg[0] == '#') (void)gdk_rgba_parse(&underline, fg);
     GtkTextTagTable *table = gtk_text_buffer_get_tag_table(tab->buffer);
     GtkTextTag *tag = gtk_text_tag_table_lookup(table, "cleaf-diagnostic-warning");
@@ -274,6 +336,9 @@ void ensure_diagnostic_tag(EditorTab *tab) {
                                NULL);
 }
 
+/**
+ * @brief Clear syntax diagnostics.
+ */
 void clear_syntax_diagnostics(EditorTab *tab) {
     if (!tab || !tab->buffer) return;
     if (tab->diagnostics_active) {
@@ -289,6 +354,9 @@ void clear_syntax_diagnostics(EditorTab *tab) {
     tab->diagnostic_warnings = 0u;
 }
 
+/**
+ * @brief Editor tab apply syntax diagnostics.
+ */
 void editor_tab_apply_syntax_diagnostics(EditorTab *tab) {
     if (!tab || !tab->buffer) return;
     if (!editor_tab_live_features_allowed(tab)) {
@@ -325,6 +393,9 @@ void editor_tab_apply_syntax_diagnostics(EditorTab *tab) {
     editor_tab_schedule_lightweight_ui_refresh(tab);
 }
 
+/**
+ * @brief Diagnostics timeout cb.
+ */
 gboolean diagnostics_timeout_cb(gpointer user_data) {
     EditorTab *tab = user_data;
     if (!tab) return G_SOURCE_REMOVE;
@@ -333,6 +404,9 @@ gboolean diagnostics_timeout_cb(gpointer user_data) {
     return G_SOURCE_REMOVE;
 }
 
+/**
+ * @brief Editor tab schedule syntax diagnostics.
+ */
 void editor_tab_schedule_syntax_diagnostics(EditorTab *tab) {
     if (!tab) return;
     cleaf_source_cancel(&tab->diagnostics_timeout);

@@ -1,3 +1,8 @@
+/**
+ * @file src/app_core.c
+ * @brief Application window implementation composition unit.
+ */
+
 #include "app_private.h"
 
 

@@ -1,6 +1,14 @@
+/**
+ * @file src/dialogs.c
+ * @brief Dialog helper declarations and implementation.
+ */
+
 #include "dialogs.h"
 #include "ui.h"
 
+/**
+ * @brief Dialog window new.
+ */
 static GtkWidget *dialog_window_new(GtkWindow *parent,
                                     const char *title,
                                     int width,
@@ -14,6 +22,9 @@ static GtkWidget *dialog_window_new(GtkWindow *parent,
     return window;
 }
 
+/**
+ * @brief Dialog content new.
+ */
 static GtkWidget *dialog_content_new(GtkWidget *window) {
     GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
     gtk_widget_add_css_class(box, "cleaf-root");
@@ -22,6 +33,9 @@ static GtkWidget *dialog_content_new(GtkWidget *window) {
     return box;
 }
 
+/**
+ * @brief Dialog label new.
+ */
 static GtkWidget *dialog_label_new(const char *text, gboolean title) {
     GtkWidget *label = gtk_label_new(text ? text : "");
     gtk_label_set_wrap(GTK_LABEL(label), TRUE);
@@ -30,12 +44,18 @@ static GtkWidget *dialog_label_new(const char *text, gboolean title) {
     return label;
 }
 
+/**
+ * @brief Button row new.
+ */
 static GtkWidget *button_row_new(void) {
     GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
     gtk_widget_set_halign(row, GTK_ALIGN_END);
     return row;
 }
 
+/**
+ * @brief Show message.
+ */
 static void show_message(GtkWindow *parent,
                          const char *title,
                          const char *primary,
@@ -57,15 +77,24 @@ static void show_message(GtkWindow *parent,
     cleaf_widget_destroy(window);
 }
 
+/**
+ * @brief Dialog error.
+ */
 void dialog_error(GtkWindow *parent, const char *primary, const char *detail) {
     show_message(parent, "Error", primary ? primary : "Error", detail);
 }
 
+/**
+ * @brief Dialog info.
+ */
 void dialog_info(GtkWindow *parent, const char *primary, const char *detail) {
     show_message(parent, "Information",
                  primary ? primary : "Information", detail);
 }
 
+/**
+ * @brief Dialog prompt text.
+ */
 char *dialog_prompt_text(GtkWindow *parent,
                          const char *title,
                          const char *label,
@@ -101,6 +130,9 @@ char *dialog_prompt_text(GtkWindow *parent,
     return result;
 }
 
+/**
+ * @brief Dialog confirm yes no.
+ */
 gboolean dialog_confirm_yes_no(GtkWindow *parent,
                                const char *title,
                                const char *message) {

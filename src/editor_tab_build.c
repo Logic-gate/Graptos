@@ -1,5 +1,13 @@
+/**
+ * @file src/editor_tab_build.c
+ * @brief Cleaf editor tab build module.
+ */
+
 #include "editor_tab_private.h"
 
+/**
+ * @brief Tab init state.
+ */
 static void tab_init_state(EditorTab *tab, EditorWindow *win) {
     tab->win = win;
     tab->backup_enabled = win ? win->backup_enabled : TRUE;
@@ -11,6 +19,9 @@ static void tab_init_state(EditorTab *tab, EditorWindow *win) {
     tab->redo_stack = g_ptr_array_new_with_free_func(g_free);
 }
 
+/**
+ * @brief Tab create text area.
+ */
 static void tab_create_text_area(EditorTab *tab, EditorWindow *win) {
     tab->box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     gtk_widget_add_css_class(tab->box, "cleaf-tab-page");
@@ -53,6 +64,9 @@ static void tab_create_text_area(EditorTab *tab, EditorWindow *win) {
 }
 
 
+/**
+ * @brief Tab create preview.
+ */
 static void tab_create_preview(EditorTab *tab, EditorWindow *win) {
     tab->preview_buffer = gtk_text_buffer_new(NULL);
     tab->preview_view = gtk_text_view_new_with_buffer(tab->preview_buffer);
@@ -116,6 +130,9 @@ static void tab_create_minimap(EditorTab *tab, EditorWindow *win) {
     if (win && !win->minimap_enabled) gtk_widget_set_visible(tab->minimap_scrolled, FALSE);
 }
 
+/**
+ * @brief Tab create completion popover.
+ */
 static void tab_create_completion_popover(EditorTab *tab) {
     tab->completion_popover = gtk_popover_new();
     cleaf_popover_attach(tab->completion_popover, tab->popover_parent);
@@ -148,6 +165,9 @@ static void tab_create_completion_popover(EditorTab *tab) {
     cleaf_popover_hide(tab->completion_popover);
 }
 
+/**
+ * @brief Tab create hover popover.
+ */
 static void tab_create_hover_popover(EditorTab *tab) {
     tab->hover_popover = gtk_popover_new();
     cleaf_popover_attach(tab->hover_popover, tab->popover_parent);
@@ -200,6 +220,9 @@ static void tab_create_hover_popover(EditorTab *tab) {
     cleaf_popover_hide(tab->hover_popover);
 }
 
+/**
+ * @brief Tab pack widgets.
+ */
 static void tab_pack_widgets(EditorTab *tab) {
     gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(tab->scrolled),
                                   tab->text_view);
@@ -216,6 +239,9 @@ static void tab_pack_widgets(EditorTab *tab) {
     gtk_box_append(GTK_BOX(tab->box), tab->editor_area);
 }
 
+/**
+ * @brief Tab create tab label.
+ */
 static void tab_create_tab_label(EditorTab *tab) {
     tab->tab_widget = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
     gtk_widget_set_size_request(tab->tab_widget, 150, -1);
@@ -287,6 +313,9 @@ static void tab_connect_signals(EditorTab *tab) {
     gtk_widget_add_controller(tab->text_view, keys);
 }
 
+/**
+ * @brief Editor tab new.
+ */
 EditorTab *editor_tab_new(EditorWindow *win) {
     EditorTab *tab = g_new0(EditorTab, 1);
     if (!tab) return NULL;

@@ -1,30 +1,56 @@
+/**
+ * @file src/project_search.c
+ * @brief Project-wide search and replace dialog implementation.
+ */
+
 #include "app_private.h"
 
 #include <glib/gstdio.h>
 #include <sys/stat.h>
 #include <string.h>
 
+/**
+ * @brief Project search max file size macro.
+ */
 #define PROJECT_SEARCH_MAX_FILE_SIZE (2u * 1024u * 1024u)
+/**
+ * @brief Project search max depth macro.
+ */
 #define PROJECT_SEARCH_MAX_DEPTH 12u
+/**
+ * @brief Project search max results macro.
+ */
 #define PROJECT_SEARCH_MAX_RESULTS 1500u
+/**
+ * @brief Project search max dir entries macro.
+ */
 #define PROJECT_SEARCH_MAX_DIR_ENTRIES 4096u
 
+/**
+ * @brief Project search type definition.
+ */
 typedef struct {
-    char *path;
-    char *snippet;
-    guint line;
+    char *path; /**< Path. */
+    char *snippet; /**< Snippet. */
+    guint line; /**< Line. */
 } ProjectMatch;
 
+/**
+ * @brief Project search type definition.
+ */
 typedef struct {
-    EditorWindow *win;
-    GtkWidget *window;
-    GtkWidget *find_entry;
-    GtkWidget *replace_entry;
-    GtkWidget *count_label;
-    GtkWidget *result_list;
-    GPtrArray *matches;
+    EditorWindow *win; /**< Win. */
+    GtkWidget *window; /**< Window. */
+    GtkWidget *find_entry; /**< Find entry. */
+    GtkWidget *replace_entry; /**< Replace entry. */
+    GtkWidget *count_label; /**< Count label. */
+    GtkWidget *result_list; /**< Result list. */
+    GPtrArray *matches; /**< Matches. */
 } ProjectSearch;
 
+/**
+ * @brief Project match free.
+ */
 static void project_match_free(gpointer data) {
     ProjectMatch *match = data;
     if (!match) return;
@@ -33,6 +59,9 @@ static void project_match_free(gpointer data) {
     g_free(match);
 }
 
+/**
+ * @brief Skip dir name.
+ */
 static gboolean skip_dir_name(const char *name) {
     static const char *skip[] = {
         ".git", "node_modules", "build", "dist", "target",
@@ -45,6 +74,9 @@ static gboolean skip_dir_name(const char *name) {
     return FALSE;
 }
 
+/**
+ * @brief Readable small file.
+ */
 static gboolean readable_small_file(const char *path) {
     GStatBuf st;
     if (!path || g_stat(path, &st) != 0) return FALSE;
@@ -52,6 +84,9 @@ static gboolean readable_small_file(const char *path) {
     return st.st_size >= 0 && (guint64)st.st_size <= PROJECT_SEARCH_MAX_FILE_SIZE;
 }
 
+/**
+ * @brief Relative display path.
+ */
 static char *relative_display_path(EditorWindow *win, const char *path) {
     const char *root = project_root_for_path(win, path);
     if (root && path) {
@@ -62,6 +97,9 @@ static char *relative_display_path(EditorWindow *win, const char *path) {
     return g_strdup(path ? path : "");
 }
 
+/**
+ * @brief Line for offset.
+ */
 static guint line_for_offset(const char *text, const char *pos) {
     guint line = 1u;
     if (!text || !pos) return line;
@@ -71,6 +109,9 @@ static guint line_for_offset(const char *text, const char *pos) {
     return line;
 }
 
+/**
+ * @brief Snippet for match.
+ */
 static char *snippet_for_match(const char *line_start, const char *match) {
     if (!line_start || !match) return g_strdup("");
     const char *line_end = strchr(match, '\n');
@@ -82,6 +123,9 @@ static char *snippet_for_match(const char *line_start, const char *match) {
     return snippet;
 }
 
+/**
+ * @brief Add result row.
+ */
 static void add_result_row(ProjectSearch *state, ProjectMatch *match) {
     if (!state || !match || !state->result_list) return;
 
@@ -114,6 +158,9 @@ static void add_result_row(ProjectSearch *state, ProjectMatch *match) {
     g_free(rel);
 }
 
+/**
+ * @brief Scan text for matches.
+ */
 static void scan_text_for_matches(ProjectSearch *state,
                                   const char *path,
                                   const char *text,
@@ -135,6 +182,9 @@ static void scan_text_for_matches(ProjectSearch *state,
     }
 }
 
+/**
+ * @brief Project scan dir.
+ */
 static void project_scan_dir(ProjectSearch *state,
                              const char *dir,
                              const char *query,
@@ -172,12 +222,18 @@ static void project_scan_dir(ProjectSearch *state,
     g_dir_close(gdir);
 }
 
+/**
+ * @brief Clear results.
+ */
 static void clear_results(ProjectSearch *state) {
     if (!state) return;
     if (state->matches) g_ptr_array_set_size(state->matches, 0u);
     if (state->result_list) cleaf_list_box_clear(state->result_list);
 }
 
+/**
+ * @brief Update count.
+ */
 static void update_count(ProjectSearch *state) {
     if (!state || !state->count_label) return;
     char *text = g_strdup_printf("%u result%s", state->matches->len,
@@ -186,6 +242,9 @@ static void update_count(ProjectSearch *state) {
     g_free(text);
 }
 
+/**
+ * @brief Project search run.
+ */
 static void project_search_run(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     ProjectSearch *state = user_data;
@@ -205,6 +264,9 @@ static void project_search_run(GtkWidget *widget, gpointer user_data) {
     update_count(state);
 }
 
+/**
+ * @brief Replace literal.
+ */
 static char *replace_literal(const char *text,
                              const char *find,
                              const char *replace,
@@ -228,6 +290,9 @@ static char *replace_literal(const char *text,
     return g_string_free(out, FALSE);
 }
 
+/**
+ * @brief Replace in file.
+ */
 static guint replace_in_file(const char *path,
                              const char *find,
                              const char *replace) {
@@ -251,6 +316,9 @@ static guint replace_in_file(const char *path,
     return count;
 }
 
+/**
+ * @brief Project replace all.
+ */
 static void project_replace_all(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     ProjectSearch *state = user_data;
@@ -290,6 +358,9 @@ static void project_replace_all(GtkWidget *widget, gpointer user_data) {
     project_search_run(NULL, state);
 }
 
+/**
+ * @brief Result activated.
+ */
 static void result_activated(GtkListBox *box,
                              GtkListBoxRow *row,
                              gpointer user_data) {
@@ -305,6 +376,9 @@ static void result_activated(GtkListBox *box,
     }
 }
 
+/**
+ * @brief Project search closed.
+ */
 static gboolean project_search_closed(GtkWindow *window, gpointer user_data) {
     (void)window;
     ProjectSearch *state = user_data;
@@ -314,6 +388,9 @@ static gboolean project_search_closed(GtkWindow *window, gpointer user_data) {
     return FALSE;
 }
 
+/**
+ * @brief Action project search.
+ */
 void action_project_search(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;

@@ -1,3 +1,8 @@
+/**
+ * @file src/codex_panel.c
+ * @brief Codex sidebar panel and chat review UI.
+ */
+
 #include "codex_panel.h"
 
 #include "app.h"
@@ -7,46 +12,58 @@
 #include "git.h"
 #include "ui.h"
 
+/**
+ * @brief Codex panel type definition.
+ */
 typedef struct {
-    struct _CodexPanel *panel;
-    GtkWidget *page;
-    GtkWidget *view;
-    GtkTextBuffer *buffer;
-    char *thread_id;
-    GString *markdown;
-    gboolean render_dirty;
+    struct _CodexPanel *panel; /**< Panel. */
+    GtkWidget *page; /**< Page. */
+    GtkWidget *view; /**< View. */
+    GtkTextBuffer *buffer; /**< Buffer. */
+    char *thread_id; /**< Thread id. */
+    GString *markdown; /**< Markdown. */
+    gboolean render_dirty; /**< Render dirty. */
 } CodexChat;
 
+/**
+ * @brief Codex panel type definition.
+ */
 struct _CodexPanel {
-    EditorWindow *win;
-    GtkWidget *revealer;
-    GtkWidget *status_label;
-    GtkWidget *transcript_view;
-    GtkTextBuffer *transcript;
-    GtkWidget *chat_notebook;
-    GPtrArray *chats;
-    CodexChat *current_chat;
-    gboolean switching_chat;
-    GtkWidget *composer_view;
-    GtkTextBuffer *composer;
-    GtkWidget *send_button;
-    GtkWidget *stop_button;
-    GtkWidget *new_button;
-    GtkWidget *file_context;
-    GtkWidget *selection_context;
-    GtkWidget *context_label;
-    GtkWidget *approval_box;
-    GtkWidget *approval_label;
-    GtkWidget *review_box;
-    GtkWidget *changed_files;
-    gboolean turn_active;
-    gboolean visible;
-    char *turn_diff;
-    guint render_timeout;
+    EditorWindow *win; /**< Win. */
+    GtkWidget *revealer; /**< Revealer. */
+    GtkWidget *status_label; /**< Status label. */
+    GtkWidget *transcript_view; /**< Transcript view. */
+    GtkTextBuffer *transcript; /**< Transcript. */
+    GtkWidget *chat_notebook; /**< Chat notebook. */
+    GPtrArray *chats; /**< Chats. */
+    CodexChat *current_chat; /**< Current chat. */
+    gboolean switching_chat; /**< Switching chat. */
+    GtkWidget *composer_view; /**< Composer view. */
+    GtkTextBuffer *composer; /**< Composer. */
+    GtkWidget *send_button; /**< Send button. */
+    GtkWidget *stop_button; /**< Stop button. */
+    GtkWidget *new_button; /**< New button. */
+    GtkWidget *file_context; /**< File context. */
+    GtkWidget *selection_context; /**< Selection context. */
+    GtkWidget *context_label; /**< Context label. */
+    GtkWidget *approval_box; /**< Approval box. */
+    GtkWidget *approval_label; /**< Approval label. */
+    GtkWidget *review_box; /**< Review box. */
+    GtkWidget *changed_files; /**< Changed files. */
+    gboolean turn_active; /**< Turn active. */
+    gboolean visible; /**< Visible. */
+    char *turn_diff; /**< Turn diff. */
+    guint render_timeout; /**< Render timeout. */
 };
 
+/**
+ * @brief Codex context limit macro.
+ */
 #define CODEX_CONTEXT_LIMIT 65536
 
+/**
+ * @brief Panel render now.
+ */
 static void panel_render_now(CodexPanel *panel) {
     if (!panel || !panel->current_chat ||
         !panel->current_chat->render_dirty) return;
@@ -61,14 +78,20 @@ static void panel_render_now(CodexPanel *panel) {
     }
 }
 
+/**
+ * @brief Panel render timeout cb.
+ */
 static gboolean panel_render_timeout_cb(gpointer user_data) {
     CodexPanel *panel = user_data;
     if (!panel) return G_SOURCE_REMOVE;
     panel->render_timeout = 0u;
     panel_render_now(panel);
-    return G_SOURCE_REMOVE;
+    return G_SOURCE_REMOVE; /**< G source remove. */
 }
 
+/**
+ * @brief Panel schedule render.
+ */
 static void panel_schedule_render(CodexPanel *panel) {
     if (!panel || panel->render_timeout != 0u || !panel->current_chat) return;
     gsize length = panel->current_chat->markdown->len;
@@ -76,6 +99,9 @@ static void panel_schedule_render(CodexPanel *panel) {
     panel->render_timeout = g_timeout_add(delay, panel_render_timeout_cb, panel);
 }
 
+/**
+ * @brief Codex chat free.
+ */
 static void codex_chat_free(gpointer data) {
     CodexChat *chat = data;
     if (!chat) return;
@@ -84,8 +110,14 @@ static void codex_chat_free(gpointer data) {
     g_free(chat);
 }
 
+/**
+ * @brief Panel close chat.
+ */
 static void panel_close_chat(GtkWidget *widget, gpointer user_data);
 
+/**
+ * @brief Panel add chat.
+ */
 static CodexChat *panel_add_chat(CodexPanel *panel) {
     CodexChat *chat = g_new0(CodexChat, 1);
     chat->panel = panel;
@@ -119,9 +151,12 @@ static CodexChat *panel_add_chat(CodexPanel *panel) {
     panel->transcript_view = chat->view;
     panel->transcript = chat->buffer;
     panel_render_now(panel);
-    return chat;
+    return chat; /**< Chat. */
 }
 
+/**
+ * @brief Panel activate chat.
+ */
 static void panel_activate_chat(CodexPanel *panel, guint index) {
     if (!panel || index >= panel->chats->len) return;
     CodexChat *chat = g_ptr_array_index(panel->chats, index);
@@ -138,6 +173,9 @@ static void panel_activate_chat(CodexPanel *panel, guint index) {
     }
 }
 
+/**
+ * @brief Panel close chat.
+ */
 static void panel_close_chat(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     CodexChat *chat = user_data;
@@ -170,6 +208,9 @@ static void panel_close_chat(GtkWidget *widget, gpointer user_data) {
     panel_activate_chat(panel, next);
 }
 
+/**
+ * @brief Panel chat switched.
+ */
 static void panel_chat_switched(GtkNotebook *notebook,
                                 GtkWidget *page,
                                 guint page_num,
@@ -201,6 +242,9 @@ static void panel_chat_switched(GtkNotebook *notebook,
     }
 }
 
+/**
+ * @brief Panel append.
+ */
 static void panel_append(CodexPanel *panel, const char *text) {
     if (!panel || !panel->transcript || !text) return;
     if (!panel->current_chat || !panel->current_chat->markdown) return;
@@ -209,6 +253,9 @@ static void panel_append(CodexPanel *panel, const char *text) {
     panel_schedule_render(panel);
 }
 
+/**
+ * @brief Panel set turn active.
+ */
 static void panel_set_turn_active(CodexPanel *panel, gboolean active) {
     if (!panel) return;
     panel->turn_active = active;
@@ -218,6 +265,9 @@ static void panel_set_turn_active(CodexPanel *panel, gboolean active) {
     gtk_text_view_set_editable(GTK_TEXT_VIEW(panel->composer_view), !active);
 }
 
+/**
+ * @brief Panel editor context.
+ */
 static char *panel_editor_context(CodexPanel *panel) {
     EditorTab *tab = panel && panel->win
         ? app_window_current_tab(panel->win) : NULL;
@@ -226,8 +276,8 @@ static char *panel_editor_context(CodexPanel *panel) {
         GTK_CHECK_BUTTON(panel->file_context));
     gboolean include_selection = gtk_check_button_get_active(
         GTK_CHECK_BUTTON(panel->selection_context));
-    GtkTextIter start;
-    GtkTextIter end;
+    GtkTextIter start; /**< Start. */
+    GtkTextIter end; /**< End. */
     gboolean selected = gtk_text_buffer_get_selection_bounds(tab->buffer,
                                                               &start, &end);
     if (!include_file && (!include_selection || !selected)) return g_strdup("");
@@ -244,14 +294,17 @@ static char *panel_editor_context(CodexPanel *panel) {
         path, selected && include_selection ? "selected text" : "current buffer",
         content);
     g_free(content);
-    return context;
+    return context; /**< Context. */
 }
 
+/**
+ * @brief Codex panel refresh context.
+ */
 void codex_panel_refresh_context(CodexPanel *panel) {
     EditorTab *tab = panel && panel->win
         ? app_window_current_tab(panel->win) : NULL;
-    GtkTextIter start;
-    GtkTextIter end;
+    GtkTextIter start; /**< Start. */
+    GtkTextIter end; /**< End. */
     gboolean selected = tab && tab->buffer &&
         gtk_text_buffer_get_selection_bounds(tab->buffer, &start, &end);
     gtk_widget_set_sensitive(panel->selection_context, selected);
@@ -262,12 +315,15 @@ void codex_panel_refresh_context(CodexPanel *panel) {
     g_free(label);
 }
 
+/**
+ * @brief Panel send.
+ */
 static void panel_send(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     CodexPanel *panel = user_data;
     if (!panel || !panel->win || !panel->win->codex_client) return;
-    GtkTextIter start;
-    GtkTextIter end;
+    GtkTextIter start; /**< Start. */
+    GtkTextIter end; /**< End. */
     gtk_text_buffer_get_bounds(panel->composer, &start, &end);
     char *prompt = gtk_text_buffer_get_text(panel->composer, &start, &end, FALSE);
     g_strstrip(prompt);
@@ -294,6 +350,9 @@ static void panel_send(GtkWidget *widget, gpointer user_data) {
     g_free(prompt);
 }
 
+/**
+ * @brief Panel stop.
+ */
 static void panel_stop(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     CodexPanel *panel = user_data;
@@ -308,6 +367,9 @@ static void panel_stop(GtkWidget *widget, gpointer user_data) {
     }
 }
 
+/**
+ * @brief Panel new thread.
+ */
 static void panel_new_thread(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     CodexPanel *panel = user_data;
@@ -318,11 +380,17 @@ static void panel_new_thread(GtkWidget *widget, gpointer user_data) {
     }
 }
 
+/**
+ * @brief Panel close.
+ */
 static void panel_close(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     codex_panel_toggle(user_data);
 }
 
+/**
+ * @brief Panel approval.
+ */
 static void panel_approval(GtkWidget *widget, gpointer user_data) {
     CodexPanel *panel = user_data;
     const char *decision = g_object_get_data(G_OBJECT(widget), "decision");
@@ -331,6 +399,9 @@ static void panel_approval(GtkWidget *widget, gpointer user_data) {
     }
 }
 
+/**
+ * @brief Panel clear children.
+ */
 static void panel_clear_children(GtkWidget *box) {
     GtkWidget *child = box ? gtk_widget_get_first_child(box) : NULL;
     while (child) {
@@ -340,6 +411,9 @@ static void panel_clear_children(GtkWidget *box) {
     }
 }
 
+/**
+ * @brief Panel open changed file.
+ */
 static void panel_open_changed_file(GtkWidget *widget, gpointer user_data) {
     CodexPanel *panel = user_data;
     const char *relative = g_object_get_data(G_OBJECT(widget), "codex-path");
@@ -351,6 +425,9 @@ static void panel_open_changed_file(GtkWidget *widget, gpointer user_data) {
     g_free(path);
 }
 
+/**
+ * @brief Panel update changed files.
+ */
 static void panel_update_changed_files(CodexPanel *panel) {
     panel_clear_children(panel->changed_files);
     if (!panel->turn_diff) return;
@@ -374,6 +451,9 @@ static void panel_update_changed_files(CodexPanel *panel) {
     g_hash_table_destroy(seen);
 }
 
+/**
+ * @brief Panel add changed path.
+ */
 static void panel_add_changed_path(CodexPanel *panel,
                                    GPtrArray *paths,
                                    GHashTable *seen,
@@ -395,6 +475,9 @@ static void panel_add_changed_path(CodexPanel *panel,
     g_ptr_array_add(paths, canonical);
 }
 
+/**
+ * @brief Panel changed paths.
+ */
 static GPtrArray *panel_changed_paths(CodexPanel *panel) {
     GPtrArray *paths = g_ptr_array_new_with_free_func(g_free);
     if (!panel || !panel->turn_diff) return paths;
@@ -413,6 +496,9 @@ static GPtrArray *panel_changed_paths(CodexPanel *panel) {
     return paths;
 }
 
+/**
+ * @brief Path in array.
+ */
 static gboolean path_in_array(GPtrArray *paths, const char *path) {
     if (!paths || !path) return FALSE;
     for (guint i = 0u; i < paths->len; i++) {
@@ -421,6 +507,9 @@ static gboolean path_in_array(GPtrArray *paths, const char *path) {
     return FALSE;
 }
 
+/**
+ * @brief Panel reload kept tabs.
+ */
 static void panel_reload_kept_tabs(CodexPanel *panel,
                                    guint *reloaded_out,
                                    guint *skipped_modified_out,
@@ -460,6 +549,9 @@ static void panel_reload_kept_tabs(CodexPanel *panel,
     g_ptr_array_free(paths, TRUE);
 }
 
+/**
+ * @brief Panel review diff.
+ */
 static void panel_review_diff(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     CodexPanel *panel = user_data;
@@ -468,6 +560,9 @@ static void panel_review_diff(GtkWidget *widget, gpointer user_data) {
     }
 }
 
+/**
+ * @brief Panel keep diff.
+ */
 static void panel_keep_diff(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     CodexPanel *panel = user_data;
@@ -499,6 +594,9 @@ static void panel_keep_diff(GtkWidget *widget, gpointer user_data) {
     }
 }
 
+/**
+ * @brief Panel revert diff.
+ */
 static void panel_revert_diff(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     CodexPanel *panel = user_data;
@@ -519,6 +617,9 @@ static void panel_revert_diff(GtkWidget *widget, gpointer user_data) {
     g_clear_error(&error);
 }
 
+/**
+ * @brief Codex panel new.
+ */
 CodexPanel *codex_panel_new(EditorWindow *win) {
     CodexPanel *panel = g_new0(CodexPanel, 1);
     panel->win = win;
@@ -646,6 +747,9 @@ CodexPanel *codex_panel_new(EditorWindow *win) {
     return panel;
 }
 
+/**
+ * @brief Codex panel free.
+ */
 void codex_panel_free(CodexPanel *panel) {
     if (panel && panel->render_timeout != 0u) {
         g_source_remove(panel->render_timeout);
@@ -656,10 +760,16 @@ void codex_panel_free(CodexPanel *panel) {
     g_free(panel);
 }
 
+/**
+ * @brief Codex panel widget.
+ */
 GtkWidget *codex_panel_widget(CodexPanel *panel) {
     return panel ? panel->revealer : NULL;
 }
 
+/**
+ * @brief Codex panel toggle.
+ */
 void codex_panel_toggle(CodexPanel *panel) {
     if (!panel) return;
     panel->visible = !panel->visible;
@@ -672,6 +782,9 @@ void codex_panel_toggle(CodexPanel *panel) {
     gtk_widget_queue_resize(panel->revealer);
 }
 
+/**
+ * @brief Codex panel set connection.
+ */
 void codex_panel_set_connection(CodexPanel *panel,
                                 CodexClientState state,
                                 const char *detail) {
@@ -696,6 +809,9 @@ void codex_panel_set_connection(CodexPanel *panel,
     }
 }
 
+/**
+ * @brief Codex panel handle event.
+ */
 void codex_panel_handle_event(CodexClient *client,
                               CodexClientEvent event,
                               const char *text,

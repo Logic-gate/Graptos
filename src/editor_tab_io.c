@@ -1,9 +1,17 @@
+/**
+ * @file src/editor_tab_io.c
+ * @brief Cleaf editor tab io module.
+ */
+
 #include "editor_tab_private.h"
 #include "git.h"
 
 #include <glib/gstdio.h>
 #include <time.h>
 
+/**
+ * @brief Write all fd.
+ */
 gboolean write_all_fd(int fd, const char *data, gsize len) {
     const char *cursor = data;
     gsize remaining = len;
@@ -22,6 +30,9 @@ gboolean write_all_fd(int fd, const char *data, gsize len) {
 }
 
 
+/**
+ * @brief Write text atomic.
+ */
 gboolean write_text_atomic(const char *path, const char *text, GError **error) {
     if (!path || path[0] == '\0' || !text) return FALSE;
 
@@ -82,6 +93,9 @@ gboolean write_text_atomic(const char *path, const char *text, GError **error) {
 }
 
 
+/**
+ * @brief Autosave path for tab.
+ */
 char *autosave_path_for_tab(EditorTab *tab) {
     if (!tab) return NULL;
     const char *cache = g_get_user_cache_dir();
@@ -106,6 +120,9 @@ char *autosave_path_for_tab(EditorTab *tab) {
 
 
 
+/**
+ * @brief Cleanup legacy tilde backup.
+ */
 static void cleanup_legacy_tilde_backup(const char *path) {
     if (!path || path[0] == '\0') return;
     char *legacy = g_strdup_printf("%s~", path);
@@ -115,6 +132,9 @@ static void cleanup_legacy_tilde_backup(const char *path) {
     g_free(legacy);
 }
 
+/**
+ * @brief Editor tab load file.
+ */
 gboolean editor_tab_load_file(EditorTab *tab, const char *path) {
     if (!tab || !path) return FALSE;
     char *contents = NULL;
@@ -159,6 +179,9 @@ gboolean editor_tab_load_file(EditorTab *tab, const char *path) {
 }
 
 
+/**
+ * @brief Write backup if needed.
+ */
 gboolean write_backup_if_needed(EditorTab *tab, const char *path) {
     if (!tab || !tab->backup_enabled || !path || !g_file_test(path, G_FILE_TEST_EXISTS)) return TRUE;
 
@@ -212,6 +235,9 @@ gboolean write_backup_if_needed(EditorTab *tab, const char *path) {
 }
 
 
+/**
+ * @brief Save to path.
+ */
 gboolean save_to_path(EditorTab *tab, const char *path) {
     if (!tab || !path || path[0] == '\0') return FALSE;
 
@@ -254,6 +280,9 @@ gboolean save_to_path(EditorTab *tab, const char *path) {
 }
 
 
+/**
+ * @brief Editor tab save.
+ */
 gboolean editor_tab_save(EditorTab *tab, gboolean force_dialog) {
     if (!tab) return FALSE;
     if (tab->locked) {
@@ -275,12 +304,18 @@ gboolean editor_tab_save(EditorTab *tab, gboolean force_dialog) {
 }
 
 
+/**
+ * @brief Close dialog button.
+ */
 static GtkWidget *close_dialog_button(const char *label, int response) {
     return cleaf_flat_button_new(label, NULL,
                                  G_CALLBACK(cleaf_modal_window_respond),
                                  GINT_TO_POINTER(response));
 }
 
+/**
+ * @brief Editor tab confirm close.
+ */
 gboolean editor_tab_confirm_close(EditorTab *tab) {
     if (!tab || !tab->modified) return TRUE;
 
@@ -332,6 +367,9 @@ gboolean editor_tab_confirm_close(EditorTab *tab) {
 }
 
 
+/**
+ * @brief Editor tab auto save.
+ */
 gboolean editor_tab_auto_save(EditorTab *tab) {
     if (!tab || !tab->modified) return TRUE;
     if (tab->file_path) return save_to_path(tab, tab->file_path);
