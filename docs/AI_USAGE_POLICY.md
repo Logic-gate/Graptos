@@ -1,6 +1,6 @@
 # AI USAGE POLICY
 
-## (Version 1)[https://github.com/Logic-gate/AI-USAGE-POLICY]
+## [Version 1](https://github.com/Logic-gate/AI-USAGE-POLICY)
 
 ## Project
 

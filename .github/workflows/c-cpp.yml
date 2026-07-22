@@ -44,7 +44,8 @@ jobs:
             pkg-config \
             libgtk-4-dev \
             libgtksourceview-5-dev \
-            libjson-glib-dev
+            libjson-glib-dev \
+            libvte-2.91-gtk4-dev
 
       - name: Show compiler version
         run: |
@@ -52,6 +53,7 @@ jobs:
           pkg-config --modversion gtk4
           pkg-config --modversion gtksourceview-5
           pkg-config --modversion json-glib-1.0
+          pkg-config --modversion vte-2.91-gtk4
 
       - name: Clean previous build
         run: make clean
@@ -61,7 +63,7 @@ jobs:
           make check \
             CC="$CC"
 
-      - name: Build Cleaf
+      - name: Build Graptoς
         run: |
           make --jobs="$(nproc)" \
             CC="$CC"
@@ -73,6 +75,6 @@ jobs:
 
       - name: Verify executable
         run: |
-          test -x build/cleaf
-          file build/cleaf
-          ls -lh build/cleaf
+          test -x build/graptos
+          file build/graptos
+          ls -lh build/graptos

@@ -480,3 +480,10 @@ index: false
 ### AI Policy
 
 AI contributions are based on [AI USAGE POLICY VERSION 1](https://github.com/Logic-gate/AI-USAGE-POLICY/blob/main/POLICY/VERSION_1.0.0.md) [docs/AI_USAGE_POLICY.md](docs/AI_USAGE_POLICY.md).
+
+### Screenshots
+
+![diff](https://i.snipboard.io/Y9HvI4.jpg)
+![Themes](https://i.snipboard.io/pBZjbK.jpg)
+![Themes](https://i.snipboard.io/rBEhLF.jpg)
+![Projects](https://i.snipboard.io/aWXAZK.jpg)
