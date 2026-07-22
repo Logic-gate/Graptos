@@ -68,7 +68,7 @@ gboolean write_text_atomic(const char *path, const char *text, GError **error) {
     }
 
     if (fd < 0) {
-        g_set_error(error, G_FILE_ERROR, g_file_error_from_errno(errno), "Could not create temporary save file: %s", g_strerror(errno));
+        g_set_error(error, G_FILE_ERROR, (gint)g_file_error_from_errno(errno), "Could not create temporary save file: %s", g_strerror(errno));
         return FALSE;
     }
 
@@ -77,20 +77,20 @@ gboolean write_text_atomic(const char *path, const char *text, GError **error) {
         int saved_errno = errno;
         close(fd);
         unlink(tmp_path);
-        g_set_error(error, G_FILE_ERROR, g_file_error_from_errno(saved_errno), "Could not write temporary save file: %s", g_strerror(saved_errno));
+        g_set_error(error, G_FILE_ERROR, (gint)g_file_error_from_errno(saved_errno), "Could not write temporary save file: %s", g_strerror(saved_errno));
     } else if (fsync(fd) != 0) {
         int saved_errno = errno;
         close(fd);
         unlink(tmp_path);
-        g_set_error(error, G_FILE_ERROR, g_file_error_from_errno(saved_errno), "Could not flush temporary save file: %s", g_strerror(saved_errno));
+        g_set_error(error, G_FILE_ERROR, (gint)g_file_error_from_errno(saved_errno), "Could not flush temporary save file: %s", g_strerror(saved_errno));
     } else if (close(fd) != 0) {
         int saved_errno = errno;
         unlink(tmp_path);
-        g_set_error(error, G_FILE_ERROR, g_file_error_from_errno(saved_errno), "Could not close temporary save file: %s", g_strerror(saved_errno));
+        g_set_error(error, G_FILE_ERROR, (gint)g_file_error_from_errno(saved_errno), "Could not close temporary save file: %s", g_strerror(saved_errno));
     } else if (rename(tmp_path, path) != 0) {
         int saved_errno = errno;
         unlink(tmp_path);
-        g_set_error(error, G_FILE_ERROR, g_file_error_from_errno(saved_errno), "Could not replace destination file: %s", g_strerror(saved_errno));
+        g_set_error(error, G_FILE_ERROR, (gint)g_file_error_from_errno(saved_errno), "Could not replace destination file: %s", g_strerror(saved_errno));
     } else {
         ok = TRUE;
     }

@@ -9,6 +9,7 @@
 #include "app_private.h"
 
 #include <pango/pangocairo.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "app/app_file_search_actions.inc.c"

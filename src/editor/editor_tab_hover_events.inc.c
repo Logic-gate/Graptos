@@ -17,7 +17,14 @@ static void regex_tester_debug(EditorTab *tab, const char *format, ...) {
 
     va_list args;
     va_start(args, format);
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat-nonliteral"
+#endif
     char *message = g_strdup_vprintf(format, args);
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
     va_end(args);
 
     if (message) {

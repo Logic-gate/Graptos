@@ -25,6 +25,131 @@ static const char *syntax_lsp_language_id(SyntaxDef *syntax) {
 }
 
 /**
+ * @brief Return whether the configured server is clangd.
+ * @details Only clangd understands the fallbackFlags initialization option.
+ *          Keeping that decision next to protocol construction prevents C/C++
+ *          include fallback behavior from leaking into other language servers.
+ * @param syntax The syntax definition used by the editor path.
+ * @return TRUE when the configured LSP command resolves to clangd.
+ */
+static gboolean syntax_lsp_is_clangd(SyntaxDef *syntax) {
+    if (!syntax || !syntax->lsp_command) return FALSE;
+    g_autofree char *basename = g_path_get_basename(syntax->lsp_command);
+    return g_strcmp0(basename, "clangd") == 0;
+}
+
+/**
+ * @brief Add one include root to clangd fallback flags.
+ * @details import_roots are editor-facing roots, so relative paths need to be
+ *          made stable against the LSP workspace root before clangd sees them.
+ *          clangd receives compiler-like flags, not Graptoς syntax keys.
+ * @param flags Output array of owned flag strings.
+ * @param root_path Workspace root used for relative roots.
+ * @param root Include root from syntax YAML or an environment variable.
+ */
+static void lsp_add_include_flag(GPtrArray *flags,
+                                 const char *root_path,
+                                 const char *root) {
+    if (!flags || !root || root[0] == '\0') return;
+
+    g_autofree char *expanded = NULL;
+    if (root[0] == '~') {
+        const char *home = g_get_home_dir();
+        if (home && root[1] == G_DIR_SEPARATOR) {
+            expanded = g_build_filename(home, root + 2, NULL);
+        } else if (home && root[1] == '\0') {
+            expanded = g_strdup(home);
+        }
+    } else if (g_path_is_absolute(root)) {
+        expanded = g_strdup(root);
+    } else {
+        g_autofree char *current_dir = NULL;
+        const char *base = root_path && root_path[0] != '\0' ? root_path : NULL;
+        if (!base) {
+            current_dir = g_get_current_dir();
+            base = current_dir;
+        }
+        expanded = g_build_filename(base, root, NULL);
+    }
+    if (!expanded || expanded[0] == '\0') return;
+
+    g_autofree char *canonical = g_canonicalize_filename(expanded, NULL);
+    if (!canonical || canonical[0] == '\0') return;
+    if (!g_file_test(canonical, G_FILE_TEST_IS_DIR)) return;
+
+    for (guint i = 0u; i < flags->len; i++) {
+        const char *existing = g_ptr_array_index(flags, i);
+        if (existing && g_str_has_prefix(existing, "-I") &&
+            g_strcmp0(existing + 2, canonical) == 0) {
+            return;
+        }
+    }
+
+    g_ptr_array_add(flags, g_strdup_printf("-I%s", canonical));
+}
+
+/**
+ * @brief Add include roots from one search-path environment variable.
+ * @details Syntax YAML can name variables such as CPATH. Expanding them here
+ *          keeps clangd fallback flags aligned with the same import roots that
+ *          Graptoς uses for local import completion.
+ * @param flags Output array of owned flag strings.
+ * @param variable Environment variable name.
+ */
+static void lsp_add_include_env_flags(GPtrArray *flags, const char *variable) {
+    if (!flags || !variable || variable[0] == '\0') return;
+    const char *value = g_getenv(variable);
+    if (!value || value[0] == '\0') return;
+
+    char **parts = g_strsplit(value, G_SEARCHPATH_SEPARATOR_S, -1);
+    for (guint i = 0u; parts && parts[i]; i++) {
+        lsp_add_include_flag(flags, NULL, parts[i]);
+    }
+    g_strfreev(parts);
+}
+
+/**
+ * @brief Build clangd fallback compiler flags from syntax import metadata.
+ * @details import_roots still belong to Graptoς import completion. This bridge
+ *          only mirrors C/C++ include roots into clangd's fallbackFlags so
+ *          diagnostics work when a project has not supplied compile_commands.json.
+ * @param syntax The syntax definition used by the editor path.
+ * @param root_path Workspace root used for relative include roots.
+ * @return Owned array of char* flags, or NULL when no fallback flags are needed.
+ */
+static GPtrArray *lsp_clangd_fallback_flags(SyntaxDef *syntax,
+                                            const char *root_path) {
+    if (!syntax_lsp_is_clangd(syntax)) return NULL;
+    if (syntax->import_style &&
+        g_ascii_strcasecmp(syntax->import_style, "c_include") != 0) {
+        return NULL;
+    }
+
+    GPtrArray *flags = g_ptr_array_new_with_free_func(g_free);
+    if (!flags) return NULL;
+
+    for (guint i = 0u; syntax->import_roots && i < syntax->import_roots->len; i++) {
+        const char *root = g_ptr_array_index(syntax->import_roots, i);
+        if (!root || root[0] == '\0') continue;
+        if (root[0] == '$') {
+            lsp_add_include_env_flags(flags, root + 1);
+        } else {
+            lsp_add_include_flag(flags, root_path, root);
+        }
+    }
+
+    for (guint i = 0u; syntax->import_env && i < syntax->import_env->len; i++) {
+        lsp_add_include_env_flags(flags, g_ptr_array_index(syntax->import_env, i));
+    }
+
+    if (flags->len == 0u) {
+        g_ptr_array_free(flags, TRUE);
+        return NULL;
+    }
+    return flags;
+}
+
+/**
  * @brief Build argv for a configured LSP command.
  * @details LSP traffic is asynchronous and can arrive after the buffer has changed. The comment records which side owns the data at this boundary and why stale replies must be handled carefully.
  * @param syntax The syntax definition used by the editor path.
@@ -209,6 +334,22 @@ static void lsp_server_send_initialize(LspServer *server, EditorWindow *win) {
     json_builder_add_string_value(builder, workspace_name ? workspace_name : "workspace");
     json_builder_end_object(builder);
     json_builder_end_array(builder);
+    g_autoptr(GPtrArray) fallback_flags =
+        lsp_clangd_fallback_flags(server->syntax, server->root_path);
+    if (fallback_flags && fallback_flags->len > 0u) {
+        lsp_debug(server,
+                  "clangd fallbackFlags from import_roots count=%u",
+                  fallback_flags->len);
+        json_builder_set_member_name(builder, "initializationOptions");
+        json_builder_begin_object(builder);
+        json_builder_set_member_name(builder, "fallbackFlags");
+        json_builder_begin_array(builder);
+        for (guint i = 0u; i < fallback_flags->len; i++) {
+            json_builder_add_string_value(builder, g_ptr_array_index(fallback_flags, i));
+        }
+        json_builder_end_array(builder);
+        json_builder_end_object(builder);
+    }
     json_builder_set_member_name(builder, "capabilities");
     json_builder_begin_object(builder);
     json_builder_set_member_name(builder, "workspace");

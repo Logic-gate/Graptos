@@ -157,7 +157,14 @@ static void lsp_debug(LspServer *server, const char *format, ...) {
 
     va_list args;
     va_start(args, format);
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat-nonliteral"
+#endif
     char *message = g_strdup_vprintf(format, args);
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
     va_end(args);
 
     if (message) {
@@ -180,7 +187,14 @@ static void lsp_client_debug(LspClient *client, const char *format, ...) {
 
     va_list args;
     va_start(args, format);
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat-nonliteral"
+#endif
     char *message = g_strdup_vprintf(format, args);
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
     va_end(args);
 
     if (message) {

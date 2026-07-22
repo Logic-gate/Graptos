@@ -1065,13 +1065,9 @@ static char *theme_rgba_to_string(const GdkRGBA *rgba) {
  * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
  * @param a The first Pango font family supplied by the model sorter.
  * @param b The second Pango font family supplied by the model sorter.
- * @param user_data The callback context passed through GTK signal data.
  * @return The computed value requested by the caller.
  */
-static int theme_font_family_compare(gconstpointer a,
-                                     gconstpointer b,
-                                     gpointer user_data) {
-    (void)user_data;
+static int theme_font_family_compare(const void *a, const void *b) {
     PangoFontFamily * const *left = a;
     PangoFontFamily * const *right = b;
     const char *left_name = left && *left ? pango_font_family_get_name(*left) : "";
@@ -1168,10 +1164,10 @@ static GtkStringList *theme_font_model_new(const char *font_desc,
     }
 
     if (families && family_count > 0) {
-        g_sort_array(families, (size_t)family_count,
-                     sizeof(PangoFontFamily *),
-                     theme_font_family_compare,
-                     NULL);
+        qsort(families,
+              (size_t)family_count,
+              sizeof(PangoFontFamily *),
+              theme_font_family_compare);
         const char *last_name = NULL;
         for (int i = 0; i < family_count; i++) {
             const char *name = pango_font_family_get_name(families[i]);

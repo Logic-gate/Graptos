@@ -16,7 +16,14 @@ static void app_window_tile_debug(EditorWindow *win, const char *format, ...) {
     if (!win || !win->debug_mode || !format) return;
     va_list args;
     va_start(args, format);
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat-nonliteral"
+#endif
     char *message = g_strdup_vprintf(format, args);
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
     va_end(args);
     if (message) {
         g_message("Tiles: %s", message);

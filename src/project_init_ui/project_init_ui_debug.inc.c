@@ -24,7 +24,14 @@ static void project_init_debug(const char *format, ...) {
 
     va_list args;
     va_start(args, format);
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat-nonliteral"
+#endif
     g_autofree char *message = g_strdup_vprintf(format, args);
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
     va_end(args);
     g_message("InitProject: %s", message ? message : "(format failed)");
 }
