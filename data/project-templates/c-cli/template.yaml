@@ -1,0 +1,71 @@
+version: 1
+id: c-cli
+name: C Command-Line Application
+description: Basic C application with optional tests.
+language: C
+
+variables:
+  build_system:
+    label: Build system
+    type: choice
+    values: [make, meson, cmake]
+    default: make
+
+  include_tests:
+    label: Include tests
+    type: boolean
+    default: true
+
+  initialize_git:
+    label: Initialize Git repository
+    type: boolean
+    default: true
+
+  license:
+    label: License
+    type: choice
+    values: [AGPL-3.0, MIT, Apache-2.0]
+    default: AGPL-3.0
+
+directories:
+  - src
+  - include
+  - path: tests
+    when: include_tests
+
+files:
+  - path: src/main.c
+    template: files/main.c
+
+  - path: include/${project_ident}.h
+    template: files/project.h
+
+  - path: Makefile
+    template: files/Makefile
+    when: build_system == "make"
+
+  - path: meson.build
+    template: files/meson.build
+    when: build_system == "meson"
+
+  - path: CMakeLists.txt
+    template: files/CMakeLists.txt
+    when: build_system == "cmake"
+
+  - path: tests/test_main.c
+    template: files/test_main.c
+    when: include_tests
+
+  - path: README.md
+    template: files/README.md
+
+  - path: .gitignore
+    template: files/gitignore
+
+actions:
+  - type: git-init
+    when: initialize_git
+
+open:
+  project: .
+  file: src/main.c

@@ -1,6 +1,12 @@
 /**
  * @file src/project/project_rows.inc.c
- * @brief Cleaf project rows module.
+ * @brief Graptoς project rows module.
+ * @details Projects change underneath the editor. We keep tree rows, filesystem context,
+ *          and search helpers away from EditorTab so directory updates do not become
+ *          buffer-management problems.
+ * @param path The filesystem path supplied by the caller.
+ * @param is_dir The is dir supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 
 static GtkWidget *project_icon_widget_for_path(const char *path,
@@ -12,7 +18,7 @@ static GtkWidget *project_icon_widget_for_path(const char *path,
     }
 
     GtkWidget *icon = gtk_picture_new();
-    gtk_widget_add_css_class(icon, "cleaf-project-icon");
+    gtk_widget_add_css_class(icon, "graptos-project-icon");
     gtk_widget_set_size_request(icon, 18, 18);
     gtk_widget_set_halign(icon, GTK_ALIGN_CENTER);
     gtk_widget_set_valign(icon, GTK_ALIGN_CENTER);
@@ -54,19 +60,65 @@ static GtkWidget *project_icon_widget_for_path(const char *path,
     return icon;
 }
 
+
+/**
+ * @brief Project lock icon widget.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
+ */
+static GtkWidget *project_lock_icon_widget(void) {
+    GtkWidget *icon = gtk_picture_new();
+    gtk_widget_add_css_class(icon, "graptos-project-lock");
+    gtk_widget_set_size_request(icon, 12, 12);
+    gtk_widget_set_halign(icon, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(icon, GTK_ALIGN_CENTER);
+    gtk_picture_set_can_shrink(GTK_PICTURE(icon), TRUE);
+    gtk_picture_set_content_fit(GTK_PICTURE(icon), GTK_CONTENT_FIT_CONTAIN);
+    gtk_widget_set_tooltip_text(icon, "Locked");
+
+    const char *fallbacks[] = {
+        "object-locked-symbolic",
+        "system-lock-screen-symbolic",
+        "channel-secure-symbolic",
+        "security-high-symbolic",
+        NULL
+    };
+    GdkDisplay *display = gdk_display_get_default();
+    GtkIconTheme *theme = display ? gtk_icon_theme_get_for_display(display) : NULL;
+    GtkIconPaintable *paintable = theme
+        ? gtk_icon_theme_lookup_icon(theme,
+                                     "changes-prevent-symbolic",
+                                     fallbacks,
+                                     11,
+                                     1,
+                                     GTK_TEXT_DIR_NONE,
+                                     GTK_ICON_LOOKUP_PRELOAD)
+        : NULL;
+    if (paintable) {
+        gtk_picture_set_paintable(GTK_PICTURE(icon), GDK_PAINTABLE(paintable));
+        g_object_unref(paintable);
+    }
+
+    return icon;
+}
+
+
 /**
  * @brief Git status css class.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param status The status supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static const char *git_status_css_class(const char *status) {
     if (!status || status[0] == '\0') return NULL;
     switch (status[0]) {
-    case '?': return "cleaf-git-status-untracked";
-    case '!': return "cleaf-git-status-conflict";
-    case 'R': return "cleaf-git-status-renamed";
-    case 'D': return "cleaf-git-status-deleted";
-    case 'A': return "cleaf-git-status-added";
-    case 'S': return "cleaf-git-status-staged";
-    case 'M': return "cleaf-git-status-modified";
+    case '?': return "graptos-git-status-untracked";
+    case '!': return "graptos-git-status-conflict";
+    case 'R': return "graptos-git-status-renamed";
+    case 'D': return "graptos-git-status-deleted";
+    case 'A': return "graptos-git-status-added";
+    case 'S': return "graptos-git-status-staged";
+    case 'M': return "graptos-git-status-modified";
     default: return NULL;
     }
 }
@@ -74,12 +126,16 @@ static const char *git_status_css_class(const char *status) {
 
 /**
  * @brief Append project row.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param build The build supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
+ * @param depth The depth supplied by the caller.
  */
 static void append_project_row(ProjectBuild *build,
                                const char *path,
                                guint depth) {
     if (!build || !build->win || !build->win->project_list || !path) return;
-    if (build->nodes >= CLEAF_PROJECT_MAX_NODES) return;
+    if (build->nodes >= GRAPTOS_PROJECT_MAX_NODES) return;
 
     gboolean is_dir = g_file_test(path, G_FILE_TEST_IS_DIR);
     gboolean expanded = is_dir && project_path_is_expanded(build->win, path);
@@ -95,7 +151,7 @@ static void append_project_row(ProjectBuild *build,
     ProjectRow *data = g_new0(ProjectRow, 1);
     data->path = g_strdup(path);
     data->is_dir = is_dir;
-    g_object_set_data_full(G_OBJECT(row), "cleaf-project-row", data,
+    g_object_set_data_full(G_OBJECT(row), "graptos-project-row", data,
                            project_row_free);
 
     GtkGesture *right_click = gtk_gesture_click_new();
@@ -119,15 +175,15 @@ static void append_project_row(ProjectBuild *build,
     if (icon) {
         gtk_box_append(GTK_BOX(line), icon);
     } else if (show_badge) {
-        GtkWidget *badge_label = row_label(badge, "cleaf-project-badge");
+        GtkWidget *badge_label = row_label(badge, "graptos-project-badge");
         gtk_widget_set_size_request(badge_label, 36, -1);
         gtk_box_append(GTK_BOX(line), badge_label);
     }
 
     if (!is_dir) {
-        const char *git_status = cleaf_git_status_for_file(build->win, path);
+        const char *git_status = graptos_git_status_for_file(build->win, path);
         if (git_status && git_status[0] != '\0') {
-            GtkWidget *git = row_label(git_status, "cleaf-git-status");
+            GtkWidget *git = row_label(git_status, "graptos-git-status");
             const char *status_class = git_status_css_class(git_status);
             if (status_class) gtk_widget_add_css_class(git, status_class);
             gtk_widget_set_size_request(git, 18, -1);
@@ -136,9 +192,7 @@ static void append_project_row(ProjectBuild *build,
     }
 
     if (locked) {
-        GtkWidget *lock = row_label("🔒", "cleaf-project-lock");
-        gtk_widget_set_size_request(lock, 18, -1);
-        gtk_box_append(GTK_BOX(line), lock);
+        gtk_box_append(GTK_BOX(line), project_lock_icon_widget());
     }
 
     GtkWidget *name = row_label(base ? base : path, NULL);
@@ -153,18 +207,23 @@ static void append_project_row(ProjectBuild *build,
 
 /**
  * @brief Add visible path.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param build The build supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
+ * @param depth The depth supplied by the caller.
  */
 static void add_visible_path(ProjectBuild *build,
                              const char *path,
                              guint depth) {
     if (!build || !path) return;
-    if (build->nodes >= CLEAF_PROJECT_MAX_NODES
-        || depth > CLEAF_PROJECT_MAX_DEPTH) {
+    if (build->nodes >= GRAPTOS_PROJECT_MAX_NODES
+        || depth > GRAPTOS_PROJECT_MAX_DEPTH) {
         return;
     }
 
     append_project_row(build, path, depth);
     if (!g_file_test(path, G_FILE_TEST_IS_DIR)) return;
+    project_tree_watch_directory(build->win, path);
     if (!project_path_is_expanded(build->win, path)) return;
 
     GPtrArray *names = sorted_dir_names(path);
@@ -175,13 +234,16 @@ static void add_visible_path(ProjectBuild *build,
                                        NULL);
         add_visible_path(build, child, depth + 1u);
         g_free(child);
-        if (build->nodes >= CLEAF_PROJECT_MAX_NODES) break;
+        if (build->nodes >= GRAPTOS_PROJECT_MAX_NODES) break;
     }
     g_ptr_array_free(names, TRUE);
 }
 
 /**
  * @brief Project root count.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param win The win supplied by the caller.
+ * @return The computed value requested by the caller.
  */
 guint project_root_count(EditorWindow *win) {
     if (!win || !win->project_roots) return 0u;
@@ -190,6 +252,10 @@ guint project_root_count(EditorWindow *win) {
 
 /**
  * @brief Project root at.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param win The win supplied by the caller.
+ * @param index The index supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 const char *project_root_at(EditorWindow *win, guint index) {
     if (!win || !win->project_roots || index >= win->project_roots->len) return NULL;
@@ -198,6 +264,9 @@ const char *project_root_at(EditorWindow *win, guint index) {
 
 /**
  * @brief Project has roots.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param win The win supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean project_has_roots(EditorWindow *win) {
     return project_root_count(win) > 0u;
@@ -205,6 +274,10 @@ gboolean project_has_roots(EditorWindow *win) {
 
 /**
  * @brief Project root for path.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param win The win supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 const char *project_root_for_path(EditorWindow *win, const char *path) {
     if (!win || !path) return NULL;
@@ -231,6 +304,10 @@ const char *project_root_for_path(EditorWindow *win, const char *path) {
 
 /**
  * @brief Project root exists.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param win The win supplied by the caller.
+ * @param canonical The canonical supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean project_root_exists(EditorWindow *win, const char *canonical) {
     if (!canonical) return FALSE;

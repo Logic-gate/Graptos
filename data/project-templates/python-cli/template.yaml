@@ -1,0 +1,64 @@
+version: 1
+id: python-cli
+name: Python Command-Line Application
+description: Python package with a console entry point and optional pytest tests.
+language: Python
+
+variables:
+  package_name:
+    label: Package name
+    type: text
+    default: ${project_ident}
+
+  include_tests:
+    label: Include tests
+    type: boolean
+    default: true
+
+  initialize_git:
+    label: Initialize Git repository
+    type: boolean
+    default: true
+
+  license:
+    label: License
+    type: choice
+    values: [AGPL-3.0, MIT, Apache-2.0]
+    default: AGPL-3.0
+
+directories:
+  - src
+  - src/${package_name}
+  - path: tests
+    when: include_tests
+
+files:
+  - path: pyproject.toml
+    template: files/pyproject.toml
+
+  - path: src/${package_name}/__init__.py
+    template: files/__init__.py
+
+  - path: src/${package_name}/__main__.py
+    template: files/__main__.py
+
+  - path: src/${package_name}/cli.py
+    template: files/cli.py
+
+  - path: tests/test_cli.py
+    template: files/test_cli.py
+    when: include_tests
+
+  - path: README.md
+    template: files/README.md
+
+  - path: .gitignore
+    template: files/gitignore
+
+actions:
+  - type: git-init
+    when: initialize_git
+
+open:
+  project: .
+  file: src/${package_name}/cli.py

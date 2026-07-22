@@ -1,0 +1,5 @@
+Advanced mode is enabled for ${project_name}.
+
+This file is controlled by:
+
+when: build_style == "advanced"

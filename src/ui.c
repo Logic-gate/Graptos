@@ -1,12 +1,15 @@
 /**
  * @file src/ui.c
  * @brief Shared GTK utility helpers and compatibility wrappers.
+ * @details Theme values should be traceable. We translate config into GTK CSS here so
+ *          colors and fonts do not get scattered through feature code where they are hard
+ *          to reason about later.
  */
 
 #include "ui.h"
 
 /*
- * Cleaf keeps a few custom dialogs synchronous because the surrounding save and
+ * Graptoς keeps a few custom dialogs synchronous because the surrounding save and
  * close flows must return a concrete response before continuing.  The nested
  * loop is local to the dialog and is stopped by either an explicit response or
  * the window close signal.
@@ -26,6 +29,10 @@ typedef struct {
 
 /**
  * @brief Modal close cb.
+ * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
+ * @param window The window supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean modal_close_cb(GtkWindow *window, gpointer user_data) {
     (void)window;
@@ -37,9 +44,12 @@ static gboolean modal_close_cb(GtkWindow *window, gpointer user_data) {
 }
 
 /**
- * @brief Cleaf set all margins.
+ * @brief Graptoς set all margins.
+ * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param margin The margin supplied by the caller.
  */
-void cleaf_set_all_margins(GtkWidget *widget, int margin) {
+void graptos_set_all_margins(GtkWidget *widget, int margin) {
     if (!widget) return;
     gtk_widget_set_margin_start(widget, margin);
     gtk_widget_set_margin_end(widget, margin);
@@ -48,9 +58,16 @@ void cleaf_set_all_margins(GtkWidget *widget, int margin) {
 }
 
 /**
- * @brief Cleaf modal window run.
+ * @brief Graptoς modal window run.
+ * @details GTK4 prefers async dialogs, but close/save/error flows are easier to
+ *          reason about when they return one concrete response. The nested loop
+ *          is deliberately small and owned by this helper, so callers get the
+ *          old synchronous shape without spreading nested-loop code around.
+ * @param window The window supplied by the caller.
+ * @param default_response The default response supplied by the caller.
+ * @return The computed value requested by the caller.
  */
-int cleaf_modal_window_run(GtkWindow *window, int default_response) {
+int graptos_modal_window_run(GtkWindow *window, int default_response) {
     if (!window) return GTK_RESPONSE_NONE;
 
     ModalRunState state;
@@ -63,7 +80,7 @@ int cleaf_modal_window_run(GtkWindow *window, int default_response) {
      * it before returning the response.
      */
     g_object_ref(window);
-    g_object_set_data(G_OBJECT(window), "cleaf-modal-state", &state);
+    g_object_set_data(G_OBJECT(window), "graptos-modal-state", &state);
     gulong close_handler = g_signal_connect(window, "close-request",
                                             G_CALLBACK(modal_close_cb),
                                             &state);
@@ -71,30 +88,51 @@ int cleaf_modal_window_run(GtkWindow *window, int default_response) {
     gtk_window_present(window);
     g_main_loop_run(state.loop);
     g_signal_handler_disconnect(window, close_handler);
-    g_object_set_data(G_OBJECT(window), "cleaf-modal-state", NULL);
+    g_object_set_data(G_OBJECT(window), "graptos-modal-state", NULL);
     g_main_loop_unref(state.loop);
     g_object_unref(window);
     return state.response;
 }
 
 /**
- * @brief Cleaf modal window respond.
+ * @brief Graptoς modal window respond.
+ * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
-void cleaf_modal_window_respond(GtkWidget *widget, gpointer user_data) {
+void graptos_modal_window_respond(GtkWidget *widget, gpointer user_data) {
     int response = GPOINTER_TO_INT(user_data);
     GtkRoot *root = widget ? gtk_widget_get_root(widget) : NULL;
     if (!GTK_IS_WINDOW(root)) return;
 
+/**
+ * @brief File dialog finish.
+ * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
+ * @param dialog The dialog supplied by the caller.
+ * @param result The result supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
+ * @param finish_func The finish func supplied by the caller.
+ */
     ModalRunState *state = g_object_get_data(G_OBJECT(root),
-                                             "cleaf-modal-state");
+                                             "graptos-modal-state");
     if (state) {
         state->response = response;
         if (state->loop) g_main_loop_quit(state->loop);
     }
 }
 
-/*
- * GtkFileDialog is asynchronous in GTK4.  Cleaf wraps it in the same modal
+/**
+ * @brief Finish a synchronous-style file dialog wrapper.
+ * @details GtkFileDialog is asynchronous in GTK4. Graptoς wraps it in the same
+ *          modal style used by the rest of the UI so file/open/save actions can
+ *          stay simple without leaking the GFile returned by the finish
+ *          function.
+ * @param dialog The file dialog that completed.
+ * @param result The asynchronous result passed by GTK.
+ * @param user_data The FileDialogState used to wake the nested modal loop.
+ * @param finish_func The GtkFileDialog finish function matching the operation.
+ *
+ * GtkFileDialog is asynchronous in GTK4.  Graptoς wraps it in the same modal
  * style used by the rest of the UI so file/open/save actions can stay simple
  * without leaking the GFile returned by the finish function.
  */
@@ -117,6 +155,10 @@ static void file_dialog_finish(GtkFileDialog *dialog,
 
 /**
  * @brief Open finish cb.
+ * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
+ * @param source The source supplied by the caller.
+ * @param result The result supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void open_finish_cb(GObject *source, GAsyncResult *result,
                            gpointer user_data) {
@@ -126,6 +168,10 @@ static void open_finish_cb(GObject *source, GAsyncResult *result,
 
 /**
  * @brief Save finish cb.
+ * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
+ * @param source The source supplied by the caller.
+ * @param result The result supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void save_finish_cb(GObject *source, GAsyncResult *result,
                            gpointer user_data) {
@@ -135,6 +181,10 @@ static void save_finish_cb(GObject *source, GAsyncResult *result,
 
 /**
  * @brief Folder finish cb.
+ * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
+ * @param source The source supplied by the caller.
+ * @param result The result supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void folder_finish_cb(GObject *source, GAsyncResult *result,
                              gpointer user_data) {
@@ -144,6 +194,12 @@ static void folder_finish_cb(GObject *source, GAsyncResult *result,
 
 /**
  * @brief Run file dialog.
+ * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
+ * @param parent The parent supplied by the caller.
+ * @param title The title supplied by the caller.
+ * @param start_func The start func supplied by the caller.
+ * @param callback Callback invoked when the asynchronous step completes.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *run_file_dialog(GtkWindow *parent,
                              const char *title,
@@ -169,33 +225,54 @@ static char *run_file_dialog(GtkWindow *parent,
 }
 
 /**
- * @brief Cleaf open file dialog.
+ * @brief Graptoς open file dialog.
+ * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
+ * @param parent The parent supplied by the caller.
+ * @param title The title supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
-char *cleaf_open_file_dialog(GtkWindow *parent, const char *title) {
+char *graptos_open_file_dialog(GtkWindow *parent, const char *title) {
     return run_file_dialog(parent, title ? title : "Open File",
                            gtk_file_dialog_open, open_finish_cb);
 }
 
 /**
- * @brief Cleaf save file dialog.
+ * @brief Graptoς save file dialog.
+ * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
+ * @param parent The parent supplied by the caller.
+ * @param title The title supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
-char *cleaf_save_file_dialog(GtkWindow *parent, const char *title) {
+char *graptos_save_file_dialog(GtkWindow *parent, const char *title) {
+/**
+ * @brief Widget destroy.
+ * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
+ * @param widget The widget that emitted the callback or receives the update.
+ */
     return run_file_dialog(parent, title ? title : "Save File",
                            gtk_file_dialog_save, save_finish_cb);
 }
 
 /**
- * @brief Cleaf select folder dialog.
+ * @brief Graptoς select folder dialog.
+ * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
+ * @param parent The parent supplied by the caller.
+ * @param title The title supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
-char *cleaf_select_folder_dialog(GtkWindow *parent, const char *title) {
+char *graptos_select_folder_dialog(GtkWindow *parent, const char *title) {
     return run_file_dialog(parent, title ? title : "Open Folder",
                            gtk_file_dialog_select_folder, folder_finish_cb);
 }
 
 /**
- * @brief Cleaf source cancel.
+ * @brief Graptoς source cancel.
+ * @details Stored source IDs can go stale after a timeout removes itself. We
+ *          look up the source before destroying it because the alternative is a
+ *          stream of GLib criticals that hide real warnings during debugging.
+ * @param source_id The source id supplied by the caller.
  */
-void cleaf_source_cancel(guint *source_id) {
+void graptos_source_cancel(guint *source_id) {
     if (!source_id || *source_id == 0u) return;
 
     /*
@@ -211,12 +288,15 @@ void cleaf_source_cancel(guint *source_id) {
     *source_id = 0u;
 }
 
-/*
- * Popovers are not normal toplevels: destroying the row or overlay that owns
- * them while they still have a child can produce GTK finalization warnings.
- * Centralize the teardown order so callers do not have to know that detail.
+/**
+ * @brief Destroy a widget through the Graptoς-safe path.
+ * @details Popovers are not normal toplevels: destroying the row or overlay
+ *          that owns them while they still have a child can produce GTK
+ *          finalization warnings. Centralizing the teardown order keeps callers
+ *          from having to remember that detail.
+ * @param widget The widget that should be torn down.
  */
-void cleaf_widget_destroy(GtkWidget *widget) {
+void graptos_widget_destroy(GtkWidget *widget) {
     if (!widget) return;
 
     if (GTK_IS_WINDOW(widget)) {
@@ -240,25 +320,34 @@ void cleaf_widget_destroy(GtkWidget *widget) {
 }
 
 /**
- * @brief Cleaf box append.
+ * @brief Graptoς box append.
+ * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
+ * @param box The box supplied by the caller.
+ * @param child The child supplied by the caller.
  */
-void cleaf_box_append(GtkWidget *box, GtkWidget *child) {
+void graptos_box_append(GtkWidget *box, GtkWidget *child) {
     if (box && child) gtk_box_append(GTK_BOX(box), child);
 }
 
 /**
- * @brief Cleaf box prepend.
+ * @brief Graptoς box prepend.
+ * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
+ * @param box The box supplied by the caller.
+ * @param child The child supplied by the caller.
  */
-void cleaf_box_prepend(GtkWidget *box, GtkWidget *child) {
+void graptos_box_prepend(GtkWidget *box, GtkWidget *child) {
     if (box && child) gtk_box_prepend(GTK_BOX(box), child);
 }
 
-/*
- * Several popovers are reused and moved between rebuilt rows/overlays.  GTK
- * requires a single widget parent, so detach first rather than relying on the
- * caller to remember the previous owner.
+/**
+ * @brief Attach a popover to a widget after detaching any old parent.
+ * @details Several popovers are reused and moved between rebuilt rows and
+ *          overlays. GTK requires a single widget parent, so detaching first
+ *          keeps callers from having to remember the previous owner.
+ * @param popover The popover being reparented.
+ * @param parent The widget that should own the popover.
  */
-void cleaf_popover_attach(GtkWidget *popover, GtkWidget *parent) {
+void graptos_popover_attach(GtkWidget *popover, GtkWidget *parent) {
     if (!popover || !parent) return;
     if (gtk_widget_get_parent(popover) == parent) return;
     if (gtk_widget_get_parent(popover)) gtk_widget_unparent(popover);
@@ -266,9 +355,13 @@ void cleaf_popover_attach(GtkWidget *popover, GtkWidget *parent) {
 }
 
 /**
- * @brief Cleaf popover show.
+ * @brief Graptoς popover show.
+ * @details Popovers are sensitive to timing. Showing one before the parent has
+ *          an allocation causes GTK snapshot warnings, so this helper refuses
+ *          to show early and lets the next user event or timeout try again.
+ * @param popover The popover supplied by the caller.
  */
-void cleaf_popover_show(GtkWidget *popover) {
+void graptos_popover_show(GtkWidget *popover) {
     if (!popover || !GTK_IS_POPOVER(popover)) return;
 
     GtkWidget *parent = gtk_widget_get_parent(popover);
@@ -286,9 +379,11 @@ void cleaf_popover_show(GtkWidget *popover) {
 }
 
 /**
- * @brief Cleaf popover hide.
+ * @brief Graptoς popover hide.
+ * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
+ * @param popover The popover supplied by the caller.
  */
-void cleaf_popover_hide(GtkWidget *popover) {
+void graptos_popover_hide(GtkWidget *popover) {
     if (popover && GTK_IS_POPOVER(popover) &&
         gtk_widget_get_parent(popover) && gtk_widget_get_visible(popover)) {
         gtk_popover_popdown(GTK_POPOVER(popover));
@@ -296,9 +391,11 @@ void cleaf_popover_hide(GtkWidget *popover) {
 }
 
 /**
- * @brief Cleaf list box clear.
+ * @brief Graptoς list box clear.
+ * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
+ * @param list_box The list box supplied by the caller.
  */
-void cleaf_list_box_clear(GtkWidget *list_box) {
+void graptos_list_box_clear(GtkWidget *list_box) {
     if (!list_box || !GTK_IS_LIST_BOX(list_box)) return;
 
     GtkWidget *child = gtk_widget_get_first_child(list_box);
@@ -310,9 +407,15 @@ void cleaf_list_box_clear(GtkWidget *list_box) {
 }
 
 /**
- * @brief Cleaf button new.
+ * @brief Graptoς button new.
+ * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
+ * @param label The label supplied by the caller.
+ * @param tooltip The tooltip supplied by the caller.
+ * @param callback Callback invoked when the asynchronous step completes.
+ * @param data The callback context passed by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
-GtkWidget *cleaf_button_new(const char *label, const char *tooltip,
+GtkWidget *graptos_button_new(const char *label, const char *tooltip,
                             GCallback callback, gpointer data) {
     GtkWidget *button = gtk_button_new_with_label(label ? label : "");
     if (tooltip) gtk_widget_set_tooltip_text(button, tooltip);
@@ -321,19 +424,27 @@ GtkWidget *cleaf_button_new(const char *label, const char *tooltip,
 }
 
 /**
- * @brief Cleaf flat button new.
+ * @brief Graptoς flat button new.
+ * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
+ * @param label The label supplied by the caller.
+ * @param tooltip The tooltip supplied by the caller.
+ * @param callback Callback invoked when the asynchronous step completes.
+ * @param data The callback context passed by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
-GtkWidget *cleaf_flat_button_new(const char *label, const char *tooltip,
+GtkWidget *graptos_flat_button_new(const char *label, const char *tooltip,
                                  GCallback callback, gpointer data) {
-    GtkWidget *button = cleaf_button_new(label, tooltip, callback, data);
-    gtk_widget_add_css_class(button, "cleaf-flat");
+    GtkWidget *button = graptos_button_new(label, tooltip, callback, data);
+    gtk_widget_add_css_class(button, "graptos-flat");
     return button;
 }
 
 /**
- * @brief Cleaf separator new.
+ * @brief Graptoς separator new.
+ * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
-GtkWidget *cleaf_separator_new(void) {
+GtkWidget *graptos_separator_new(void) {
     GtkWidget *sep = gtk_separator_new(GTK_ORIENTATION_VERTICAL);
     gtk_widget_set_margin_start(sep, 4);
     gtk_widget_set_margin_end(sep, 4);

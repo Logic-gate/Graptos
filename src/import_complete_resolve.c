@@ -1,6 +1,9 @@
 /**
  * @file src/import_complete_resolve.c
  * @brief Import path and member resolution helpers.
+ * @details Import completion is intentionally pragmatic. We resolve enough project-local
+ *          structure to be helpful when LSP is unavailable, without pretending this is a
+ *          compiler for every language.
  */
 
 #include "import_complete_private.h"
@@ -12,10 +15,13 @@
 
 /**
  * @brief Name is safe.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param name The name supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean name_is_safe(const char *name) {
     if (!name || name[0] == '\0') return FALSE;
-    if (strlen(name) > CLEAF_IMPORT_MAX_NAME) return FALSE;
+    if (strlen(name) > GRAPTOS_IMPORT_MAX_NAME) return FALSE;
     if (strstr(name, "..")) return FALSE;
     for (const char *p = name; *p; p++) {
         unsigned char ch = (unsigned char)*p;
@@ -26,6 +32,10 @@ static gboolean name_is_safe(const char *name) {
 
 /**
  * @brief Prefix matches.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param word The symbol text being matched.
+ * @param prefix The prefix supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean prefix_matches(const char *word, const char *prefix) {
     if (!word || !prefix) return FALSE;
@@ -35,6 +45,12 @@ static gboolean prefix_matches(const char *word, const char *prefix) {
 
 /**
  * @brief Add candidate.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param out Output storage filled when the lookup succeeds.
+ * @param seen The seen supplied by the caller.
+ * @param word The symbol text being matched.
+ * @param prefix The prefix supplied by the caller.
+ * @param max_results The max results supplied by the caller.
  */
 static void add_candidate(GPtrArray *out,
                           GHashTable *seen,
@@ -51,6 +67,9 @@ static void add_candidate(GPtrArray *out,
 }
 /**
  * @brief Tab directory.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *tab_directory(EditorTab *tab) {
     if (tab && tab->file_path) return g_path_get_dirname(tab->file_path);
@@ -59,6 +78,9 @@ static char *tab_directory(EditorTab *tab) {
 
 /**
  * @brief Add root.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param roots The roots supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
  */
 static void add_root(GPtrArray *roots, const char *path) {
     if (!roots || !path || path[0] == '\0') return;
@@ -91,6 +113,9 @@ static void add_root(GPtrArray *roots, const char *path) {
 
 /**
  * @brief Add env roots.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param roots The roots supplied by the caller.
+ * @param env_name The env name supplied by the caller.
  */
 static void add_env_roots(GPtrArray *roots, const char *env_name) {
     const char *value = g_getenv(env_name);
@@ -102,6 +127,9 @@ static void add_env_roots(GPtrArray *roots, const char *env_name) {
 
 /**
  * @brief Collect roots.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param roots The roots supplied by the caller.
  */
 static void collect_roots(EditorTab *tab, GPtrArray *roots) {
     SyntaxDef *syntax = tab ? tab->active_syntax : NULL;
@@ -165,6 +193,10 @@ static void collect_roots(EditorTab *tab, GPtrArray *roots) {
 
 /**
  * @brief Suffix allowed.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param syntax The syntax definition used by the editor path.
+ * @param name The name supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean suffix_allowed(SyntaxDef *syntax, const char *name) {
     if (!syntax || !syntax->import_extensions ||
@@ -180,6 +212,10 @@ static gboolean suffix_allowed(SyntaxDef *syntax, const char *name) {
 
 /**
  * @brief Strip suffix.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param syntax The syntax definition used by the editor path.
+ * @param name The name supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *strip_suffix(SyntaxDef *syntax, const char *name) {
     if (!syntax || !syntax->import_strip_extensions) return g_strdup(name);
@@ -195,6 +231,10 @@ static char *strip_suffix(SyntaxDef *syntax, const char *name) {
 
 /**
  * @brief Module fragment.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param syntax The syntax definition used by the editor path.
+ * @param module The module supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *module_fragment(SyntaxDef *syntax, const char *module) {
     if (!module) return g_strdup("");
@@ -207,6 +247,13 @@ static char *module_fragment(SyntaxDef *syntax, const char *module) {
 
 /**
  * @brief Scan dir.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param out Output storage filled when the lookup succeeds.
+ * @param seen The seen supplied by the caller.
+ * @param syntax The syntax definition used by the editor path.
+ * @param dir The dir supplied by the caller.
+ * @param prefix The prefix supplied by the caller.
+ * @param max_results The max results supplied by the caller.
  */
 static void scan_dir(GPtrArray *out, GHashTable *seen, SyntaxDef *syntax,
                      const char *dir, const char *prefix,
@@ -216,7 +263,7 @@ static void scan_dir(GPtrArray *out, GHashTable *seen, SyntaxDef *syntax,
     const char *name = NULL;
     guint count = 0u;
     while ((name = g_dir_read_name(gdir)) != NULL &&
-           out->len < max_results && count < CLEAF_IMPORT_MAX_DIR_ENTRIES) {
+           out->len < max_results && count < GRAPTOS_IMPORT_MAX_DIR_ENTRIES) {
         count++;
         if (name[0] == '.' && name[1] != '\0') continue;
         if (strcmp(name, "node_modules") == 0 || strcmp(name, ".git") == 0 ||
@@ -242,6 +289,12 @@ static void scan_dir(GPtrArray *out, GHashTable *seen, SyntaxDef *syntax,
 
 /**
  * @brief Collect module candidates.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param ctx The ctx supplied by the caller.
+ * @param out Output storage filled when the lookup succeeds.
+ * @param seen The seen supplied by the caller.
+ * @param max_results The max results supplied by the caller.
  */
 static void collect_module_candidates(EditorTab *tab, ImportParse *ctx,
                                       GPtrArray *out, GHashTable *seen,
@@ -262,6 +315,12 @@ static void collect_module_candidates(EditorTab *tab, ImportParse *ctx,
 
 /**
  * @brief Add identifier.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param out Output storage filled when the lookup succeeds.
+ * @param seen The seen supplied by the caller.
+ * @param word The symbol text being matched.
+ * @param prefix The prefix supplied by the caller.
+ * @param max_results The max results supplied by the caller.
  */
 static void add_identifier(GPtrArray *out, GHashTable *seen, const char *word,
                            const char *prefix, guint max_results) {
@@ -272,6 +331,12 @@ static void add_identifier(GPtrArray *out, GHashTable *seen, const char *word,
 
 /**
  * @brief Scan quoted identifier list.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param out Output storage filled when the lookup succeeds.
+ * @param seen The seen supplied by the caller.
+ * @param line The zero-based or display line handled by the caller, matching the surrounding API.
+ * @param prefix The prefix supplied by the caller.
+ * @param max_results The max results supplied by the caller.
  */
 static void scan_quoted_identifier_list(GPtrArray *out, GHashTable *seen,
                                         const char *line, const char *prefix,
@@ -297,13 +362,19 @@ static void scan_quoted_identifier_list(GPtrArray *out, GHashTable *seen,
 
 /**
  * @brief Scan text symbols.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param out Output storage filled when the lookup succeeds.
+ * @param seen The seen supplied by the caller.
+ * @param text The text fragment supplied by the caller.
+ * @param prefix The prefix supplied by the caller.
+ * @param max_results The max results supplied by the caller.
  */
 static void scan_text_symbols(GPtrArray *out, GHashTable *seen,
                               const char *text, const char *prefix,
                               guint max_results) {
     static const char *marks[] = {
         "def ", "class ", "function ", "const ", "let ", "var ",
-        "export ", "pub ", "fn ", "struct ", "enum ", "trait ",
+        "fn ", "struct ", "enum ", "trait ",
         "type ", "interface ", "func ", "#define ", "typedef ", NULL
     };
     const char *p = text;
@@ -341,6 +412,12 @@ static void scan_text_symbols(GPtrArray *out, GHashTable *seen,
 
 /**
  * @brief Scan symbol file.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param out Output storage filled when the lookup succeeds.
+ * @param seen The seen supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
+ * @param prefix The prefix supplied by the caller.
+ * @param max_results The max results supplied by the caller.
  */
 static void scan_symbol_file(GPtrArray *out, GHashTable *seen,
                              const char *path, const char *prefix,
@@ -348,7 +425,7 @@ static void scan_symbol_file(GPtrArray *out, GHashTable *seen,
     char *text = NULL;
     gsize len = 0u;
     if (!g_file_get_contents(path, &text, &len, NULL)) return;
-    if (len <= CLEAF_IMPORT_MAX_FILE_BYTES) {
+    if (len <= GRAPTOS_IMPORT_MAX_FILE_BYTES) {
         scan_text_symbols(out, seen, text, prefix, max_results);
     }
     g_free(text);
@@ -356,6 +433,13 @@ static void scan_symbol_file(GPtrArray *out, GHashTable *seen,
 
 /**
  * @brief Collect static members.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param syntax The syntax definition used by the editor path.
+ * @param out Output storage filled when the lookup succeeds.
+ * @param seen The seen supplied by the caller.
+ * @param module The module supplied by the caller.
+ * @param prefix The prefix supplied by the caller.
+ * @param max_results The max results supplied by the caller.
  */
 static void collect_static_members(SyntaxDef *syntax, GPtrArray *out,
                                    GHashTable *seen, const char *module,
@@ -381,6 +465,12 @@ static void collect_static_members(SyntaxDef *syntax, GPtrArray *out,
 
 /**
  * @brief Collect member candidates.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param ctx The ctx supplied by the caller.
+ * @param out Output storage filled when the lookup succeeds.
+ * @param seen The seen supplied by the caller.
+ * @param max_results The max results supplied by the caller.
  */
 static void collect_member_candidates(EditorTab *tab, ImportParse *ctx,
                                       GPtrArray *out, GHashTable *seen,
@@ -425,6 +515,11 @@ static void collect_member_candidates(EditorTab *tab, ImportParse *ctx,
 
 /**
  * @brief Import collect candidates.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param ctx The ctx supplied by the caller.
+ * @param out Output storage filled when the lookup succeeds.
+ * @param max_results The max results supplied by the caller.
  */
 void import_collect_candidates(EditorTab *tab,
                                ImportParse *ctx,

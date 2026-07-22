@@ -1,6 +1,10 @@
 /**
  * @file src/codex_markdown.c
  * @brief Codex response markdown renderer.
+ * @details AI touches the parts of the app where mistakes are expensive: files,
+ *          permissions, markdown, and long-running processes. We keep protocol, client,
+ *          panel, and review logic separated so approval and cleanup paths are easy to
+ *          audit.
  */
 
 #include "codex_markdown.h"
@@ -9,11 +13,20 @@
 
 /**
  * @brief Codex markdown type definition.
+ * @details Rendering walks a GtkTextBuffer iter forward. This tiny writer keeps
+ *          the buffer and current insert point together so inline and block
+ *          renderers do not pass both around separately.
  */
 typedef struct { GtkTextBuffer *buffer; GtkTextIter iter; } Writer;
 
 /**
  * @brief Tag ensure.
+ * @details Tags are created lazily because the response buffer can be replaced
+ *          many times. Reusing tag names keeps re-rendering cheap and avoids
+ *          filling the tag table with duplicate styles.
+ * @param buffer The text buffer used for the operation.
+ * @param name The name supplied by the caller.
+ * @param first The first supplied by the caller.
  */
 static void tag_ensure(GtkTextBuffer *buffer, const char *name,
                        const char *first, ...) {
@@ -30,6 +43,10 @@ static void tag_ensure(GtkTextBuffer *buffer, const char *name,
 
 /**
  * @brief Tags ensure.
+ * @details The renderer intentionally supports a small markdown subset. These
+ *          tags cover the pieces Codex commonly emits without turning the
+ *          response pane into a browser widget.
+ * @param buffer The text buffer used for the operation.
  */
 static void tags_ensure(GtkTextBuffer *buffer) {
     tag_ensure(buffer, "ai-h1", "weight", PANGO_WEIGHT_BOLD, "scale", 1.55,
@@ -50,6 +67,10 @@ static void tags_ensure(GtkTextBuffer *buffer) {
 
 /**
  * @brief Put.
+ * @details Plain insertion still goes through a helper so escaped/unknown
+ *          markdown falls back to visible text instead of being silently dropped.
+ * @param writer The writer supplied by the caller.
+ * @param text The text fragment supplied by the caller.
  */
 static void put(Writer *writer, const char *text) {
     gtk_text_buffer_insert(writer->buffer, &writer->iter, text ? text : "", -1);
@@ -57,6 +78,12 @@ static void put(Writer *writer, const char *text) {
 
 /**
  * @brief Put tag.
+ * @details GtkTextBuffer applies tags over ranges, not over future writes. We
+ *          remember the offset before inserting, then tag only the text we just
+ *          added.
+ * @param writer The writer supplied by the caller.
+ * @param text The text fragment supplied by the caller.
+ * @param tag The tag supplied by the caller.
  */
 static void put_tag(Writer *writer, const char *text, const char *tag) {
     gint offset = gtk_text_iter_get_offset(&writer->iter);
@@ -68,6 +95,11 @@ static void put_tag(Writer *writer, const char *text, const char *tag) {
 
 /**
  * @brief Inline render.
+ * @details Inline parsing is deliberately forgiving. If a construct is not
+ *          closed, we render the original character and move on so malformed AI
+ *          output never eats the rest of the response.
+ * @param writer The writer supplied by the caller.
+ * @param line The zero-based or display line handled by the caller, matching the surrounding API.
  */
 static void inline_render(Writer *writer, const char *line) {
     const char *p = line ? line : "";
@@ -98,6 +130,12 @@ static void inline_render(Writer *writer, const char *line) {
 
 /**
  * @brief Line render.
+ * @details Blocks are handled line-by-line because the response pane only needs
+ *          readable chat output. Fenced code toggles a simple state instead of
+ *          building a full markdown AST.
+ * @param writer The writer supplied by the caller.
+ * @param line The zero-based or display line handled by the caller, matching the surrounding API.
+ * @param code The code supplied by the caller.
  */
 static void line_render(Writer *writer, const char *line, gboolean *code) {
     if (g_str_has_prefix(line, "```") || g_str_has_prefix(line, "~~~")) {
@@ -116,6 +154,11 @@ static void line_render(Writer *writer, const char *line, gboolean *code) {
 
 /**
  * @brief Codex markdown render.
+ * @details Rendering replaces the whole buffer. Codex responses are appendable
+ *          at the panel level, while this function only owns transforming the
+ *          current markdown string into styled text.
+ * @param buffer The text buffer used for the operation.
+ * @param markdown The markdown supplied by the caller.
  */
 void codex_markdown_render(GtkTextBuffer *buffer, const char *markdown) {
     if (!buffer) return;

@@ -9,6 +9,9 @@ icon: mime
 filenames: []
 index: true
 import_style: python_module
+lsp_command: pylsp
+lsp_language_id: python
+lsp_args: []
 import_keywords: [import]
 import_from_keywords: [from]
 import_member_keywords: [import]
@@ -24,11 +27,38 @@ line_close_pairs: []
 statement_required_enders: []
 statement_exempt_prefixes: ["#", "@", "def ", "class ", "if ", "elif ", "else", "for ", "while ", "try", "except", "finally", "with ", "match ", "case "]
 statement_exempt_suffixes: [":", "\\", ")", "]", "}"]
+formatting:
+  enabled: false
+  scope: selection_or_block
+  profile: indent_colon
+  block_style: indent
+  statement_style: newline
+  brace_style: attach
+  one_statement_per_line: false
+  space_before_block_opener: true
+  space_after_comma: true
+  space_after_control_keyword: true
+  space_around_binary_operators: true
+  space_around_logical_operators: true
+  logical_operators: ["and", "or"]
+  binary_operators: ["+", "-", "*", "/", "%", "=", "==", "!=", "<", ">", "<=", ">="]
+  unary_prefix_operators: ["not"]
+  protected_scopes: [comment, string]
+  pointer_alignment: name
+  continuation_indent: 4
+  max_column: 100
+  wrap_after_comma: true
+  case_indent: 0
+  preserve_blank_lines: true
+  max_blank_lines: 0
+  collapse_empty_blocks: false
 rules:
   - name: comment
+    scope: comment
     pattern: "#.*$"
     color: "#6A9955"
   - name: string-double
+    scope: string
     pattern: "(?s)\"\"\".*?\"\"\"|'''.*?'''|\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'"
     color: "#CE9178"
   - name: keyword

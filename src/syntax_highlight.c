@@ -1,6 +1,9 @@
 /**
  * @file src/syntax_highlight.c
  * @brief Legacy syntax tag application helpers.
+ * @details The syntax layer gives Graptoς useful language behavior without requiring LSP.
+ *          YAML keeps the language definitions editable, while this code handles loading,
+ *          highlighting, diagnostics, and safe fallbacks.
  */
 
 #include "syntax.h"
@@ -9,13 +12,22 @@
 
 /**
  * @brief Tag name for rule.
+ * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
+ * @param rule The rule supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *tag_name_for_rule(const SyntaxRule *rule) {
-    return g_strdup_printf("cleaf-syntax-%p", (const void *)rule);
+    return g_strdup_printf("graptos-syntax-%p", (const void *)rule);
 }
 
 /**
  * @brief Ensure rule tag.
+ * @details Tags are keyed by the rule pointer because YAML syntax rules are
+ *          already unique after loading. That avoids inventing global names for
+ *          every regex while still letting GTK reuse tags between highlights.
+ * @param buffer The text buffer used for the operation.
+ * @param rule The rule supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static GtkTextTag *ensure_rule_tag(GtkTextBuffer *buffer, const SyntaxRule *rule) {
     if (!buffer || !rule) return NULL;
@@ -36,6 +48,12 @@ static GtkTextTag *ensure_rule_tag(GtkTextBuffer *buffer, const SyntaxRule *rule
 
 /**
  * @brief Syntax iter range for lines.
+ * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
+ * @param buffer The text buffer used for the operation.
+ * @param start_line The start line supplied by the caller.
+ * @param end_line The end line supplied by the caller.
+ * @param start The start supplied by the caller.
+ * @param end The end supplied by the caller.
  */
 static void syntax_iter_range_for_lines(GtkTextBuffer *buffer, guint start_line, guint end_line, GtkTextIter *start, GtkTextIter *end) {
     if (!buffer || !start || !end) return;
@@ -60,6 +78,11 @@ static void syntax_iter_range_for_lines(GtkTextBuffer *buffer, guint start_line,
 
 /**
  * @brief Syntax clear range.
+ * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
+ * @param buffer The text buffer used for the operation.
+ * @param syntaxes The syntaxes supplied by the caller.
+ * @param start_line The start line supplied by the caller.
+ * @param end_line The end line supplied by the caller.
  */
 void syntax_clear_range(GtkTextBuffer *buffer, GPtrArray *syntaxes, guint start_line, guint end_line) {
     if (!buffer || !syntaxes) return;
@@ -82,6 +105,9 @@ void syntax_clear_range(GtkTextBuffer *buffer, GPtrArray *syntaxes, guint start_
 
 /**
  * @brief Syntax clear.
+ * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
+ * @param buffer The text buffer used for the operation.
+ * @param syntaxes The syntaxes supplied by the caller.
  */
 void syntax_clear(GtkTextBuffer *buffer, GPtrArray *syntaxes) {
     if (!buffer) return;
@@ -91,6 +117,12 @@ void syntax_clear(GtkTextBuffer *buffer, GPtrArray *syntaxes) {
 
 /**
  * @brief Syntax apply range.
+ * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
+ * @param buffer The text buffer used for the operation.
+ * @param syntaxes The syntaxes supplied by the caller.
+ * @param active_syntax The active syntax supplied by the caller.
+ * @param start_line The start line supplied by the caller.
+ * @param end_line The end line supplied by the caller.
  */
 void syntax_apply_range(GtkTextBuffer *buffer, GPtrArray *syntaxes, SyntaxDef *active_syntax, guint start_line, guint end_line) {
     if (!buffer) return;
@@ -114,7 +146,7 @@ void syntax_apply_range(GtkTextBuffer *buffer, GPtrArray *syntaxes, SyntaxDef *a
         GMatchInfo *match_info = NULL;
         gboolean matched = g_regex_match(rule->regex, text, 0, &match_info);
         guint count = 0u;
-        while (matched && match_info && count < CLEAF_MAX_REGEX_MATCHES_PER_RULE) {
+        while (matched && match_info && count < GRAPTOS_MAX_REGEX_MATCHES_PER_RULE) {
             gint start_pos = -1;
             gint end_pos = -1;
             if (g_match_info_fetch_pos(match_info, 0, &start_pos, &end_pos) && end_pos > start_pos) {
@@ -138,11 +170,15 @@ void syntax_apply_range(GtkTextBuffer *buffer, GPtrArray *syntaxes, SyntaxDef *a
 
 /**
  * @brief Syntax apply.
+ * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
+ * @param buffer The text buffer used for the operation.
+ * @param syntaxes The syntaxes supplied by the caller.
+ * @param active_syntax The active syntax supplied by the caller.
  */
 void syntax_apply(GtkTextBuffer *buffer, GPtrArray *syntaxes, SyntaxDef *active_syntax) {
     if (!buffer) return;
 
-    if ((guint)gtk_text_buffer_get_char_count(buffer) > CLEAF_MAX_HIGHLIGHT_BYTES) {
+    if ((guint)gtk_text_buffer_get_char_count(buffer) > GRAPTOS_MAX_HIGHLIGHT_BYTES) {
         return;
     }
 
@@ -152,7 +188,7 @@ void syntax_apply(GtkTextBuffer *buffer, GPtrArray *syntaxes, SyntaxDef *active_
     char *text = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
     if (!text) return;
     gsize bytes = strlen(text);
-    if (bytes > CLEAF_MAX_HIGHLIGHT_BYTES) {
+    if (bytes > GRAPTOS_MAX_HIGHLIGHT_BYTES) {
         g_free(text);
         return;
     }
@@ -161,4 +197,3 @@ void syntax_apply(GtkTextBuffer *buffer, GPtrArray *syntaxes, SyntaxDef *active_
     gint lines = gtk_text_buffer_get_line_count(buffer);
     syntax_apply_range(buffer, syntaxes, active_syntax, 0u, lines > 0 ? (guint)lines - 1u : 0u);
 }
-

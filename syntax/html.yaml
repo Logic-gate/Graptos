@@ -5,6 +5,9 @@ icon: mime
 filenames: []
 index: true
 import_style: generic
+lsp_command: vscode-html-language-server
+lsp_language_id: html
+lsp_args: [--stdio]
 completions: [html, head, body, div, span, script, style, link, meta, section, article, header, footer, main, class, id, doctype, title, nav, aside, form, input, button, label, select, option, textarea, ul, ol, li, table, thead, tbody, tr, td, th, src, href, alt, type, name, value, data-]
 auto_indent: true
 indent_openers: [">"]
@@ -23,8 +26,34 @@ import_extensions: [.html, .htm, .css, .js, .ts, .svg, .png, .jpg, .jpeg, .webp]
 import_member_files: []
 import_strip_extensions: false
 import_dot_modules: false
+formatting:
+  enabled: false
+  scope: selection_or_block
+  profile: markup
+  block_style: tags
+  statement_style: none
+  brace_style: attach
+  one_statement_per_line: false
+  space_before_block_opener: false
+  space_after_comma: false
+  space_after_control_keyword: false
+  space_around_binary_operators: false
+  space_around_logical_operators: false
+  logical_operators: []
+  binary_operators: ["="]
+  unary_prefix_operators: []
+  protected_scopes: [comment, string]
+  pointer_alignment: name
+  continuation_indent: 4
+  max_column: 100
+  wrap_after_comma: false
+  case_indent: 0
+  preserve_blank_lines: true
+  max_blank_lines: 0
+  collapse_empty_blocks: false
 rules:
   - name: comment
+    scope: comment
     pattern: "<!--[\\s\\S]*?-->"
     color: "#6A9955"
   - name: tag
@@ -34,6 +63,7 @@ rules:
     pattern: "[A-Za-z_:][-A-Za-z0-9_:.]*[[:space:]]*="
     color: "#9CDCFE"
   - name: string
+    scope: string
     pattern: "\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'"
     color: "#CE9178"
   - name: doctype

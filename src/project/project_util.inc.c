@@ -1,6 +1,10 @@
 /**
  * @file src/project/project_util.inc.c
- * @brief Cleaf project util module.
+ * @brief Graptoς project util module.
+ * @details Projects change underneath the editor. We keep tree rows, filesystem context,
+ *          and search helpers away from EditorTab so directory updates do not become
+ *          buffer-management problems.
+ * @param data The callback context passed by the caller.
  */
 
 static void project_row_free(gpointer data) {
@@ -12,6 +16,8 @@ static void project_row_free(gpointer data) {
 
 /**
  * @brief Project action free.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param data The callback context passed by the caller.
  */
 static void project_action_free(gpointer data) {
     ProjectAction *action = data;
@@ -22,6 +28,11 @@ static void project_action_free(gpointer data) {
 
 /**
  * @brief Project action new.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param win The win supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
+ * @param is_dir The is dir supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static ProjectAction *project_action_new(EditorWindow *win,
                                          const char *path,
@@ -35,6 +46,10 @@ static ProjectAction *project_action_new(EditorWindow *win,
 
 /**
  * @brief Compare names.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param a Pointer to the first filename string pointer.
+ * @param b Pointer to the second filename string pointer.
+ * @return The computed value requested by the caller.
  */
 static gint compare_names(gconstpointer a, gconstpointer b) {
     const char *sa = *(char * const *)a;
@@ -50,10 +65,13 @@ static gint compare_names(gconstpointer a, gconstpointer b) {
 
 /**
  * @brief Should skip name.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param name The name supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean should_skip_name(const char *name) {
     static const char *skip[] = {
-        ".git", ".cache", ".venv", ".cleaf-backups", ".cleaf-autosave", ".cleaf-latex-build",
+        ".git", ".cache", ".venv", ".graptos-backups", ".graptos-autosave", ".graptos-latex-build",
         "node_modules", "build", "dist", "target", "__pycache__", NULL
     };
 
@@ -66,6 +84,9 @@ static gboolean should_skip_name(const char *name) {
 
 /**
  * @brief Sorted dir names.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param path The filesystem path supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static GPtrArray *sorted_dir_names(const char *path) {
     GDir *dir = g_dir_open(path, 0, NULL);
@@ -96,6 +117,9 @@ static GPtrArray *sorted_dir_names(const char *path) {
 
 /**
  * @brief Add icon candidate.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param candidates The candidates supplied by the caller.
+ * @param name The name supplied by the caller.
  */
 static void add_icon_candidate(GPtrArray *candidates, const char *name) {
     if (!candidates || !name || name[0] == '\0') return;
@@ -109,6 +133,9 @@ static void add_icon_candidate(GPtrArray *candidates, const char *name) {
 
 /**
  * @brief Add icon candidates from gicon.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param candidates The candidates supplied by the caller.
+ * @param icon The icon supplied by the caller.
  */
 static void add_icon_candidates_from_gicon(GPtrArray *candidates, GIcon *icon) {
     if (!candidates || !icon) return;
@@ -123,6 +150,9 @@ static void add_icon_candidates_from_gicon(GPtrArray *candidates, GIcon *icon) {
 
 /**
  * @brief Add extension icon candidates.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param candidates The candidates supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
  */
 static void add_extension_icon_candidates(GPtrArray *candidates, const char *path) {
     if (!candidates || !path) return;
@@ -194,6 +224,10 @@ static void add_extension_icon_candidates(GPtrArray *candidates, const char *pat
 
 /**
  * @brief Project icon candidates for path.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param path The filesystem path supplied by the caller.
+ * @param is_dir The is dir supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static GPtrArray *project_icon_candidates_for_path(const char *path,
                                                    gboolean is_dir) {
@@ -225,4 +259,3 @@ static GPtrArray *project_icon_candidates_for_path(const char *path,
     add_icon_candidate(candidates, "text-x-generic-symbolic");
     return candidates;
 }
-

@@ -1,0 +1,77 @@
+version: 1
+id: c-library
+name: C Library
+description: Small C library with optional tests.
+language: C
+
+variables:
+  library_kind:
+    label: Library kind
+    type: choice
+    values: [static, shared]
+    default: static
+
+  build_system:
+    label: Build system
+    type: choice
+    values: [make, meson, cmake]
+    default: make
+
+  include_tests:
+    label: Include tests
+    type: boolean
+    default: true
+
+  initialize_git:
+    label: Initialize Git repository
+    type: boolean
+    default: true
+
+  license:
+    label: License
+    type: choice
+    values: [AGPL-3.0, MIT, Apache-2.0]
+    default: AGPL-3.0
+
+directories:
+  - include
+  - src
+  - path: tests
+    when: include_tests
+
+files:
+  - path: include/${project_ident}.h
+    template: files/project.h
+
+  - path: src/${project_ident}.c
+    template: files/project.c
+
+  - path: tests/test_${project_ident}.c
+    template: files/test_project.c
+    when: include_tests
+
+  - path: Makefile
+    template: files/Makefile
+    when: build_system == "make"
+
+  - path: meson.build
+    template: files/meson.build
+    when: build_system == "meson"
+
+  - path: CMakeLists.txt
+    template: files/CMakeLists.txt
+    when: build_system == "cmake"
+
+  - path: README.md
+    template: files/README.md
+
+  - path: .gitignore
+    template: files/gitignore
+
+actions:
+  - type: git-init
+    when: initialize_git
+
+open:
+  project: .
+  file: include/${project_ident}.h

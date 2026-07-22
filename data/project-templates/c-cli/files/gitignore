@@ -1,0 +1,4 @@
+*.o
+/${project_slug}
+/build/
+/tests/test_main

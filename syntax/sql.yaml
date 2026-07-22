@@ -23,11 +23,38 @@ import_extensions: [.sql]
 import_member_files: []
 import_strip_extensions: false
 import_dot_modules: false
+formatting:
+  enabled: false
+  scope: selection_or_block
+  profile: data
+  block_style: none
+  statement_style: semicolon
+  brace_style: attach
+  one_statement_per_line: true
+  space_before_block_opener: false
+  space_after_comma: true
+  space_after_control_keyword: true
+  space_around_binary_operators: true
+  space_around_logical_operators: true
+  logical_operators: ["and", "or"]
+  binary_operators: ["=", "!=", "<>", "<", ">", "<=", ">=", "+", "-", "*", "/"]
+  unary_prefix_operators: ["not"]
+  protected_scopes: [comment, string]
+  pointer_alignment: name
+  continuation_indent: 4
+  max_column: 100
+  wrap_after_comma: true
+  case_indent: 0
+  preserve_blank_lines: true
+  max_blank_lines: 0
+  collapse_empty_blocks: false
 rules:
   - name: comment-line
+    scope: comment
     pattern: "--.*$"
     color: "#6A9955"
   - name: string
+    scope: string
     pattern: "'(?:''|[^'])*'|\"(?:\\\\.|[^\"\\\\])*\""
     color: "#CE9178"
   - name: keyword

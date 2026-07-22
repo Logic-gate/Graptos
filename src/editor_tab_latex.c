@@ -1,6 +1,9 @@
 /**
  * @file src/editor_tab_latex.c
- * @brief Cleaf editor tab latex module.
+ * @brief Graptoς editor tab latex module.
+ * @details Editor tabs hold the real editing surface. We split the implementation by
+ *          lifecycle, input, rendering, preview, and transient UI because each part has
+ *          different timing and cleanup pressure.
  */
 
 #include "editor_tab_private.h"
@@ -11,10 +14,13 @@
 /**
  * @brief Latex build dir macro.
  */
-#define LATEX_BUILD_DIR ".cleaf-latex-build"
+#define LATEX_BUILD_DIR ".graptos-latex-build"
 
 /**
  * @brief Has space.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param text The text fragment supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean has_space(const char *text) {
     const unsigned char *p = (const unsigned char *)text;
@@ -27,9 +33,11 @@ static gboolean has_space(const char *text) {
 
 /**
  * @brief Find latex command.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *find_latex_command(void) {
-    const char *env = g_getenv("CLEAF_LATEX_COMMAND");
+    const char *env = g_getenv("GRAPTOS_LATEX_COMMAND");
     if (env && env[0] != '\0' && !has_space(env)) return g_strdup(env);
 
     static const char *commands[] = {
@@ -51,6 +59,9 @@ static char *find_latex_command(void) {
 
 /**
  * @brief Basename without suffix.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param path The filesystem path supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *basename_without_suffix(const char *path) {
     g_autofree char *base = g_path_get_basename(path ? path : "document.tex");
@@ -64,6 +75,10 @@ static char *basename_without_suffix(const char *path) {
 
 /**
  * @brief Ensure saved source.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param source_path_out Output storage filled when the operation can provide a value.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean ensure_saved_source(EditorTab *tab, char **source_path_out) {
     if (!tab || !source_path_out) return FALSE;
@@ -78,7 +93,7 @@ static gboolean ensure_saved_source(EditorTab *tab, char **source_path_out) {
     if (!text) return FALSE;
 
     g_autoptr(GError) error = NULL;
-    g_autofree char *tmp_dir = g_dir_make_tmp("cleaf-latex-XXXXXX", &error);
+    g_autofree char *tmp_dir = g_dir_make_tmp("graptos-latex-XXXXXX", &error);
     if (!tmp_dir) {
         app_window_set_error_status(tab->win, "Could not create temp dir",
                                     error ? error->message : "Unknown error");
@@ -99,6 +114,9 @@ static gboolean ensure_saved_source(EditorTab *tab, char **source_path_out) {
 
 /**
  * @brief Build output dir for source.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param source_path The source path supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *build_output_dir_for_source(const char *source_path) {
     g_autofree char *dir = g_path_get_dirname(source_path);
@@ -114,6 +132,11 @@ static char *build_output_dir_for_source(const char *source_path) {
 
 /**
  * @brief Latex log message.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param command The command supplied by the caller.
+ * @param stdout_text The stdout text supplied by the caller.
+ * @param stderr_text The stderr text supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *latex_log_message(const char *command,
                                const char *stdout_text,
@@ -136,6 +159,13 @@ static char *latex_log_message(const char *command,
 
 /**
  * @brief Run latex.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param command The command supplied by the caller.
+ * @param source_path The source path supplied by the caller.
+ * @param working_dir The working dir supplied by the caller.
+ * @param output_dir The output dir supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean run_latex(EditorTab *tab,
                           const char *command,
@@ -174,6 +204,10 @@ static gboolean run_latex(EditorTab *tab,
 
 /**
  * @brief Open pdf.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param pdf_path The pdf path supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean open_pdf(EditorTab *tab, const char *pdf_path) {
     g_autoptr(GError) error = NULL;
@@ -194,6 +228,8 @@ static gboolean open_pdf(EditorTab *tab, const char *pdf_path) {
 
 /**
  * @brief Editor tab render latex.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void editor_tab_render_latex(EditorTab *tab) {
     if (!tab || !tab->win) return;
@@ -207,7 +243,7 @@ void editor_tab_render_latex(EditorTab *tab) {
     if (!command) {
         app_window_set_error_status(tab->win, "LaTeX command not found",
                                     "Install pdflatex, xelatex, or lualatex, or set "
-                                    "CLEAF_LATEX_COMMAND to the command path.");
+                                    "GRAPTOS_LATEX_COMMAND to the command path.");
         return;
     }
 
@@ -219,7 +255,7 @@ void editor_tab_render_latex(EditorTab *tab) {
     g_autofree char *output_dir = build_output_dir_for_source(source_path);
     if (!output_dir) {
         app_window_set_error_status(tab->win, "Could not create build dir",
-                                    "Cleaf could not create .cleaf-latex-build.");
+                                    "Graptoς could not create .graptos-latex-build.");
         return;
     }
 
@@ -237,6 +273,6 @@ void editor_tab_render_latex(EditorTab *tab) {
         }
     } else {
         app_window_set_error_status(tab->win, "Rendered PDF not found",
-                                    "LaTeX finished, but Cleaf could not find the PDF output.");
+                                    "LaTeX finished, but Graptoς could not find the PDF output.");
     }
 }

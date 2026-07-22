@@ -1,6 +1,10 @@
 /**
  * @file src/codex_client.c
  * @brief Codex process client and event bridge.
+ * @details AI touches the parts of the app where mistakes are expensive: files,
+ *          permissions, markdown, and long-running processes. We keep protocol, client,
+ *          panel, and review logic separated so approval and cleanup paths are easy to
+ *          audit.
  */
 
 #include "codex_client.h"
@@ -8,9 +12,14 @@
 #include <string.h>
 
 #include "codex_protocol.h"
+#include "version.h"
 
 /**
  * @brief Codex client type definition.
+ * @details The client owns the Codex subprocess and translates its JSON events
+ *          into UI-safe callbacks. The extra request ids and pending flags are
+ *          there because prompts, interrupts, and approvals can overlap in the
+ *          protocol even though the panel presents one turn at a time.
  */
 struct _CodexClient {
     GSubprocess *process; /**< Process. */
@@ -43,11 +52,18 @@ enum {
 
 /**
  * @brief Codex client read next.
+ * @details Reads are scheduled one line at a time. The function is forward
+ *          declared because startup and callbacks both need to arm the next
+ *          async read without exposing the helper outside this file.
+ * @param client The client instance that owns the protocol state.
  */
 static void codex_client_read_next(CodexClient *client);
 
 /**
  * @brief Codex client ref.
+ * @details Async GLib callbacks may run after the caller has tried to stop or
+ *          free the client. A small manual refcount keeps the client alive until
+ *          the pending read callback has finished using it.
  */
 static CodexClient *codex_client_ref(CodexClient *client) {
     if (client) client->ref_count++;
@@ -56,6 +72,10 @@ static CodexClient *codex_client_ref(CodexClient *client) {
 
 /**
  * @brief Codex client unref.
+ * @details The client is not a GObject, so we free the process-adjacent state
+ *          manually when the last async user releases it. Approval JSON nodes
+ *          are owned here because they must survive until the button click.
+ * @param client The client instance that owns the protocol state.
  */
 static void codex_client_unref(CodexClient *client) {
     if (!client || --client->ref_count != 0u) return;
@@ -69,6 +89,12 @@ static void codex_client_unref(CodexClient *client) {
 
 /**
  * @brief Codex client emit.
+ * @details The process layer should not know about GTK widgets. It emits small
+ *          typed events and leaves rendering, buttons, and tab reload behavior
+ *          to the panel.
+ * @param client The client instance that owns the protocol state.
+ * @param event The event supplied by the caller.
+ * @param text The text fragment supplied by the caller.
  */
 static void codex_client_emit(CodexClient *client,
                               CodexClientEvent event,
@@ -80,6 +106,12 @@ static void codex_client_emit(CodexClient *client,
 
 /**
  * @brief Codex client set state.
+ * @details State changes are reported immediately because the panel uses them
+ *          to enable Send/Stop and to show connection errors. The detail string
+ *          stays optional so normal ready/stopped transitions stay quiet.
+ * @param client The client instance that owns the protocol state.
+ * @param state The state supplied by the caller.
+ * @param detail The detail supplied by the caller.
  */
 static void codex_client_set_state(CodexClient *client,
                                    CodexClientState state,
@@ -93,6 +125,12 @@ static void codex_client_set_state(CodexClient *client,
 
 /**
  * @brief Codex client write.
+ * @details All writes take ownership of the generated protocol line. That keeps
+ *          call sites simple and makes failed writes clean up the same way as
+ *          successful writes.
+ * @param client The client instance that owns the protocol state.
+ * @param message The message supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean codex_client_write(CodexClient *client, char *message) {
     if (!client || !client->input || !message) {
@@ -116,6 +154,10 @@ static gboolean codex_client_write(CodexClient *client, char *message) {
 
 /**
  * @brief Codex client start thread.
+ * @details A thread is scoped to the current working directory. We send the cwd
+ *          explicitly so Codex can reason about files relative to the same root
+ *          Graptoς is showing.
+ * @param client The client instance that owns the protocol state.
  */
 static void codex_client_start_thread(CodexClient *client) {
     JsonNode *params = codex_protocol_object_params();
@@ -129,6 +171,11 @@ static void codex_client_start_thread(CodexClient *client) {
 
 /**
  * @brief Codex client decline request.
+ * @details If Codex asks for an approval while one is already pending, we deny
+ *          the extra request. The UI only presents one decision at a time, and
+ *          silently queueing permission prompts would be unsafe.
+ * @param client The client instance that owns the protocol state.
+ * @param id The id supplied by the caller.
  */
 static void codex_client_decline_request(CodexClient *client, guint64 id) {
     JsonNode *result = codex_protocol_object_params();
@@ -141,6 +188,10 @@ static void codex_client_decline_request(CodexClient *client, guint64 id) {
 
 /**
  * @brief Codex client clear approval.
+ * @details Only one approval prompt is active at a time. Clearing all related
+ *          fields together avoids the old bug where a later allow/deny click
+ *          had an id but no method, or a method but no request node.
+ * @param client The client instance that owns the protocol state.
  */
 static void codex_client_clear_approval(CodexClient *client) {
     if (!client) return;
@@ -151,6 +202,12 @@ static void codex_client_clear_approval(CodexClient *client) {
 
 /**
  * @brief Codex client response for id.
+ * @details Some protocol ids are not plain integers. We preserve the original
+ *          id node from the request so the response matches exactly what Codex
+ *          sent instead of coercing it through `guint64`.
+ * @param id_node The id node supplied by the caller.
+ * @param result The result supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *codex_client_response_for_id(JsonNode *id_node, JsonNode *result) {
     if (!id_node || !result) return NULL;
@@ -177,6 +234,12 @@ static char *codex_client_response_for_id(JsonNode *id_node, JsonNode *result) {
 
 /**
  * @brief Codex json object member.
+ * @details Json-GLib warns when callers ask for the wrong node type. This helper
+ *          checks shape first so optional protocol fields can be probed without
+ *          producing critical logs.
+ * @param object The object supplied by the caller.
+ * @param member The member supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static JsonObject *codex_json_object_member(JsonObject *object,
                                             const char *member) {
@@ -187,6 +250,12 @@ static JsonObject *codex_json_object_member(JsonObject *object,
 
 /**
  * @brief Codex json array member.
+ * @details Protocol fields have changed shape over time. Returning NULL for a
+ *          missing or non-array member lets newer and older Codex servers share
+ *          the same parsing path.
+ * @param object The object supplied by the caller.
+ * @param member The member supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static JsonArray *codex_json_array_member(JsonObject *object,
                                           const char *member) {
@@ -197,6 +266,11 @@ static JsonArray *codex_json_array_member(JsonObject *object,
 
 /**
  * @brief Codex client method is approval.
+ * @details The app-server has used both item-scoped and older approval method
+ *          names. Keeping the compatibility list here keeps the rest of the
+ *          client focused on one approval flow.
+ * @param method The method supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean codex_client_method_is_approval(const char *method) {
     return method &&
@@ -208,6 +282,11 @@ static gboolean codex_client_method_is_approval(const char *method) {
 
 /**
  * @brief Codex client method uses review decision.
+ * @details Older approval methods expect different decision words. This check
+ *          isolates that translation so the UI can still use stable button
+ *          decisions like accept, decline, and cancel.
+ * @param method The method supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean codex_client_method_uses_review_decision(const char *method) {
     return method &&
@@ -217,6 +296,11 @@ static gboolean codex_client_method_uses_review_decision(const char *method) {
 
 /**
  * @brief Codex client response decision.
+ * @details Button decisions are Graptoς vocabulary. This function maps them to
+ *          the vocabulary required by the active Codex protocol method.
+ * @param method The method supplied by the caller.
+ * @param decision The decision supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static const char *codex_client_response_decision(const char *method,
                                                   const char *decision) {
@@ -230,6 +314,11 @@ static const char *codex_client_response_decision(const char *method,
 
 /**
  * @brief Codex client command text.
+ * @details Commands may arrive as a string or argv array. We normalize them
+ *          into display text only; the real command remains inside the Codex
+ *          request and is never reconstructed from this string.
+ * @param params The params supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *codex_client_command_text(JsonObject *params) {
     if (!params) return NULL;
@@ -251,6 +340,11 @@ static char *codex_client_command_text(JsonObject *params) {
 
 /**
  * @brief Codex client file change count.
+ * @details File-change requests have appeared as an object map and as an array.
+ *          Counting both shapes keeps the approval dialog useful across Codex
+ *          protocol versions.
+ * @param params The params supplied by the caller.
+ * @return The computed value requested by the caller.
  */
 static guint codex_client_file_change_count(JsonObject *params) {
     if (!params) return 0u;
@@ -262,6 +356,12 @@ static guint codex_client_file_change_count(JsonObject *params) {
 
 /**
  * @brief Codex client approval detail.
+ * @details Approval messages arrive in a few protocol shapes. We normalize them
+ *          into one human sentence so the dialog can stay simple and the user
+ *          can see whether the request is command execution or file mutation.
+ * @param method The method supplied by the caller.
+ * @param params The params supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *codex_client_approval_detail(const char *method,
                                           JsonObject *params) {
@@ -297,6 +397,11 @@ static char *codex_client_approval_detail(const char *method,
 
 /**
  * @brief Codex client item summary.
+ * @details Activity events can be verbose. We collapse command and file-change
+ *          items into one line so the panel gives progress without becoming a
+ *          raw protocol log.
+ * @param item The item supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *codex_client_item_summary(JsonObject *item) {
     const char *type = json_object_get_string_member_with_default(
@@ -322,6 +427,11 @@ static char *codex_client_item_summary(JsonObject *item) {
 
 /**
  * @brief Codex client handle notification.
+ * @details Notifications are the streaming side of a turn. This function keeps
+ *          deltas, activity, approvals, diffs, and completion state in one
+ *          switchboard so the panel sees ordered UI events.
+ * @param client The client instance that owns the protocol state.
+ * @param object The object supplied by the caller.
  */
 static void codex_client_handle_notification(CodexClient *client,
                                              JsonObject *object) {
@@ -400,6 +510,11 @@ static void codex_client_handle_notification(CodexClient *client,
 
 /**
  * @brief Codex client handle message.
+ * @details A line can be a notification, a response, an approval request, or an
+ *          error. The parser keeps those branches explicit because mixing them
+ *          was how allow/deny clicks previously got ignored.
+ * @param client The client instance that owns the protocol state.
+ * @param root The root supplied by the caller.
  */
 static void codex_client_handle_message(CodexClient *client, JsonNode *root) {
     JsonObject *object = json_node_get_object(root);
@@ -505,6 +620,12 @@ static void codex_client_handle_message(CodexClient *client, JsonNode *root) {
 
 /**
  * @brief Codex client line ready.
+ * @details This is the async read boundary. It owns one reference from
+ *          `codex_client_read_next`, parses exactly one JSON line, schedules the
+ *          next read if the client is still alive, then releases that reference.
+ * @param source The source supplied by the caller.
+ * @param result The result supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void codex_client_line_ready(GObject *source,
                                     GAsyncResult *result,
@@ -534,6 +655,10 @@ static void codex_client_line_ready(GObject *source,
 
 /**
  * @brief Codex client read next.
+ * @details There is always at most one pending stdout read. That makes teardown
+ *          manageable: cancellation wakes the one callback, which then drops its
+ *          temporary client reference.
+ * @param client The client instance that owns the protocol state.
  */
 static void codex_client_read_next(CodexClient *client) {
     if (!client || !client->output || !client->cancellable) return;
@@ -546,6 +671,9 @@ static void codex_client_read_next(CodexClient *client) {
 
 /**
  * @brief Codex client new.
+ * @details Construction only creates local state. Starting the subprocess is a
+ *          separate step so the panel can wire callbacks before any events are
+ *          emitted.
  */
 CodexClient *codex_client_new(CodexClientStatusFunc status_func,
                               gpointer user_data) {
@@ -560,6 +688,10 @@ CodexClient *codex_client_new(CodexClientStatusFunc status_func,
 
 /**
  * @brief Codex client set event func.
+ * @details Status and event callbacks are split because connection state and
+ *          turn output drive different parts of the panel.
+ * @param client The client instance that owns the protocol state.
+ * @param event_func The event func supplied by the caller.
  */
 void codex_client_set_event_func(CodexClient *client,
                                  CodexClientEventFunc event_func) {
@@ -568,6 +700,12 @@ void codex_client_set_event_func(CodexClient *client,
 
 /**
  * @brief Codex client send prompt.
+ * @details A new prompt is rejected while a turn is pending or active. The UI
+ *          gets one live turn per thread, which keeps Stop and approval state
+ *          unambiguous.
+ * @param client The client instance that owns the protocol state.
+ * @param prompt The prompt supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean codex_client_send_prompt(CodexClient *client, const char *prompt) {
     if (!client || client->state != CODEX_CLIENT_READY || client->turn_id ||
@@ -593,6 +731,11 @@ gboolean codex_client_send_prompt(CodexClient *client, const char *prompt) {
 
 /**
  * @brief Codex client interrupt.
+ * @details Codex cannot interrupt a turn until the turn id is known. If the user
+ *          clicks Stop during the start gap, we remember that intent and send
+ *          the interrupt as soon as `turn/started` arrives.
+ * @param client The client instance that owns the protocol state.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean codex_client_interrupt(CodexClient *client) {
     if (!client || !client->thread_id) return FALSE;
@@ -614,6 +757,11 @@ gboolean codex_client_interrupt(CodexClient *client) {
 
 /**
  * @brief Codex client new thread.
+ * @details New thread clears the current thread id and asks the app-server for
+ *          a fresh thread in the same running process. We do not restart Codex
+ *          just to reset conversation context.
+ * @param client The client instance that owns the protocol state.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean codex_client_new_thread(CodexClient *client) {
     if (!client || client->state != CODEX_CLIENT_READY || client->turn_id ||
@@ -628,6 +776,11 @@ gboolean codex_client_new_thread(CodexClient *client) {
 
 /**
  * @brief Codex client resume thread.
+ * @details Resume is allowed only while idle. Switching thread identity during
+ *          a turn would make later deltas and approvals ambiguous.
+ * @param client The client instance that owns the protocol state.
+ * @param thread_id The thread id supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean codex_client_resume_thread(CodexClient *client,
                                     const char *thread_id) {
@@ -646,6 +799,12 @@ gboolean codex_client_resume_thread(CodexClient *client,
 
 /**
  * @brief Codex client resolve approval.
+ * @details The stored request id node is consumed here. We clear approval state
+ *          before writing the response so a failed write cannot leave buttons
+ *          connected to stale permission data.
+ * @param client The client instance that owns the protocol state.
+ * @param decision The decision supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean codex_client_resolve_approval(CodexClient *client,
                                        const char *decision) {
@@ -671,6 +830,11 @@ gboolean codex_client_resolve_approval(CodexClient *client,
 
 /**
  * @brief Codex client start.
+ * @details Startup launches `codex app-server --stdio`, begins reading stdout,
+ *          then sends initialize. Stderr is silenced here because protocol logs
+ *          and UI events should come from JSON, not mixed terminal output.
+ * @param client The client instance that owns the protocol state.
+ * @param cwd The cwd supplied by the caller.
  */
 void codex_client_start(CodexClient *client, const char *cwd) {
     if (!client || client->process) return;
@@ -699,8 +863,8 @@ void codex_client_start(CodexClient *client, const char *cwd) {
     JsonNode *params = codex_protocol_object_params();
     JsonObject *object = json_node_get_object(params);
     JsonObject *info = json_object_new();
-    json_object_set_string_member(info, "name", "cleaf");
-    json_object_set_string_member(info, "title", "Cleaf");
+    json_object_set_string_member(info, "name", "graptos");
+    json_object_set_string_member(info, "title", "Graptoς");
     json_object_set_string_member(info, "version", APP_VERSION);
     json_object_set_object_member(object, "clientInfo", info);
     char *request = codex_protocol_request(INITIALIZE_REQUEST_ID,
@@ -711,6 +875,10 @@ void codex_client_start(CodexClient *client, const char *cwd) {
 
 /**
  * @brief Codex client stop.
+ * @details Stop is intentionally blunt. The subprocess is an external tool, so
+ *          cancellation and force-exit are safer than leaving a half-connected
+ *          server with old approvals or turn ids.
+ * @param client The client instance that owns the protocol state.
  */
 void codex_client_stop(CodexClient *client) {
     if (!client) return;
@@ -725,6 +893,10 @@ void codex_client_stop(CodexClient *client) {
 
 /**
  * @brief Codex client free.
+ * @details Free disables callbacks before stopping the process. That prevents
+ *          late async reads from trying to update a panel that is already being
+ *          destroyed.
+ * @param client The client instance that owns the protocol state.
  */
 void codex_client_free(CodexClient *client) {
     if (!client) return;
@@ -738,6 +910,8 @@ void codex_client_free(CodexClient *client) {
 
 /**
  * @brief Codex client get state.
+ * @details Callers get STOPPED for NULL so UI refresh code can be defensive
+ *          without adding null checks at every label/button update.
  */
 CodexClientState codex_client_get_state(const CodexClient *client) {
     return client ? client->state : CODEX_CLIENT_STOPPED;
@@ -745,6 +919,10 @@ CodexClientState codex_client_get_state(const CodexClient *client) {
 
 /**
  * @brief Codex client get thread id.
+ * @details The returned pointer belongs to the client. The panel only uses it
+ *          for display/history context and must not free it.
+ * @param client The client instance that owns the protocol state.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 const char *codex_client_get_thread_id(const CodexClient *client) {
     return client ? client->thread_id : NULL;

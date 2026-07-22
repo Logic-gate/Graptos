@@ -1,12 +1,18 @@
 /**
  * @file src/syntax_diagnostics.c
  * @brief Syntax registry diagnostic text generation.
+ * @details The syntax layer gives Graptoς useful language behavior without requiring LSP.
+ *          YAML keeps the language definitions editable, while this code handles loading,
+ *          highlighting, diagnostics, and safe fallbacks.
  */
 
 #include "syntax.h"
 
 /**
  * @brief Syntax diagnostics.
+ * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
+ * @param syntaxes The syntaxes supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 char *syntax_diagnostics(GPtrArray *syntaxes) {
     GString *out = g_string_new("Loaded syntax definitions:\n");

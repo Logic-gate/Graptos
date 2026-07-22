@@ -1,6 +1,12 @@
 /**
  * @file src/project/project_context.inc.c
- * @brief Cleaf project context module.
+ * @brief Graptoς project context module.
+ * @details Projects change underneath the editor. We keep tree rows, filesystem context,
+ *          and search helpers away from EditorTab so directory updates do not become
+ *          buffer-management problems.
+ * @param win The win supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 
 static gboolean project_path_is_expanded(EditorWindow *win, const char *path) {
@@ -10,6 +16,10 @@ static gboolean project_path_is_expanded(EditorWindow *win, const char *path) {
 
 /**
  * @brief Project set expanded.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param win The win supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
+ * @param expanded The expanded supplied by the caller.
  */
 static void project_set_expanded(EditorWindow *win,
                                  const char *path,
@@ -32,6 +42,10 @@ static void project_set_expanded(EditorWindow *win,
 
 /**
  * @brief Row label.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param text The text fragment supplied by the caller.
+ * @param css_class The css class supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static GtkWidget *row_label(const char *text, const char *css_class) {
     GtkWidget *label = gtk_label_new(text ? text : "");
@@ -44,6 +58,9 @@ static GtkWidget *row_label(const char *text, const char *css_class) {
 
 /**
  * @brief Close project folder for path.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param win The win supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
  */
 static void close_project_folder_for_path(EditorWindow *win, const char *path) {
     if (!win || !win->project_roots || !path) return;
@@ -85,6 +102,9 @@ static void close_project_folder_for_path(EditorWindow *win, const char *path) {
 
 /**
  * @brief Project context open.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void project_context_open(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -103,6 +123,9 @@ static void project_context_open(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Project context close folder.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void project_context_close_folder(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -113,6 +136,9 @@ static void project_context_close_folder(GtkWidget *widget, gpointer user_data) 
 
 /**
  * @brief Project context toggle lock.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void project_context_toggle_lock(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -134,6 +160,9 @@ static void project_context_toggle_lock(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Invalid new name.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param name The name supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean invalid_new_name(const char *name) {
     if (!name || name[0] == '\0') return TRUE;
@@ -143,6 +172,9 @@ static gboolean invalid_new_name(const char *name) {
 
 /**
  * @brief Project context rename.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void project_context_rename(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -198,15 +230,22 @@ static void project_context_rename(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Project context button.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param label The label supplied by the caller.
+ * @param callback Callback invoked when the asynchronous step completes.
+ * @param win The win supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
+ * @param is_dir The is dir supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static GtkWidget *project_context_button(const char *label,
                                          GCallback callback,
                                          EditorWindow *win,
                                          const char *path,
                                          gboolean is_dir) {
-    GtkWidget *button = cleaf_flat_button_new(label, NULL, NULL, NULL);
+    GtkWidget *button = graptos_flat_button_new(label, NULL, NULL, NULL);
     ProjectAction *action = project_action_new(win, path, is_dir);
-    g_object_set_data_full(G_OBJECT(button), "cleaf-project-action", action,
+    g_object_set_data_full(G_OBJECT(button), "graptos-project-action", action,
                            project_action_free);
     g_signal_connect(button, "clicked", callback, action);
     return button;
@@ -214,38 +253,49 @@ static GtkWidget *project_context_button(const char *label,
 
 /**
  * @brief Project context popover closed.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param popover The popover supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void project_context_popover_closed(GtkPopover *popover,
                                            gpointer user_data) {
     GtkWidget *owner = user_data;
     if (owner) {
         GtkWidget *stored = g_object_get_data(G_OBJECT(owner),
-                                             "cleaf-project-context-popover");
+                                             "graptos-project-context-popover");
         if (stored == GTK_WIDGET(popover)) {
             g_object_set_data(G_OBJECT(owner),
-                              "cleaf-project-context-popover", NULL);
+                              "graptos-project-context-popover", NULL);
         }
     }
-    cleaf_widget_destroy(GTK_WIDGET(popover));
+    graptos_widget_destroy(GTK_WIDGET(popover));
 }
 
 /**
  * @brief Project context popover close for list.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param win The win supplied by the caller.
  */
 static void project_context_popover_close_for_list(EditorWindow *win) {
     if (!win || !win->project_list) return;
     GtkWidget *old_popover = g_object_get_data(G_OBJECT(win->project_list),
-                                               "cleaf-project-context-popover");
+                                               "graptos-project-context-popover");
     if (old_popover && GTK_IS_POPOVER(old_popover)) {
-        cleaf_popover_hide(old_popover);
-        cleaf_widget_destroy(old_popover);
+        graptos_popover_hide(old_popover);
+        graptos_widget_destroy(old_popover);
         g_object_set_data(G_OBJECT(win->project_list),
-                          "cleaf-project-context-popover", NULL);
+                          "graptos-project-context-popover", NULL);
     }
 }
 
 /**
  * @brief On project row right click.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param gesture The gesture supplied by the caller.
+ * @param n_press The n press supplied by the caller.
+ * @param x The x supplied by the caller.
+ * @param y The y supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void on_project_row_right_click(GtkGestureClick *gesture,
                                        int n_press,
@@ -260,7 +310,7 @@ static void on_project_row_right_click(GtkGestureClick *gesture,
     EditorWindow *win = user_data;
     if (!win || !row) return;
 
-    ProjectRow *data = g_object_get_data(G_OBJECT(row), "cleaf-project-row");
+    ProjectRow *data = g_object_get_data(G_OBJECT(row), "graptos-project-row");
     if (!data || !data->path) return;
 
     gtk_gesture_set_state(GTK_GESTURE(gesture), GTK_EVENT_SEQUENCE_CLAIMED);
@@ -268,14 +318,14 @@ static void on_project_row_right_click(GtkGestureClick *gesture,
     project_context_popover_close_for_list(win);
 
     GtkWidget *popover = gtk_popover_new();
-    cleaf_popover_attach(popover, win->project_list);
+    graptos_popover_attach(popover, win->project_list);
     gtk_popover_set_has_arrow(GTK_POPOVER(popover), FALSE);
-    gtk_widget_add_css_class(popover, "cleaf-context-popover");
+    gtk_widget_add_css_class(popover, "graptos-context-popover");
     g_object_set_data(G_OBJECT(win->project_list),
-                      "cleaf-project-context-popover", popover);
+                      "graptos-project-context-popover", popover);
 
     GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
-    cleaf_set_all_margins(box, 6);
+    graptos_set_all_margins(box, 6);
     gtk_box_append(GTK_BOX(box),
                    project_context_button(data->is_dir ? "Expand / Collapse" : "Open",
                                           G_CALLBACK(project_context_open),
@@ -315,5 +365,5 @@ static void on_project_row_right_click(GtkGestureClick *gesture,
     g_signal_connect(popover, "closed",
                      G_CALLBACK(project_context_popover_closed),
                      win->project_list);
-    cleaf_popover_show(popover);
+    graptos_popover_show(popover);
 }

@@ -8,7 +8,7 @@ line_comment: //
 auto_indent: true
 indent_openers: ["{"]
 indent_closers: ["}"]
-close_pairs: ["(=>)", "{=>}", "[=>]"]
+close_pairs: ["(=>)", "{=>}", "[=>]", "<=>>", '"=>"']
 line_close_pairs: ["#include <=>>"]
 statement_required_enders: [";"]
 statement_exempt_prefixes: ["#", "//", "/*", "*", "}", "{", "else", "case ", "default:", "if ", "if(", "for ", "for(", "while ", "while(", "switch ", "switch(", "do", "struct ", "enum ", "union ", "typedef "]
@@ -17,6 +17,9 @@ icon: mime
 filenames: []
 index: true
 import_style: c_include
+lsp_command: clangd
+lsp_language_id: c
+lsp_args: []
 import_keywords:
 - '#include'
 import_from_keywords: []
@@ -574,20 +577,49 @@ completions:
 - gtk_label_new
 - gtk_entry_get_text
 - gtk_text_view_get_buffer
+formatting:
+  enabled: true
+  scope: selection_or_block
+  profile: brace_semicolon
+  block_style: braces
+  statement_style: semicolon
+  brace_style: attach
+  one_statement_per_line: true
+  space_before_block_opener: true
+  space_after_comma: true
+  space_after_control_keyword: true
+  space_around_binary_operators: true
+  space_around_logical_operators: true
+  logical_operators: ["&&", "||"]
+  binary_operators: ["+", "-", "*", "/", "%", "=", "==", "!=", "<", ">", "<=", ">="]
+  unary_prefix_operators: ["!", "~"]
+  protected_scopes: [comment, string, character, preprocessor]
+  pointer_alignment: name
+  continuation_indent: 4
+  max_column: 100
+  wrap_after_comma: true
+  case_indent: 0
+  preserve_blank_lines: false
+  max_blank_lines: 0
+  collapse_empty_blocks: true
 rules:
 - name: comment-doc-block
+  scope: comment
   pattern: /\*\*(?:[^*]|\*+[^*/])*\*+/
   color: '#6272a4'
   italic: true
 - name: comment-block
+  scope: comment
   pattern: /\*(?:[^*]|\*+[^*/])*\*+/
   color: '#6272a4'
   italic: true
 - name: comment-doc-line
+  scope: comment
   pattern: ///.*$|//!.*$
   color: '#6272a4'
   italic: true
 - name: comment-line
+  scope: comment
   pattern: //.*$
   color: '#6272a4'
   italic: true
@@ -596,9 +628,11 @@ rules:
   color: '#D7BA7D'
   bold: true
 - name: string
+  scope: string
   pattern: (?<![A-Za-z0-9_])(?:u8|u|U|L)?"(?:\\.|[^"\\])*"
   color: '#f1fa8c'
 - name: character
+  scope: character
   pattern: (?<![A-Za-z0-9_])(?:u8|u|U|L)?'(?:\\.|[^'\\])+'
   color: '#CE9178'
 - name: escape-sequence
@@ -606,10 +640,12 @@ rules:
   color: '#D7BA7D'
   bold: true
 - name: preprocessor
+  scope: preprocessor
   pattern: ^[[:space:]]*#[[:space:]]*[A-Za-z_][A-Za-z0-9_]*.*$
   color: '#C586C0'
   bold: true
 - name: preprocessor-directive
+  scope: preprocessor
   pattern: ^[[:space:]]*#[[:space:]]*(include|define|undef|ifdef|ifndef|if|elif|elifdef|elifndef|else|endif|error|warning|pragma|line)(?![A-Za-z0-9_])
   color: '#C586C0'
   bold: true

@@ -1,6 +1,10 @@
 /**
  * @file src/codex_panel.c
  * @brief Codex sidebar panel and chat review UI.
+ * @details AI touches the parts of the app where mistakes are expensive: files,
+ *          permissions, markdown, and long-running processes. We keep protocol, client,
+ *          panel, and review logic separated so approval and cleanup paths are easy to
+ *          audit.
  */
 
 #include "codex_panel.h"
@@ -14,6 +18,9 @@
 
 /**
  * @brief Codex panel type definition.
+ * @details One Codex chat owns one markdown transcript and one rendered
+ *          GtkTextView page. We keep markdown as the source because streamed
+ *          deltas can arrive before the UI is ready to re-render.
  */
 typedef struct {
     struct _CodexPanel *panel; /**< Panel. */
@@ -27,6 +34,9 @@ typedef struct {
 
 /**
  * @brief Codex panel type definition.
+ * @details The panel is UI state only. It does not speak the app-server
+ *          protocol directly; it asks CodexClient to do that and reacts to
+ *          normalized events.
  */
 struct _CodexPanel {
     EditorWindow *win; /**< Win. */
@@ -63,6 +73,10 @@ struct _CodexPanel {
 
 /**
  * @brief Panel render now.
+ * @details Streaming every token straight into GtkTextBuffer is expensive and
+ *          can make the app feel stuck. We render the accumulated markdown only
+ *          when the scheduled render fires or the turn completes.
+ * @param panel The panel instance affected by the operation.
  */
 static void panel_render_now(CodexPanel *panel) {
     if (!panel || !panel->current_chat ||
@@ -80,6 +94,11 @@ static void panel_render_now(CodexPanel *panel) {
 
 /**
  * @brief Panel render timeout cb.
+ * @details The timeout is the boundary between fast protocol deltas and slower
+ *          GTK text rendering. Clearing the source id first lets new deltas
+ *          schedule a later render safely.
+ * @param user_data The callback context passed through GTK signal data.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean panel_render_timeout_cb(gpointer user_data) {
     CodexPanel *panel = user_data;
@@ -91,6 +110,10 @@ static gboolean panel_render_timeout_cb(gpointer user_data) {
 
 /**
  * @brief Panel schedule render.
+ * @details Larger transcripts get a longer delay because re-rendering the whole
+ *          markdown buffer costs more as the chat grows. This is deliberately
+ *          simple and predictable rather than trying to diff rendered text.
+ * @param panel The panel instance affected by the operation.
  */
 static void panel_schedule_render(CodexPanel *panel) {
     if (!panel || panel->render_timeout != 0u || !panel->current_chat) return;
@@ -101,6 +124,10 @@ static void panel_schedule_render(CodexPanel *panel) {
 
 /**
  * @brief Codex chat free.
+ * @details The notebook owns the page widget; the chat owns only the bookkeeping
+ *          and markdown string. GtkTextBuffer is unreffed after being attached
+ *          to the view, so it follows GTK widget lifetime.
+ * @param data The callback context passed by the caller.
  */
 static void codex_chat_free(gpointer data) {
     CodexChat *chat = data;
@@ -112,11 +139,18 @@ static void codex_chat_free(gpointer data) {
 
 /**
  * @brief Panel close chat.
+ * @details The real callback is below; this forward declaration is needed
+ *          because each tab button is wired while the chat page is being built.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void panel_close_chat(GtkWidget *widget, gpointer user_data);
 
 /**
  * @brief Panel add chat.
+ * @details New chats are real notebook pages, not just cleared text buffers.
+ *          That lets users keep separate Codex threads visible and switch back
+ *          to their transcripts without losing rendered state.
  */
 static CodexChat *panel_add_chat(CodexPanel *panel) {
     CodexChat *chat = g_new0(CodexChat, 1);
@@ -125,7 +159,7 @@ static CodexChat *panel_add_chat(CodexPanel *panel) {
     chat->buffer = gtk_text_buffer_new(NULL);
     chat->view = gtk_text_view_new_with_buffer(chat->buffer);
     g_object_unref(chat->buffer);
-    gtk_widget_add_css_class(chat->view, "cleaf-codex-preview");
+    gtk_widget_add_css_class(chat->view, "graptos-codex-preview");
     gtk_text_view_set_editable(GTK_TEXT_VIEW(chat->view), FALSE);
     gtk_text_view_set_cursor_visible(GTK_TEXT_VIEW(chat->view), FALSE);
     gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(chat->view), GTK_WRAP_WORD_CHAR);
@@ -137,10 +171,10 @@ static CodexChat *panel_add_chat(CodexPanel *panel) {
     char *title = g_strdup_printf("AI %u", panel->chats->len + 1u);
     GtkWidget *tab_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 3);
     GtkWidget *label = gtk_label_new(title);
-    GtkWidget *close = cleaf_flat_button_new("×", "Close AI tab",
+    GtkWidget *close = graptos_flat_button_new("×", "Close AI tab",
                                               G_CALLBACK(panel_close_chat), chat);
     g_free(title);
-    gtk_widget_add_css_class(close, "cleaf-tab-close");
+    gtk_widget_add_css_class(close, "graptos-tab-close");
     gtk_box_append(GTK_BOX(tab_box), label);
     gtk_box_append(GTK_BOX(tab_box), close);
     gtk_notebook_append_page(GTK_NOTEBOOK(panel->chat_notebook), scroll, tab_box);
@@ -156,6 +190,11 @@ static CodexChat *panel_add_chat(CodexPanel *panel) {
 
 /**
  * @brief Panel activate chat.
+ * @details Activating a chat also resumes its Codex thread when needed. The UI
+ *          and app-server thread id have to move together or later deltas would
+ *          appear in the wrong transcript.
+ * @param panel The panel instance affected by the operation.
+ * @param index The index supplied by the caller.
  */
 static void panel_activate_chat(CodexPanel *panel, guint index) {
     if (!panel || index >= panel->chats->len) return;
@@ -175,6 +214,11 @@ static void panel_activate_chat(CodexPanel *panel, guint index) {
 
 /**
  * @brief Panel close chat.
+ * @details The active chat cannot be closed during a turn because approvals,
+ *          streamed output, and diff updates are still targeting it. The last
+ *          tab is reset into a fresh thread instead of leaving the panel empty.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void panel_close_chat(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -210,6 +254,13 @@ static void panel_close_chat(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Panel chat switched.
+ * @details User tab switches are blocked while a turn is active. That keeps the
+ *          active transcript, Codex thread id, Stop button, and approval box
+ *          pointing at the same conversation.
+ * @param notebook The notebook supplied by the caller.
+ * @param page The page supplied by the caller.
+ * @param page_num The page num supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void panel_chat_switched(GtkNotebook *notebook,
                                 GtkWidget *page,
@@ -244,6 +295,11 @@ static void panel_chat_switched(GtkNotebook *notebook,
 
 /**
  * @brief Panel append.
+ * @details Appends mutate the markdown source, not the rendered buffer. The
+ *          renderer can then rebuild the preview in batches without losing the
+ *          exact raw response text.
+ * @param panel The panel instance affected by the operation.
+ * @param text The text fragment supplied by the caller.
  */
 static void panel_append(CodexPanel *panel, const char *text) {
     if (!panel || !panel->transcript || !text) return;
@@ -255,6 +311,10 @@ static void panel_append(CodexPanel *panel, const char *text) {
 
 /**
  * @brief Panel set turn active.
+ * @details The composer is locked during a turn so the user cannot start a
+ *          second prompt against state that is still being modified by Codex.
+ * @param panel The panel instance affected by the operation.
+ * @param active The active supplied by the caller.
  */
 static void panel_set_turn_active(CodexPanel *panel, gboolean active) {
     if (!panel) return;
@@ -267,6 +327,11 @@ static void panel_set_turn_active(CodexPanel *panel, gboolean active) {
 
 /**
  * @brief Panel editor context.
+ * @details Context is appended as a small XML-like block so it is visible to
+ *          Codex but separated from the user's actual prompt. The hard limit
+ *          avoids freezing the panel by sending a huge buffer accidentally.
+ * @param panel The panel instance affected by the operation.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *panel_editor_context(CodexPanel *panel) {
     EditorTab *tab = panel && panel->win
@@ -289,8 +354,8 @@ static char *panel_editor_context(CodexPanel *panel) {
     }
     const char *path = tab->file_path ? tab->file_path : "Untitled buffer";
     char *context = g_strdup_printf(
-        "\n\n<cleaf_editor_context>\nFile: %s\nSource: %s\n```\n%s\n```\n"
-        "</cleaf_editor_context>",
+        "\n\n<graptos_editor_context>\nFile: %s\nSource: %s\n```\n%s\n```\n"
+        "</graptos_editor_context>",
         path, selected && include_selection ? "selected text" : "current buffer",
         content);
     g_free(content);
@@ -299,6 +364,10 @@ static char *panel_editor_context(CodexPanel *panel) {
 
 /**
  * @brief Codex panel refresh context.
+ * @details This only refreshes labels and sensitivity. The actual file/selection
+ *          content is read at send time so Codex receives the latest buffer
+ *          state, not whatever was selected when the panel last repainted.
+ * @param panel The panel instance affected by the operation.
  */
 void codex_panel_refresh_context(CodexPanel *panel) {
     EditorTab *tab = panel && panel->win
@@ -317,6 +386,12 @@ void codex_panel_refresh_context(CodexPanel *panel) {
 
 /**
  * @brief Panel send.
+ * @details Send joins the user's prompt with the current editor context and
+ *          records the user text in the transcript before Codex answers. The
+ *          context block is not shown back to the user because it is just input
+ *          scaffolding.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void panel_send(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -352,6 +427,11 @@ static void panel_send(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Panel stop.
+ * @details Stop is disabled after the interrupt is accepted so repeated clicks
+ *          do not send duplicate interrupt requests while Codex is shutting the
+ *          turn down.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void panel_stop(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -369,6 +449,11 @@ static void panel_stop(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Panel new thread.
+ * @details A new thread gets its own visible chat page. We ask CodexClient for
+ *          the server-side thread first so the UI does not create a page that
+ *          cannot send prompts.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void panel_new_thread(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -382,6 +467,10 @@ static void panel_new_thread(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Panel close.
+ * @details The sidebar close button uses the same toggle path as the View/AI
+ *          tool, so visibility state stays in one place.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void panel_close(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -390,6 +479,11 @@ static void panel_close(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Panel approval.
+ * @details Approval buttons store only the decision string. The client owns the
+ *          request id and method translation, which keeps UI code out of the
+ *          protocol details.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void panel_approval(GtkWidget *widget, gpointer user_data) {
     CodexPanel *panel = user_data;
@@ -401,6 +495,10 @@ static void panel_approval(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Panel clear children.
+ * @details Changed-file rows are rebuilt from each diff update. Removing all
+ *          children first is simpler than trying to reconcile old and new diff
+ *          paths.
+ * @param box The box supplied by the caller.
  */
 static void panel_clear_children(GtkWidget *box) {
     GtkWidget *child = box ? gtk_widget_get_first_child(box) : NULL;
@@ -413,6 +511,11 @@ static void panel_clear_children(GtkWidget *box) {
 
 /**
  * @brief Panel open changed file.
+ * @details Diff paths are relative to the project root when one is open. We
+ *          rebuild the absolute path at click time so the button does not need
+ *          to own more state than the displayed relative path.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void panel_open_changed_file(GtkWidget *widget, gpointer user_data) {
     CodexPanel *panel = user_data;
@@ -427,6 +530,10 @@ static void panel_open_changed_file(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Panel update changed files.
+ * @details The diff can contain both old and new paths for one file. We collect
+ *          unique display paths so the review box shows useful targets without
+ *          duplicate buttons.
+ * @param panel The panel instance affected by the operation.
  */
 static void panel_update_changed_files(CodexPanel *panel) {
     panel_clear_children(panel->changed_files);
@@ -440,7 +547,7 @@ static void panel_update_changed_files(CodexPanel *panel) {
         if (!path || path[0] == '\0' || g_str_equal(path, "/dev/null") ||
             g_hash_table_contains(seen, path)) continue;
         g_hash_table_add(seen, g_strdup(path));
-        GtkWidget *button = cleaf_flat_button_new(path, "Open changed file",
+        GtkWidget *button = graptos_flat_button_new(path, "Open changed file",
                                                    G_CALLBACK(panel_open_changed_file),
                                                    panel);
         g_object_set_data_full(G_OBJECT(button), "codex-path", g_strdup(path), g_free);
@@ -452,63 +559,14 @@ static void panel_update_changed_files(CodexPanel *panel) {
 }
 
 /**
- * @brief Panel add changed path.
- */
-static void panel_add_changed_path(CodexPanel *panel,
-                                   GPtrArray *paths,
-                                   GHashTable *seen,
-                                   const char *relative) {
-    if (!panel || !paths || !seen || !relative || relative[0] == '\0' ||
-        g_str_equal(relative, "/dev/null")) return;
-
-    const char *root = panel->win && panel->win->project_root
-        ? panel->win->project_root : NULL;
-    char *path = root ? g_build_filename(root, relative, NULL)
-                      : g_canonicalize_filename(relative, NULL);
-    char *canonical = path ? g_canonicalize_filename(path, NULL) : NULL;
-    g_free(path);
-    if (!canonical || g_hash_table_contains(seen, canonical)) {
-        g_free(canonical);
-        return;
-    }
-    g_hash_table_add(seen, g_strdup(canonical));
-    g_ptr_array_add(paths, canonical);
-}
-
-/**
- * @brief Panel changed paths.
- */
-static GPtrArray *panel_changed_paths(CodexPanel *panel) {
-    GPtrArray *paths = g_ptr_array_new_with_free_func(g_free);
-    if (!panel || !panel->turn_diff) return paths;
-
-    GHashTable *seen = g_hash_table_new_full(g_str_hash, g_str_equal,
-                                             g_free, NULL);
-    char **lines = g_strsplit(panel->turn_diff, "\n", -1);
-    for (guint i = 0u; lines[i]; i++) {
-        const char *path = g_str_has_prefix(lines[i], "+++ b/")
-            ? lines[i] + 6
-            : g_str_has_prefix(lines[i], "--- a/") ? lines[i] + 6 : NULL;
-        panel_add_changed_path(panel, paths, seen, path);
-    }
-    g_strfreev(lines);
-    g_hash_table_destroy(seen);
-    return paths;
-}
-
-/**
- * @brief Path in array.
- */
-static gboolean path_in_array(GPtrArray *paths, const char *path) {
-    if (!paths || !path) return FALSE;
-    for (guint i = 0u; i < paths->len; i++) {
-        if (g_strcmp0(g_ptr_array_index(paths, i), path) == 0) return TRUE;
-    }
-    return FALSE;
-}
-
-/**
  * @brief Panel reload kept tabs.
+ * @details Codex edits files outside GtkTextBuffer. Keep reloads unmodified
+ *          open tabs from disk so accepted AI changes appear immediately, while
+ *          modified tabs are skipped to avoid overwriting user work.
+ * @param panel The panel instance affected by the operation.
+ * @param reloaded_out Output storage filled when the operation can provide a value.
+ * @param skipped_modified_out Output storage filled when the operation can provide a value.
+ * @param skipped_missing_out Output storage filled when the operation can provide a value.
  */
 static void panel_reload_kept_tabs(CodexPanel *panel,
                                    guint *reloaded_out,
@@ -517,20 +575,20 @@ static void panel_reload_kept_tabs(CodexPanel *panel,
     if (reloaded_out) *reloaded_out = 0u;
     if (skipped_modified_out) *skipped_modified_out = 0u;
     if (skipped_missing_out) *skipped_missing_out = 0u;
-    if (!panel || !panel->win || !panel->win->notebook) return;
+    if (!panel || !panel->win) return;
 
-    GPtrArray *paths = panel_changed_paths(panel);
-    gint pages = gtk_notebook_get_n_pages(GTK_NOTEBOOK(panel->win->notebook));
-    for (gint i = 0; i < pages; i++) {
-        GtkWidget *child = gtk_notebook_get_nth_page(GTK_NOTEBOOK(panel->win->notebook), i);
-        EditorTab *tab = child ? g_object_get_data(G_OBJECT(child), "cleaf-tab") : NULL;
+    guint count = app_window_tab_count(panel->win);
+    for (guint i = 0u; i < count; i++) {
+        EditorTab *tab = app_window_tab_at(panel->win, i);
         if (!tab || !tab->file_path) continue;
 
         char *canonical = g_canonicalize_filename(tab->file_path, NULL);
-        if (!path_in_array(paths, canonical)) {
-            g_free(canonical);
-            continue;
-        }
+        /*
+         * Codex applies changes outside Graptoς's GtkTextBuffer.  Diff formats
+         * vary enough that path parsing can miss a changed file, so Keep
+         * refreshes every unmodified file-backed tab.  Modified tabs are still
+         * skipped to avoid overwriting unsaved user edits.
+         */
         if (tab->modified) {
             if (skipped_modified_out) (*skipped_modified_out)++;
             g_free(canonical);
@@ -546,11 +604,14 @@ static void panel_reload_kept_tabs(CodexPanel *panel,
         }
         g_free(canonical);
     }
-    g_ptr_array_free(paths, TRUE);
 }
 
 /**
  * @brief Panel review diff.
+ * @details Review opens a separate locked diff tab. The sidebar stays on the
+ *          chat, while the editor area gets a larger view of the exact patch.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void panel_review_diff(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -562,6 +623,11 @@ static void panel_review_diff(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Panel keep diff.
+ * @details Keep means the disk changes are accepted as-is. We clear the stored
+ *          turn diff, hide review controls, refresh Git, and reload safe open
+ *          tabs so the editor catches up with the filesystem.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void panel_keep_diff(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -574,7 +640,7 @@ static void panel_keep_diff(GtkWidget *widget, gpointer user_data) {
                            &skipped_missing);
     g_clear_pointer(&panel->turn_diff, g_free);
     gtk_widget_set_visible(panel->review_box, FALSE);
-    cleaf_git_refresh_and_rebuild(panel->win);
+    graptos_git_refresh_and_rebuild(panel->win);
     if (skipped_modified > 0u || skipped_missing > 0u) {
         char *message = g_strdup_printf(
             "Codex changes kept; reloaded %u open tab%s%s%s",
@@ -596,6 +662,10 @@ static void panel_keep_diff(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Panel revert diff.
+ * @details Revert is explicit and confirmed because it mutates files on disk.
+ *          The stored turn diff is cleared only after the reverse patch succeeds.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void panel_revert_diff(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -618,6 +688,9 @@ static void panel_revert_diff(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Codex panel new.
+ * @details Construction wires the whole sidebar but leaves it hidden on first
+ *          launch. The client can connect in the background while the user keeps
+ *          the editor focused.
  */
 CodexPanel *codex_panel_new(EditorWindow *win) {
     CodexPanel *panel = g_new0(CodexPanel, 1);
@@ -627,22 +700,23 @@ CodexPanel *codex_panel_new(EditorWindow *win) {
     gtk_revealer_set_transition_type(GTK_REVEALER(panel->revealer),
                                      GTK_REVEALER_TRANSITION_TYPE_NONE);
     gtk_revealer_set_transition_duration(GTK_REVEALER(panel->revealer), 0u);
-    gtk_revealer_set_reveal_child(GTK_REVEALER(panel->revealer), TRUE);
+    gtk_revealer_set_reveal_child(GTK_REVEALER(panel->revealer), FALSE);
     gtk_widget_set_size_request(panel->revealer, 340, -1);
-    panel->visible = TRUE;
+    gtk_widget_set_visible(panel->revealer, FALSE);
+    panel->visible = FALSE;
 
     GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
-    gtk_widget_add_css_class(box, "cleaf-codex-panel");
+    gtk_widget_add_css_class(box, "graptos-codex-panel");
     gtk_widget_set_size_request(box, 340, -1);
 
     GtkWidget *header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
     GtkWidget *title = gtk_label_new("Codex");
-    gtk_widget_add_css_class(title, "cleaf-tool-title");
+    gtk_widget_add_css_class(title, "graptos-tool-title");
     gtk_widget_set_hexpand(title, TRUE);
     gtk_label_set_xalign(GTK_LABEL(title), 0.0f);
-    panel->new_button = cleaf_flat_button_new("New", "Start a new Codex chat",
+    panel->new_button = graptos_flat_button_new("New", "Start a new Codex chat",
                                                G_CALLBACK(panel_new_thread), panel);
-    GtkWidget *close = cleaf_flat_button_new("×", "Close Codex panel",
+    GtkWidget *close = graptos_flat_button_new("×", "Close Codex panel",
                                               G_CALLBACK(panel_close), panel);
     gtk_box_append(GTK_BOX(header), title);
     gtk_box_append(GTK_BOX(header), panel->new_button);
@@ -651,7 +725,7 @@ CodexPanel *codex_panel_new(EditorWindow *win) {
 
     panel->status_label = gtk_label_new("Connecting to Codex…");
     gtk_label_set_xalign(GTK_LABEL(panel->status_label), 0.0f);
-    gtk_widget_add_css_class(panel->status_label, "cleaf-codex-status");
+    gtk_widget_add_css_class(panel->status_label, "graptos-codex-status");
     gtk_box_append(GTK_BOX(box), panel->status_label);
 
     GtkWidget *context_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
@@ -677,16 +751,16 @@ CodexPanel *codex_panel_new(EditorWindow *win) {
     panel_add_chat(panel);
 
     panel->review_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
-    gtk_widget_add_css_class(panel->review_box, "cleaf-codex-review");
+    gtk_widget_add_css_class(panel->review_box, "graptos-codex-review");
     GtkWidget *review_title = gtk_label_new("Changes from this turn");
     gtk_label_set_xalign(GTK_LABEL(review_title), 0.0f);
     panel->changed_files = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
     GtkWidget *review_actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
-    GtkWidget *review = cleaf_flat_button_new("Review diff", "Open the turn diff",
+    GtkWidget *review = graptos_flat_button_new("Review diff", "Open the turn diff",
                                               G_CALLBACK(panel_review_diff), panel);
-    GtkWidget *keep = cleaf_flat_button_new("Keep", "Keep these changes",
+    GtkWidget *keep = graptos_flat_button_new("Keep", "Keep these changes",
                                             G_CALLBACK(panel_keep_diff), panel);
-    GtkWidget *revert = cleaf_flat_button_new("Revert", "Reverse this turn only",
+    GtkWidget *revert = graptos_flat_button_new("Revert", "Reverse this turn only",
                                               G_CALLBACK(panel_revert_diff), panel);
     gtk_box_append(GTK_BOX(review_actions), review);
     gtk_box_append(GTK_BOX(review_actions), keep);
@@ -698,14 +772,14 @@ CodexPanel *codex_panel_new(EditorWindow *win) {
     gtk_box_append(GTK_BOX(box), panel->review_box);
 
     panel->approval_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
-    gtk_widget_add_css_class(panel->approval_box, "cleaf-codex-approval");
+    gtk_widget_add_css_class(panel->approval_box, "graptos-codex-approval");
     panel->approval_label = gtk_label_new("");
     gtk_label_set_wrap(GTK_LABEL(panel->approval_label), TRUE);
     gtk_label_set_xalign(GTK_LABEL(panel->approval_label), 0.0f);
     GtkWidget *approval_actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
-    GtkWidget *deny = cleaf_flat_button_new("Deny", "Decline this request",
+    GtkWidget *deny = graptos_flat_button_new("Deny", "Decline this request",
                                             G_CALLBACK(panel_approval), panel);
-    GtkWidget *allow = cleaf_flat_button_new("Allow once", "Allow this request",
+    GtkWidget *allow = graptos_flat_button_new("Allow once", "Allow this request",
                                              G_CALLBACK(panel_approval), panel);
     g_object_set_data(G_OBJECT(deny), "decision", "decline");
     g_object_set_data(G_OBJECT(allow), "decision", "accept");
@@ -717,7 +791,7 @@ CodexPanel *codex_panel_new(EditorWindow *win) {
     gtk_box_append(GTK_BOX(box), panel->approval_box);
 
     panel->composer_view = gtk_text_view_new();
-    gtk_widget_add_css_class(panel->composer_view, "cleaf-codex-prompt");
+    gtk_widget_add_css_class(panel->composer_view, "graptos-codex-prompt");
     panel->composer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(panel->composer_view));
     gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(panel->composer_view), GTK_WRAP_WORD_CHAR);
     gtk_text_view_set_left_margin(GTK_TEXT_VIEW(panel->composer_view), 8);
@@ -729,9 +803,9 @@ CodexPanel *codex_panel_new(EditorWindow *win) {
     gtk_box_append(GTK_BOX(box), composer_scroll);
 
     GtkWidget *actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
-    panel->stop_button = cleaf_flat_button_new("Stop", "Interrupt this turn",
+    panel->stop_button = graptos_flat_button_new("Stop", "Interrupt this turn",
                                                 G_CALLBACK(panel_stop), panel);
-    panel->send_button = cleaf_flat_button_new("Send", "Send prompt to Codex",
+    panel->send_button = graptos_flat_button_new("Send", "Send prompt to Codex",
                                                 G_CALLBACK(panel_send), panel);
     gtk_widget_set_hexpand(panel->stop_button, TRUE);
     gtk_widget_set_halign(panel->stop_button, GTK_ALIGN_END);
@@ -748,6 +822,10 @@ CodexPanel *codex_panel_new(EditorWindow *win) {
 
 /**
  * @brief Codex panel free.
+ * @details The render timeout can still be pending when the window closes. We
+ *          remove it before freeing chats so a late callback cannot touch freed
+ *          transcript buffers.
+ * @param panel The panel instance affected by the operation.
  */
 void codex_panel_free(CodexPanel *panel) {
     if (panel && panel->render_timeout != 0u) {
@@ -761,6 +839,10 @@ void codex_panel_free(CodexPanel *panel) {
 
 /**
  * @brief Codex panel widget.
+ * @details The caller embeds the revealer, not the internal box, so the panel
+ *          controls its own show/hide behavior.
+ * @param panel The panel instance affected by the operation.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 GtkWidget *codex_panel_widget(CodexPanel *panel) {
     return panel ? panel->revealer : NULL;
@@ -768,6 +850,10 @@ GtkWidget *codex_panel_widget(CodexPanel *panel) {
 
 /**
  * @brief Codex panel toggle.
+ * @details Hidden panels are also set invisible so they do not keep blocking
+ *          editor layout. When shown again, context is refreshed from the active
+ *          tab.
+ * @param panel The panel instance affected by the operation.
  */
 void codex_panel_toggle(CodexPanel *panel) {
     if (!panel) return;
@@ -783,6 +869,12 @@ void codex_panel_toggle(CodexPanel *panel) {
 
 /**
  * @brief Codex panel set connection.
+ * @details Connection state drives only connection UI. Turn activity remains
+ *          separate so a reconnect/status change does not accidentally unlock
+ *          the composer during an active response.
+ * @param panel The panel instance affected by the operation.
+ * @param state The state supplied by the caller.
+ * @param detail The detail supplied by the caller.
  */
 void codex_panel_set_connection(CodexPanel *panel,
                                 CodexClientState state,
@@ -810,6 +902,13 @@ void codex_panel_set_connection(CodexPanel *panel,
 
 /**
  * @brief Codex panel handle event.
+ * @details This is the panel's normalized event reducer. CodexClient handles
+ *          protocol parsing; the panel turns those events into transcript text,
+ *          review buttons, approval UI, and Send/Stop state.
+ * @param client The client instance that owns the protocol state.
+ * @param event The event supplied by the caller.
+ * @param text The text fragment supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void codex_panel_handle_event(CodexClient *client,
                               CodexClientEvent event,

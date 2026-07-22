@@ -1,10 +1,15 @@
 /**
  * @file src/git/git_credentials.inc.c
- * @brief Cleaf git credentials module.
+ * @brief Graptoς git credentials module.
+ * @details Git already knows the repository truth. Graptoς adds UI, status parsing,
+ *          credentials, and command wiring, but we avoid building a half-Git inside the
+ *          editor.
+ * @param repo The repo supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 
 static char *remote_host_for_repo(const char *repo) {
-    CleafGitResult result;
+    GraptosGitResult result;
     if (!run_git_args(repo, NULL, &result, "remote", "get-url", "origin", NULL)) {
         git_result_clear(&result);
         return g_strdup("github.com");
@@ -31,6 +36,14 @@ static char *remote_host_for_repo(const char *repo) {
 
 /**
  * @brief Credential dialog.
+ * @details Git actions are user-facing wrappers around command output. The comment keeps the boundary clear between collecting results and presenting them in Graptoς dialogs.
+ * @param win The win supplied by the caller.
+ * @param protocol_out Output storage filled when the operation can provide a value.
+ * @param host_out Output storage filled when the operation can provide a value.
+ * @param username_out Output storage filled when the operation can provide a value.
+ * @param secret_out Output storage filled when the operation can provide a value.
+ * @param helper_out Output storage filled when the operation can provide a value.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *credential_dialog(EditorWindow *win,
                                char **protocol_out,
@@ -49,25 +62,30 @@ static char *credential_dialog(EditorWindow *win,
     g_free(repo);
 
     GtkWidget *window = gtk_window_new();
-    gtk_widget_add_css_class(window, "cleaf-window");
+    gtk_widget_add_css_class(window, "graptos-window");
+    gtk_widget_add_css_class(window, "graptos-dialog");
     gtk_window_set_title(GTK_WINDOW(window), "Git Credentials");
     gtk_window_set_default_size(GTK_WINDOW(window), 500, 300);
     gtk_window_set_modal(GTK_WINDOW(window), TRUE);
     if (win) gtk_window_set_transient_for(GTK_WINDOW(window), app_window_gtk(win));
 
     GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
-    gtk_widget_add_css_class(box, "cleaf-root");
-    cleaf_set_all_margins(box, 14);
+    gtk_widget_add_css_class(box, "graptos-root");
+    gtk_widget_add_css_class(box, "graptos-dialog-root");
+    gtk_widget_add_css_class(box, "graptos-flat-dialog");
+    graptos_set_all_margins(box, 14);
     gtk_window_set_child(GTK_WINDOW(window), box);
 
     GtkWidget *title = gtk_label_new("Save Git HTTPS credentials through Git credential helper");
     gtk_label_set_xalign(GTK_LABEL(title), 0.0f);
-    gtk_widget_add_css_class(title, "cleaf-menu-title");
+    gtk_widget_add_css_class(title, "graptos-menu-title");
+    gtk_widget_add_css_class(title, "graptos-dialog-title");
     gtk_box_append(GTK_BOX(box), title);
 
     GtkWidget *hint = gtk_label_new("Supports GitHub, GitLab, Gitea, and generic HTTPS Git hosts. For GitHub, use a personal access token as the secret.");
     gtk_label_set_wrap(GTK_LABEL(hint), TRUE);
     gtk_label_set_xalign(GTK_LABEL(hint), 0.0f);
+    gtk_widget_add_css_class(hint, "graptos-dialog-body");
     gtk_box_append(GTK_BOX(box), hint);
 
     GtkWidget *protocol = gtk_entry_new();
@@ -92,13 +110,23 @@ static char *credential_dialog(EditorWindow *win,
     gtk_box_append(GTK_BOX(box), helper);
 
     GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    gtk_widget_add_css_class(row, "graptos-dialog-actions");
     gtk_widget_set_halign(row, GTK_ALIGN_END);
-    gtk_box_append(GTK_BOX(row), cleaf_flat_button_new("Cancel", NULL, G_CALLBACK(cleaf_modal_window_respond), GINT_TO_POINTER(GTK_RESPONSE_CANCEL)));
-    gtk_box_append(GTK_BOX(row), cleaf_flat_button_new("Save", NULL, G_CALLBACK(cleaf_modal_window_respond), GINT_TO_POINTER(GTK_RESPONSE_ACCEPT)));
+    GtkWidget *cancel = graptos_flat_button_new("Cancel", NULL,
+        G_CALLBACK(graptos_modal_window_respond),
+        GINT_TO_POINTER(GTK_RESPONSE_CANCEL));
+    GtkWidget *save = graptos_flat_button_new("Save", NULL,
+        G_CALLBACK(graptos_modal_window_respond),
+        GINT_TO_POINTER(GTK_RESPONSE_ACCEPT));
+    gtk_widget_add_css_class(cancel, "graptos-dialog-action");
+    gtk_widget_add_css_class(save, "graptos-dialog-action");
+    gtk_widget_add_css_class(save, "graptos-dialog-action-default");
+    gtk_box_append(GTK_BOX(row), cancel);
+    gtk_box_append(GTK_BOX(row), save);
     gtk_box_append(GTK_BOX(box), row);
 
     char *error = NULL;
-    if (cleaf_modal_window_run(GTK_WINDOW(window), GTK_RESPONSE_CANCEL) == GTK_RESPONSE_ACCEPT) {
+    if (graptos_modal_window_run(GTK_WINDOW(window), GTK_RESPONSE_CANCEL) == GTK_RESPONSE_ACCEPT) {
         *protocol_out = g_strdup(gtk_entry_get_text(GTK_ENTRY(protocol)));
         *host_out = g_strdup(gtk_entry_get_text(GTK_ENTRY(host)));
         *username_out = g_strdup(gtk_entry_get_text(GTK_ENTRY(username)));
@@ -117,13 +145,26 @@ static char *credential_dialog(EditorWindow *win,
         error = g_strdup("cancelled");
     }
 
-    cleaf_widget_destroy(window);
+/**
+ * @brief Action git credentials.
+ * @details Git actions are user-facing wrappers around command output. The comment keeps the boundary clear between collecting results and presenting them in Graptoς dialogs.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
+ */
+    graptos_widget_destroy(window);
     g_free(default_host);
     return error;
 }
 
-/*
- * Cleaf submits secrets to Git's configured credential helper instead of
+/**
+ * @brief Prompt for Git credentials and submit them to Git's helper.
+ * @details Graptoς submits secrets to Git's configured credential helper instead
+ *          of storing plaintext tokens in its own config. GitHub, GitLab, and
+ *          Gitea differences are handled by the remote host and helper policy.
+ * @param widget The widget that emitted the credentials action.
+ * @param user_data The application window passed through GTK signal data.
+ *
+ * Graptoς submits secrets to Git's configured credential helper instead of
  * storing plaintext tokens in its own config.  GitHub/GitLab/Gitea differences
  * are handled by the remote host and helper policy.
  */
@@ -146,7 +187,7 @@ void action_git_credentials(GtkWidget *widget, gpointer user_data) {
     }
 
     if (helper && helper[0]) {
-        CleafGitResult cfg;
+        GraptosGitResult cfg;
         gboolean ok = run_git_args(NULL, NULL, &cfg, "config", "--global", "credential.helper", helper, NULL);
         if (!ok) {
             show_git_error(win, "Git Credential Helper", &cfg);
@@ -160,7 +201,7 @@ void action_git_credentials(GtkWidget *widget, gpointer user_data) {
     char *input = g_strdup_printf("protocol=%s\nhost=%s\nusername=%s\npassword=%s\n\n",
                                   protocol, host, username, secret);
     const char *argv[] = { "git", "credential", "approve", NULL };
-    CleafGitResult result;
+    GraptosGitResult result;
     gboolean ok = run_argv(argv, input, &result);
     if (!ok) show_git_error(win, "Git Credentials", &result);
     else dialog_info(app_window_gtk(win), "Git credentials saved", "Credentials were submitted to Git's configured credential helper.");
@@ -172,16 +213,22 @@ void action_git_credentials(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action git refresh.
+ * @details Git actions are user-facing wrappers around command output. The comment keeps the boundary clear between collecting results and presenting them in Graptoς dialogs.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_git_refresh(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
-    cleaf_git_refresh_and_rebuild(win);
+    graptos_git_refresh_and_rebuild(win);
     app_window_set_status(win, "Git status refreshed.");
 }
 
 /**
  * @brief Action git run.
+ * @details Git actions are user-facing wrappers around command output. The comment keeps the boundary clear between collecting results and presenting them in Graptoς dialogs.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_git_run(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -221,10 +268,10 @@ void action_git_run(GtkWidget *widget, gpointer user_data) {
     for (int i = 0; i < argc; i++) argv_add(argv, parsed[i]);
     g_ptr_array_add(argv, NULL);
 
-    CleafGitResult result;
+    GraptosGitResult result;
     gboolean ok = run_argv((const char * const *)argv->pdata, NULL, &result);
     show_result_or_error(win, "Git Command", &result, ok);
-    if (ok) cleaf_git_refresh_and_rebuild(win);
+    if (ok) graptos_git_refresh_and_rebuild(win);
     git_result_clear(&result);
 
     g_ptr_array_free(argv, TRUE);

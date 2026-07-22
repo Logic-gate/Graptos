@@ -1,6 +1,9 @@
 /**
  * @file src/syntax.c
  * @brief Syntax definition model and lookup helpers.
+ * @details The syntax layer gives Graptoς useful language behavior without requiring LSP.
+ *          YAML keeps the language definitions editable, while this code handles loading,
+ *          highlighting, diagnostics, and safe fallbacks.
  */
 
 #include "syntax_private.h"
@@ -12,11 +15,13 @@
 /**
  * @brief Datadir macro.
  */
-#define DATADIR "/usr/local/share/cleaf"
+#define DATADIR "/usr/local/share/graptos"
 #endif
 
 /**
  * @brief Syntax pair free.
+ * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
+ * @param data The callback context passed by the caller.
  */
 void syntax_pair_free(gpointer data) {
     SyntaxPair *pair = data;
@@ -28,11 +33,14 @@ void syntax_pair_free(gpointer data) {
 
 /**
  * @brief Syntax rule free.
+ * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
+ * @param data The callback context passed by the caller.
  */
 void syntax_rule_free(gpointer data) {
     SyntaxRule *rule = data;
     if (!rule) return;
     g_free(rule->name);
+    g_free(rule->scope);
     g_free(rule->pattern);
     g_free(rule->color);
     if (rule->regex) g_regex_unref(rule->regex);
@@ -40,7 +48,31 @@ void syntax_rule_free(gpointer data) {
 }
 
 /**
+ * @brief Release optional formatter policy.
+ * @details Formatter settings carry strings because YAML owns names rather than
+ *          enums. Freeing them in one helper keeps syntax teardown predictable.
+ * @param data The formatting policy to free.
+ */
+void syntax_formatting_free(gpointer data) {
+    SyntaxFormatting *formatting = data;
+    if (!formatting) return;
+    g_free(formatting->scope);
+    g_free(formatting->profile);
+    g_free(formatting->block_style);
+    g_free(formatting->statement_style);
+    g_free(formatting->brace_style);
+    g_free(formatting->pointer_alignment);
+    if (formatting->logical_operators) g_ptr_array_free(formatting->logical_operators, TRUE);
+    if (formatting->binary_operators) g_ptr_array_free(formatting->binary_operators, TRUE);
+    if (formatting->unary_prefix_operators) g_ptr_array_free(formatting->unary_prefix_operators, TRUE);
+    if (formatting->protected_scopes) g_ptr_array_free(formatting->protected_scopes, TRUE);
+    g_free(formatting);
+}
+
+/**
  * @brief Syntax def free.
+ * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
+ * @param data The callback context passed by the caller.
  */
 void syntax_def_free(gpointer data) {
     SyntaxDef *syntax = data;
@@ -57,6 +89,10 @@ void syntax_def_free(gpointer data) {
     if (syntax->import_extensions) g_ptr_array_free(syntax->import_extensions, TRUE);
     if (syntax->import_member_files) g_ptr_array_free(syntax->import_member_files, TRUE);
     if (syntax->import_static_modules) g_ptr_array_free(syntax->import_static_modules, TRUE);
+    g_free(syntax->lsp_command);
+    if (syntax->lsp_args) g_ptr_array_free(syntax->lsp_args, TRUE);
+    g_free(syntax->lsp_language_id);
+    syntax_formatting_free(syntax->formatting);
     if (syntax->close_pairs) g_ptr_array_free(syntax->close_pairs, TRUE);
     if (syntax->line_close_pairs) g_ptr_array_free(syntax->line_close_pairs, TRUE);
     if (syntax->statement_required_enders) g_ptr_array_free(syntax->statement_required_enders, TRUE);
@@ -74,6 +110,8 @@ void syntax_def_free(gpointer data) {
 
 /**
  * @brief Syntax def new default.
+ * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 SyntaxDef *syntax_def_new_default(void) {
     SyntaxDef *syntax = g_new0(SyntaxDef, 1);
@@ -90,6 +128,7 @@ SyntaxDef *syntax_def_new_default(void) {
     syntax->import_extensions = g_ptr_array_new_with_free_func(g_free);
     syntax->import_member_files = g_ptr_array_new_with_free_func(g_free);
     syntax->import_static_modules = g_ptr_array_new_with_free_func(g_free);
+    syntax->lsp_args = g_ptr_array_new_with_free_func(g_free);
     syntax->rules = g_ptr_array_new_with_free_func(syntax_rule_free);
     syntax->close_pairs = g_ptr_array_new_with_free_func(syntax_pair_free);
     syntax->line_close_pairs = g_ptr_array_new_with_free_func(syntax_pair_free);
@@ -110,6 +149,10 @@ SyntaxDef *syntax_def_new_default(void) {
 
 /**
  * @brief Syntax by name.
+ * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
+ * @param syntaxes The syntaxes supplied by the caller.
+ * @param name The name supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 SyntaxDef *syntax_by_name(GPtrArray *syntaxes, const char *name) {
     if (!syntaxes || !name) return NULL;
@@ -122,6 +165,10 @@ SyntaxDef *syntax_by_name(GPtrArray *syntaxes, const char *name) {
 
 /**
  * @brief Syntax matches basename.
+ * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
+ * @param syntax The syntax definition used by the editor path.
+ * @param basename The basename supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean syntax_matches_basename(const SyntaxDef *syntax, const char *basename) {
     if (!syntax || !syntax->filenames || !basename) return FALSE;
@@ -134,6 +181,10 @@ static gboolean syntax_matches_basename(const SyntaxDef *syntax, const char *bas
 
 /**
  * @brief Syntax matches extension.
+ * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
+ * @param syntax The syntax definition used by the editor path.
+ * @param path The filesystem path supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean syntax_matches_extension(const SyntaxDef *syntax, const char *path) {
     if (!syntax || !syntax->extensions || !path) return FALSE;
@@ -148,6 +199,10 @@ static gboolean syntax_matches_extension(const SyntaxDef *syntax, const char *pa
 
 /**
  * @brief Syntax for path.
+ * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
+ * @param syntaxes The syntaxes supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 SyntaxDef *syntax_for_path(GPtrArray *syntaxes, const char *path) {
     if (!syntaxes || !path) return NULL;
@@ -175,6 +230,10 @@ SyntaxDef *syntax_for_path(GPtrArray *syntaxes, const char *path) {
 
 /**
  * @brief Syntax path is indexable.
+ * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
+ * @param syntaxes The syntaxes supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean syntax_path_is_indexable(GPtrArray *syntaxes, const char *path) {
     SyntaxDef *syntax = syntax_for_path(syntaxes, path);
@@ -183,6 +242,11 @@ gboolean syntax_path_is_indexable(GPtrArray *syntaxes, const char *path) {
 
 /**
  * @brief Syntax icon for path.
+ * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
+ * @param syntaxes The syntaxes supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
+ * @param is_dir The is dir supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 const char *syntax_icon_for_path(GPtrArray *syntaxes, const char *path, gboolean is_dir) {
     if (is_dir) return "DIR";
@@ -193,6 +257,10 @@ const char *syntax_icon_for_path(GPtrArray *syntaxes, const char *path, gboolean
 
 /**
  * @brief Syntax language for path.
+ * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
+ * @param syntaxes The syntaxes supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 const char *syntax_language_for_path(GPtrArray *syntaxes, const char *path) {
     if (!path) return "Buffer";
@@ -203,6 +271,10 @@ const char *syntax_language_for_path(GPtrArray *syntaxes, const char *path) {
 
 /**
  * @brief Text has token.
+ * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
+ * @param text The text fragment supplied by the caller.
+ * @param token The token supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean text_has_token(const char *text, const char *token) {
     if (!text || !token) return FALSE;
@@ -211,6 +283,10 @@ static gboolean text_has_token(const char *text, const char *token) {
 
 /**
  * @brief Syntax for content.
+ * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
+ * @param syntaxes The syntaxes supplied by the caller.
+ * @param buffer The text buffer used for the operation.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 SyntaxDef *syntax_for_content(GPtrArray *syntaxes, GtkTextBuffer *buffer) {
     if (!syntaxes || !buffer) return NULL;

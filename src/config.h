@@ -1,24 +1,33 @@
 /**
  * @file src/config.h
- * @brief Persistent Cleaf configuration loading and saving.
+ * @brief Persistent Graptoς configuration loading and saving.
+ * @details Configuration is the shared contract between defaults, manual edits, and live
+ *          theme changes. We parse it once here so individual features do not invent their
+ *          own config behavior.
  */
 
-#ifndef CLEAF_CONFIG_H
-#define CLEAF_CONFIG_H
+#ifndef GRAPTOS_CONFIG_H
+#define GRAPTOS_CONFIG_H
 
 #include "app.h"
 
 /**
- * @brief Cleaf config load.
+ * @brief Graptoς config load.
+ * @details Configuration values are user data, not internal constants. The comment makes the fallback path explicit so missing keys do not overwrite intentional manual edits.
+ * @param win The win supplied by the caller.
  */
-void cleaf_config_load(EditorWindow *win);
+void graptos_config_load(EditorWindow *win);
 /**
- * @brief Cleaf config save.
+ * @brief Graptoς config save.
+ * @details Configuration values are user data, not internal constants. The comment makes the fallback path explicit so missing keys do not overwrite intentional manual edits.
+ * @param win The win supplied by the caller.
  */
-void cleaf_config_save(EditorWindow *win);
+void graptos_config_save(EditorWindow *win);
 /**
- * @brief Cleaf config path.
+ * @brief Graptoς config path.
+ * @details Configuration values are user data, not internal constants. The comment makes the fallback path explicit so missing keys do not overwrite intentional manual edits.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
-char *cleaf_config_path(void);
+char *graptos_config_path(void);
 
-#endif /* CLEAF_CONFIG_H */
+#endif /* GRAPTOS_CONFIG_H */

@@ -5,6 +5,9 @@ icon: mime
 filenames: [package.json, tsconfig.json]
 index: true
 import_style: generic
+lsp_command: vscode-json-language-server
+lsp_language_id: json
+lsp_args: [--stdio]
 completions: [true, false, null, name, version, scripts, dependencies, devDependencies, description, peerDependencies, repository, license, author, main, module, type, exports, imports]
 auto_indent: true
 indent_openers: ["{", "["]
@@ -23,12 +26,38 @@ import_extensions: [.json]
 import_member_files: []
 import_strip_extensions: false
 import_dot_modules: false
+formatting:
+  enabled: false
+  scope: selection_or_block
+  profile: data
+  block_style: braces
+  statement_style: none
+  brace_style: attach
+  one_statement_per_line: false
+  space_before_block_opener: false
+  space_after_comma: true
+  space_after_control_keyword: false
+  space_around_binary_operators: false
+  space_around_logical_operators: false
+  logical_operators: []
+  binary_operators: [":"]
+  unary_prefix_operators: []
+  protected_scopes: [string]
+  pointer_alignment: name
+  continuation_indent: 4
+  max_column: 100
+  wrap_after_comma: true
+  case_indent: 0
+  preserve_blank_lines: true
+  max_blank_lines: 0
+  collapse_empty_blocks: false
 rules:
   - name: key
     pattern: "\"[^\"\\\\]+\"[[:space:]]*:"
     color: "#9CDCFE"
     bold: true
   - name: string
+    scope: string
     pattern: "\"(?:\\\\.|[^\"\\\\])*\""
     color: "#CE9178"
   - name: boolean

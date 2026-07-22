@@ -23,15 +23,42 @@ import_extensions: [.md, .markdown, .txt]
 import_member_files: []
 import_strip_extensions: false
 import_dot_modules: false
+formatting:
+  enabled: false
+  scope: selection_or_block
+  profile: plain
+  block_style: none
+  statement_style: none
+  brace_style: attach
+  one_statement_per_line: false
+  space_before_block_opener: false
+  space_after_comma: false
+  space_after_control_keyword: false
+  space_around_binary_operators: false
+  space_around_logical_operators: false
+  logical_operators: []
+  binary_operators: []
+  unary_prefix_operators: []
+  protected_scopes: [comment, string]
+  pointer_alignment: name
+  continuation_indent: 4
+  max_column: 0
+  wrap_after_comma: false
+  case_indent: 0
+  preserve_blank_lines: true
+  max_blank_lines: 0
+  collapse_empty_blocks: false
 rules:
   - name: heading
     pattern: "^#{1,6}[[:space:]].*$"
     color: "#569CD6"
     bold: true
   - name: codeblock
+    scope: string
     pattern: "(?s)```.*?```"
     color: "#CE9178"
   - name: inline-code
+    scope: string
     pattern: "`[^`]+`"
     color: "#CE9178"
   - name: link
@@ -47,6 +74,7 @@ rules:
     color: "#569CD6"
     bold: true
   - name: code-span
+    scope: string
     pattern: "`[^`]+`"
     color: "#CE9178"
   - name: link

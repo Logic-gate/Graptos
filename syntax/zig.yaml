@@ -1,0 +1,766 @@
+# Zig language configuration for Graptoς
+# Targets Zig 0.16.x syntax and standard-library conventions.
+
+name: Zig
+extensions:
+- .zig
+- .zon
+line_comment: //
+auto_indent: true
+indent_openers: ["{"]
+indent_closers: ["}"]
+close_pairs: ["(=>)", "{=>}", "[=>]", '"=>"', "'=>'"]
+line_close_pairs: []
+statement_required_enders: [";"]
+statement_exempt_prefixes:
+- "//"
+- "///"
+- "//!"
+- "}"
+- "{"
+- "else"
+- "switch"
+- "while"
+- "for"
+- "if"
+- "comptime"
+statement_exempt_suffixes:
+- ";"
+- "{"
+- "}"
+- ":"
+- ","
+icon: mime
+filenames:
+- build.zig
+- build.zig.zon
+index: true
+# Graptoς needs a Zig-aware resolver for semantic @import completion.
+# Until that resolver exists, this metadata exposes quoted Zig paths.
+import_style: quoted
+lsp_command: /home/mad-dev/Projects/zls/zig-out/bin/zls
+lsp_language_id: zig
+lsp_args: []
+import_keywords:
+- "@import"
+import_from_keywords: []
+import_member_keywords: []
+import_roots:
+- .
+- src
+- lib
+- zig-out
+- zig-cache
+- .zig-cache
+import_env:
+- ZIG_LIB_DIR
+- ZIG_GLOBAL_CACHE_DIR
+- ZIG_LOCAL_CACHE_DIR
+import_extensions:
+- .zig
+- .zon
+import_member_files: []
+import_strip_extensions: false
+import_dot_modules: false
+import_static_modules:
+- std=ArrayList|ArrayListUnmanaged|AutoHashMap|AutoHashMapUnmanaged|StringHashMap|StringHashMapUnmanaged|MultiArrayList|PriorityQueue|DynamicBitSet|StaticBitSet|EnumSet|EnumMap|heap|mem|fmt|debug|log|testing|math|crypto|hash|json|zig|Build|fs|Io|net|process|Thread|time|unicode|ascii|sort|Random|Uri|http|tar|zip|compress|coff|elf|macho|wasm|posix
+- builtin=mode|target|cpu|os|abi|object_format|link_mode|is_test|single_threaded|zig_backend|output_mode
+- root=
+
+formatting:
+  enabled: true
+  scope: selection_or_block
+  profile: brace_semicolon
+  block_style: braces
+  statement_style: semicolon
+  brace_style: attach
+  one_statement_per_line: true
+  space_before_block_opener: true
+  space_after_comma: true
+  space_after_control_keyword: true
+  space_around_binary_operators: true
+  space_around_logical_operators: true
+  logical_operators: ["and", "or"]
+  binary_operators: ["+", "-", "*", "/", "%", "=", "==", "!=", "<", ">", "<=", ">="]
+  unary_prefix_operators: ["!", "~"]
+  protected_scopes: [comment, string, character]
+  pointer_alignment: name
+  continuation_indent: 4
+  max_column: 100
+  wrap_after_comma: true
+  case_indent: 0
+  preserve_blank_lines: true
+  max_blank_lines: 0
+  collapse_empty_blocks: true
+
+completions:
+- addrspace
+- align
+- allowzero
+- and
+- anyframe
+- anytype
+- asm
+- async
+- await
+- break
+- callconv
+- catch
+- comptime
+- const
+- continue
+- defer
+- else
+- enum
+- errdefer
+- error
+- export
+- extern
+- fn
+- for
+- if
+- inline
+- noalias
+- noinline
+- nosuspend
+- opaque
+- or
+- orelse
+- packed
+- pub
+- resume
+- return
+- linksection
+- struct
+- suspend
+- switch
+- test
+- threadlocal
+- try
+- union
+- unreachable
+- usingnamespace
+- var
+- volatile
+- while
+- anyerror
+- anyopaque
+- bool
+- comptime_float
+- comptime_int
+- f16
+- f32
+- f64
+- f80
+- f128
+- i8
+- i16
+- i32
+- i64
+- i128
+- isize
+- noreturn
+- type
+- u0
+- u1
+- u8
+- u16
+- u32
+- u64
+- u128
+- usize
+- void
+- c_char
+- c_short
+- c_ushort
+- c_int
+- c_uint
+- c_long
+- c_ulong
+- c_longlong
+- c_ulonglong
+- c_longdouble
+- "true"
+- "false"
+- "null"
+- undefined
+- "@addrSpaceCast"
+- "@addWithOverflow"
+- "@alignCast"
+- "@alignOf"
+- "@as"
+- "@atomicLoad"
+- "@atomicRmw"
+- "@atomicStore"
+- "@bitCast"
+- "@bitOffsetOf"
+- "@bitReverse"
+- "@bitSizeOf"
+- "@branchHint"
+- "@breakpoint"
+- "@byteSwap"
+- "@call"
+- "@cDefine"
+- "@cImport"
+- "@cInclude"
+- "@clz"
+- "@cmpxchgStrong"
+- "@cmpxchgWeak"
+- "@compileError"
+- "@compileLog"
+- "@constCast"
+- "@cos"
+- "@ctz"
+- "@cUndef"
+- "@divExact"
+- "@divFloor"
+- "@divTrunc"
+- "@embedFile"
+- "@enumFromInt"
+- "@errorCast"
+- "@errorFromInt"
+- "@errorName"
+- "@errorReturnTrace"
+- "@exp"
+- "@exp2"
+- "@export"
+- "@extern"
+- "@field"
+- "@fieldParentPtr"
+- "@FieldType"
+- "@floatCast"
+- "@floatFromInt"
+- "@frameAddress"
+- "@hasDecl"
+- "@hasField"
+- "@import"
+- "@inComptime"
+- "@intCast"
+- "@intFromBool"
+- "@intFromEnum"
+- "@intFromError"
+- "@intFromFloat"
+- "@intFromPtr"
+- "@log"
+- "@log2"
+- "@log10"
+- "@max"
+- "@memcpy"
+- "@memset"
+- "@min"
+- "@mod"
+- "@mulAdd"
+- "@mulWithOverflow"
+- "@offsetOf"
+- "@panic"
+- "@popCount"
+- "@prefetch"
+- "@ptrCast"
+- "@ptrFromInt"
+- "@rem"
+- "@returnAddress"
+- "@round"
+- "@select"
+- "@setAlignStack"
+- "@setCold"
+- "@setEvalBranchQuota"
+- "@setFloatMode"
+- "@setRuntimeSafety"
+- "@shlExact"
+- "@shlWithOverflow"
+- "@shrExact"
+- "@shuffle"
+- "@sin"
+- "@sizeOf"
+- "@splat"
+- "@sqrt"
+- "@src"
+- "@subWithOverflow"
+- "@tagName"
+- "@tan"
+- "@This"
+- "@trap"
+- "@trunc"
+- "@truncate"
+- "@TypeOf"
+- "@typeInfo"
+- "@typeName"
+- "@Vector"
+- "@volatileCast"
+- "@workGroupId"
+- "@workGroupSize"
+- "@workItemId"
+
+# Bare builtin names are required for completion after the '@' prefix.
+- import
+- addrSpaceCast
+- addWithOverflow
+- alignCast
+- alignOf
+- as
+- atomicLoad
+- atomicRmw
+- atomicStore
+- bitCast
+- bitOffsetOf
+- bitReverse
+- bitSizeOf
+- branchHint
+- breakpoint
+- byteSwap
+- call
+- cDefine
+- cImport
+- cInclude
+- clz
+- cmpxchgStrong
+- cmpxchgWeak
+- compileError
+- compileLog
+- constCast
+- cos
+- ctz
+- cUndef
+- divExact
+- divFloor
+- divTrunc
+- embedFile
+- enumFromInt
+- errorCast
+- errorFromInt
+- errorName
+- errorReturnTrace
+- exp
+- exp2
+- export
+- extern
+- field
+- fieldParentPtr
+- FieldType
+- floatCast
+- floatFromInt
+- frameAddress
+- hasDecl
+- hasField
+- import
+- inComptime
+- intCast
+- intFromBool
+- intFromEnum
+- intFromError
+- intFromFloat
+- intFromPtr
+- log
+- log2
+- log10
+- max
+- memcpy
+- memset
+- min
+- mod
+- mulAdd
+- mulWithOverflow
+- offsetOf
+- panic
+- popCount
+- prefetch
+- ptrCast
+- ptrFromInt
+- rem
+- returnAddress
+- round
+- select
+- setAlignStack
+- setCold
+- setEvalBranchQuota
+- setFloatMode
+- setRuntimeSafety
+- shlExact
+- shlWithOverflow
+- shrExact
+- shuffle
+- sin
+- sizeOf
+- splat
+- sqrt
+- src
+- subWithOverflow
+- tagName
+- tan
+- This
+- trap
+- trunc
+- truncate
+- TypeOf
+- typeInfo
+- typeName
+- Vector
+- volatileCast
+- workGroupId
+- workGroupSize
+- workItemId
+- Enum
+- EnumLiteral
+- Fn
+- Int
+- Pointer
+- Struct
+- Tuple
+- Union
+- "@Enum"
+- "@EnumLiteral"
+- "@Fn"
+- "@Int"
+- "@Pointer"
+- "@Struct"
+- "@Tuple"
+- "@Union"
+- std
+- ArrayList
+- ArrayListUnmanaged
+- AutoHashMap
+- AutoHashMapUnmanaged
+- StringHashMap
+- StringHashMapUnmanaged
+- MultiArrayList
+- PriorityQueue
+- DynamicBitSet
+- StaticBitSet
+- EnumSet
+- EnumMap
+- Allocator
+- ArenaAllocator
+- GeneralPurposeAllocator
+- FixedBufferAllocator
+- page_allocator
+- c_allocator
+- heap
+- mem
+- fmt
+- debug
+- log
+- testing
+- math
+- crypto
+- hash
+- json
+- fs
+- Io
+- net
+- process
+- Thread
+- time
+- unicode
+- ascii
+- sort
+- Random
+- Uri
+- http
+- posix
+- builtin
+- Build
+- init
+- deinit
+- create
+- destroy
+- alloc
+- allocSentinel
+- alignedAlloc
+- dupe
+- dupeZ
+- free
+- resize
+- remap
+- append
+- appendSlice
+- appendNTimes
+- ensureTotalCapacity
+- ensureUnusedCapacity
+- clearRetainingCapacity
+- clearAndFree
+- insert
+- orderedRemove
+- swapRemove
+- pop
+- get
+- getPtr
+- getOrPut
+- getOrPutValue
+- put
+- putNoClobber
+- remove
+- contains
+- count
+- capacity
+- keys
+- values
+- iterator
+- next
+- eql
+- lessThan
+- order
+- copyForwards
+- copyBackwards
+- zeroes
+- bytesAsSlice
+- sliceAsBytes
+- span
+- indexOf
+- lastIndexOf
+- startsWith
+- endsWith
+- splitScalar
+- splitSequence
+- tokenizeScalar
+- tokenizeSequence
+- trim
+- trimLeft
+- trimRight
+- join
+- concat
+- format
+- print
+- writer
+- reader
+- read
+- readAll
+- readToEndAlloc
+- write
+- writeAll
+- openFile
+- createFile
+- openDir
+- cwd
+- stat
+- close
+- seekTo
+- seekBy
+- getPos
+- expect
+- expectEqual
+- expectEqualSlices
+- expectError
+- expectApproxEqAbs
+- expectApproxEqRel
+- panic
+- assert
+- parseInt
+- parseFloat
+- intToEnum
+- enumFromInt
+- stringify
+- spawn
+- join
+- sleep
+- nanoTimestamp
+- timestamp
+- root
+- self
+- Self
+- build
+- build_options
+- panic_handler
+- main
+- format
+- typeInfo
+- typeName
+- field
+- hasDecl
+- hasField
+- sizeOf
+- alignOf
+- bitSizeOf
+- offsetOf
+- bitOffsetOf
+- import
+- cImport
+- cInclude
+- cDefine
+- cUndef
+- embedFile
+- compileError
+- compileLog
+- setEvalBranchQuota
+- setRuntimeSafety
+- setFloatMode
+- branchHint
+- reduce
+- shuffle
+- select
+- frameAddress
+- returnAddress
+- errorName
+- tagName
+- src
+- This
+
+# Types
+- i8
+- u8
+- i16
+- u16
+- i32
+- u32
+- i64
+- u64
+- i128
+- u128
+- isize
+- usize
+- c_char
+- c_short
+- c_ushort
+- c_int
+- c_uint
+- c_long
+- c_ulong
+- c_longlong
+- c_ulonglong
+- c_longdouble
+- f16
+- f32
+- f64
+- f80
+- f128
+- bool
+- anyopaque
+- noreturn
+- type
+- anyerror
+- comptime_int
+- comptime_float
+
+rules:
+- name: comment-doc-line
+  pattern: '///.*$|//!.*$'
+  color: '#8b949e'
+  italic: true
+- name: comment-line
+  pattern: '//.*$'
+  color: '#8b949e'
+  italic: true
+- name: todo-note
+  pattern: '(?<![A-Za-z0-9_])(TODO|FIXME|BUG|HACK|NOTE|XXX|OPTIMIZE|REVIEW)(?![A-Za-z0-9_])'
+  color: '#d29922'
+  bold: true
+- name: multiline-string
+  pattern: '^[[:space:]]*\\\\.*$'
+  color: '#a5d6ff'
+- name: string
+  pattern: '"(?:\\.|[^"\\])*"'
+  color: '#a5d6ff'
+- name: import-builtin
+  pattern: '@import(?=[[:space:]]*\()'
+  color: '#ff7b72'
+  bold: true
+- name: import-path
+  pattern: '@import[[:space:]]*\([[:space:]]*"[^"]+"[[:space:]]*\)'
+  color: '#a5d6ff'
+- name: character
+  pattern: "'(?:\\\\.|[^'\\\\])'"
+  color: '#a5d6ff'
+- name: escape-sequence
+  pattern: '\\(?:[nrt\\''"]|x[0-9A-Fa-f]{2}|u\{[0-9A-Fa-f]{1,6}\})'
+  color: '#79c0ff'
+  bold: true
+- name: builtin-function
+  pattern: '@[A-Za-z_][A-Za-z0-9_]*'
+  color: '#d2a8ff'
+  bold: true
+- name: control-keyword
+  pattern: '(?<![A-Za-z0-9_])(break|catch|continue|defer|else|errdefer|for|if|orelse|return|switch|try|unreachable|while)(?![A-Za-z0-9_])'
+  color: '#ff7b72'
+  bold: true
+- name: declaration-keyword
+  pattern: '(?<![A-Za-z0-9_])(const|var|fn|pub|export|extern|test|usingnamespace|threadlocal)(?![A-Za-z0-9_])'
+  color: '#ff7b72'
+  bold: true
+- name: type-keyword
+  pattern: '(?<![A-Za-z0-9_])(struct|enum|union|opaque|packed|extern|anytype|anyframe|anyerror|anyopaque|type|void|noreturn|bool|comptime_int|comptime_float|isize|usize|c_char|c_short|c_ushort|c_int|c_uint|c_long|c_ulong|c_longlong|c_ulonglong|c_longdouble|f16|f32|f64|f80|f128|i[0-9]+|u[0-9]+)(?![A-Za-z0-9_])'
+  color: '#ffa657'
+  bold: true
+- name: error-keyword
+  pattern: '(?<![A-Za-z0-9_])error(?![A-Za-z0-9_])'
+  color: '#ff7b72'
+  bold: true
+- name: modifier-keyword
+  pattern: '(?<![A-Za-z0-9_])(addrspace|align|allowzero|callconv|comptime|inline|linksection|noalias|noinline|nosuspend|volatile)(?![A-Za-z0-9_])'
+  color: '#ff7b72'
+  bold: true
+- name: async-keyword
+  pattern: '(?<![A-Za-z0-9_])(async|await|resume|suspend)(?![A-Za-z0-9_])'
+  color: '#ff7b72'
+  bold: true
+- name: primitive-type
+  pattern: '(?<![A-Za-z0-9_])(anyerror|anyopaque|bool|comptime_float|comptime_int|f16|f32|f64|f80|f128|i[0-9]+|u[0-9]+|isize|usize|noreturn|void|c_char|c_short|c_ushort|c_int|c_uint|c_long|c_ulong|c_longlong|c_ulonglong|c_longdouble)(?![A-Za-z0-9_])'
+  color: '#79c0ff'
+  bold: true
+- name: boolean-null-undefined
+  pattern: '(?<![A-Za-z0-9_])(true|false|null|undefined)(?![A-Za-z0-9_])'
+  color: '#79c0ff'
+  bold: true
+- name: error-value
+  pattern: '(?<![A-Za-z0-9_])error\.[A-Za-z_][A-Za-z0-9_]*'
+  color: '#f85149'
+- name: enum-literal
+  pattern: '(?<![A-Za-z0-9_])\.[A-Za-z_][A-Za-z0-9_]*'
+  color: '#79c0ff'
+- name: number-hex-float
+  pattern: '(?<![A-Za-z0-9_])0[xX](?:[0-9A-Fa-f](?:_?[0-9A-Fa-f])*)?(?:\.(?:[0-9A-Fa-f](?:_?[0-9A-Fa-f])*)?)?[pP][+-]?[0-9](?:_?[0-9])*(?![A-Za-z0-9_])'
+  color: '#79c0ff'
+- name: number-hex
+  pattern: '(?<![A-Za-z0-9_])0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*(?![A-Za-z0-9_])'
+  color: '#79c0ff'
+- name: number-binary
+  pattern: '(?<![A-Za-z0-9_])0[bB][01](?:_?[01])*(?![A-Za-z0-9_])'
+  color: '#79c0ff'
+- name: number-octal
+  pattern: '(?<![A-Za-z0-9_])0[oO][0-7](?:_?[0-7])*(?![A-Za-z0-9_])'
+  color: '#79c0ff'
+- name: number-float
+  pattern: '(?<![A-Za-z0-9_])(?:(?:[0-9](?:_?[0-9])*)?\.[0-9](?:_?[0-9])*(?:[eE][+-]?[0-9](?:_?[0-9])*)?|[0-9](?:_?[0-9])*[eE][+-]?[0-9](?:_?[0-9])*)(?![A-Za-z0-9_])'
+  color: '#79c0ff'
+- name: number-decimal
+  pattern: '(?<![A-Za-z0-9_])[0-9](?:_?[0-9])*(?![A-Za-z0-9_])'
+  color: '#79c0ff'
+- name: function-declaration
+  pattern: '(?<![A-Za-z0-9_])fn[[:space:]]+[A-Za-z_][A-Za-z0-9_]*'
+  color: '#d2a8ff'
+  bold: true
+- name: function-call
+  pattern: '(?<![A-Za-z0-9_])(?!(if|for|while|switch|catch)[[:space:]]*\()[A-Za-z_][A-Za-z0-9_]*[[:space:]]*(?=\()'
+  color: '#d2a8ff'
+- name: type-name
+  pattern: '(?<![A-Za-z0-9_])[A-Z][A-Za-z0-9_]*(?![A-Za-z0-9_])'
+  color: '#ffa657'
+- name: member-access
+  pattern: '\.[A-Za-z_][A-Za-z0-9_]*'
+  color: '#ffa657'
+- name: label
+  pattern: '(?<![A-Za-z0-9_])[A-Za-z_][A-Za-z0-9_]*[[:space:]]*:(?!:)'
+  color: '#d29922'
+- name: quoted-identifier
+  pattern: '@"[A-Za-z_][^"]*"'
+  color: '#a5d6ff'
+- name: container-declaration
+  pattern: '(?<![A-Za-z0-9_])(struct|enum|union|opaque)[[:space:]]*\{'
+  color: '#ff7b72'
+  bold: true
+- name: payload-capture
+  pattern: '\|[A-Za-z_][A-Za-z0-9_]*(?:[[:space:]]*,[[:space:]]*[A-Za-z_][A-Za-z0-9_]*)?\|'
+  color: '#ffa657'
+- name: label-reference
+  pattern: ':[A-Za-z_][A-Za-z0-9_]*'
+  color: '#d29922'
+- name: operator-word
+  pattern: '(?<![A-Za-z0-9_])(and|or)(?![A-Za-z0-9_])'
+  color: '#e6edf3'
+- name: operator
+  pattern: '(\+%|\-%|\*%|\+|\-|\*|/|%|==|!=|<=|>=|<<|>>|&|\||\^|~|!|=|\+=|-=|\*=|/=|%=|<<=|>>=|&=|\|=|\^=|\?|\.\*|\.\?)'
+  color: '#e6edf3'
+- name: bracket
+  pattern: '[{}\[\]()]'
+  color: '#e6edf3'
+- name: punctuation
+  pattern: '[,;:]'
+  color: '#8b949e'

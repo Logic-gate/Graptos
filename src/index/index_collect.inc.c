@@ -1,6 +1,11 @@
 /**
  * @file src/index/index_collect.inc.c
- * @brief Cleaf index collect module.
+ * @brief Graptoς index collect module.
+ * @details The index is our local memory of the project. It trades perfect semantic
+ *          knowledge for speed and predictability, which is the right fallback when
+ *          external tooling is absent or incomplete.
+ * @param ch The ch supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 
 
@@ -10,6 +15,9 @@ static gboolean ascii_word_start(char ch) {
 
 /**
  * @brief Ascii word char.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param ch The ch supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean ascii_word_char(char ch) {
     return g_ascii_isalnum(ch) || ch == '_';
@@ -17,6 +25,9 @@ static gboolean ascii_word_char(char ch) {
 
 /**
  * @brief Tab text.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *tab_text(EditorTab *tab) {
     if (!tab || !tab->buffer) return NULL;
@@ -27,7 +38,25 @@ static char *tab_text(EditorTab *tab) {
 }
 
 /**
+ * @brief Return whether an index caller still owns usable editor state.
+ * @details Index lookups are often scheduled by delayed completion and hover
+ *          paths. During window teardown those callbacks must stop before they
+ *          touch buffers, syntax tables, or project roots that are already
+ *          being released.
+ * @param tab The editor tab whose state would be indexed.
+ * @return TRUE when the tab and owning window are still open for indexing.
+ */
+static gboolean index_tab_available(EditorTab *tab) {
+    return tab && !tab->disposing && tab->buffer &&
+           (!tab->win || !tab->win->closing);
+}
+
+/**
  * @brief Has word boundary.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param line The zero-based or display line handled by the caller, matching the surrounding API.
+ * @param word The symbol text being matched.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean has_word_boundary(const char *line, const char *word) {
     if (!line || !word || word[0] == '\0') return FALSE;
@@ -35,6 +64,13 @@ static gboolean has_word_boundary(const char *line, const char *word) {
     gsize len = strlen(word);
     while ((p = strstr(p, word)) != NULL) {
         char before = p == line ? '\0' : p[-1];
+/**
+ * @brief Read small file.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param path The filesystem path supplied by the caller.
+ * @param out_text Output storage filled when the operation can provide a value.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
+ */
         char after = p[len];
         if (!ascii_word_char(before) && !ascii_word_char(after)) return TRUE;
         p += len;
@@ -42,7 +78,15 @@ static gboolean has_word_boundary(const char *line, const char *word) {
     return FALSE;
 }
 
-/*
+/**
+ * @brief Read a small project file for indexing.
+ * @details Index only small UTF-8 source-like files. Skipping binaries and very
+ *          large files is intentional: reference popovers should answer from a
+ *          bounded cache, not stall while reading arbitrary project data.
+ * @param path The filesystem path to read.
+ * @param out_text Output storage that receives owned file text on success.
+ * @return TRUE when text was read; otherwise FALSE.
+ *
  * Index only small UTF-8 source-like files.  Skipping binaries and very large
  * files is intentional: reference popovers should answer from a bounded cache,
  * not stall while reading arbitrary project data.
@@ -53,7 +97,7 @@ static gboolean read_small_file(const char *path, char **out_text) {
     struct stat st;
     if (stat(path, &st) != 0) return FALSE;
     if (!S_ISREG(st.st_mode)) return FALSE;
-    if (st.st_size < 0 || (guint64)st.st_size > (guint64)CLEAF_INDEX_MAX_FILE_BYTES) return FALSE;
+    if (st.st_size < 0 || (guint64)st.st_size > (guint64)GRAPTOS_INDEX_MAX_FILE_BYTES) return FALSE;
     g_autofree char *text = NULL;
     gsize len = 0u;
     g_autoptr(GError) error = NULL;
@@ -69,6 +113,12 @@ static gboolean read_small_file(const char *path, char **out_text) {
 
 /**
  * @brief Add unique.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param out Output storage filled when the lookup succeeds.
+ * @param seen The seen supplied by the caller.
+ * @param word The symbol text being matched.
+ * @param prefix The prefix supplied by the caller.
+ * @param max_results The max results supplied by the caller.
  */
 static void add_unique(GPtrArray *out, GHashTable *seen, const char *word, const char *prefix, guint max_results) {
     if (!out || !seen || !word || !prefix) return;
@@ -84,6 +134,12 @@ static void add_unique(GPtrArray *out, GHashTable *seen, const char *word, const
 
 /**
  * @brief Collect identifiers.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param out Output storage filled when the lookup succeeds.
+ * @param seen The seen supplied by the caller.
+ * @param text The text fragment supplied by the caller.
+ * @param prefix The prefix supplied by the caller.
+ * @param max_results The max results supplied by the caller.
  */
 static void collect_identifiers(GPtrArray *out, GHashTable *seen, const char *text, const char *prefix, guint max_results) {
     if (!out || !seen || !text || !prefix) return;
@@ -103,16 +159,22 @@ static void collect_identifiers(GPtrArray *out, GHashTable *seen, const char *te
 
 /**
  * @brief Collect c declarations.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param out Output storage filled when the lookup succeeds.
+ * @param seen The seen supplied by the caller.
+ * @param text The text fragment supplied by the caller.
+ * @param prefix The prefix supplied by the caller.
+ * @param max_results The max results supplied by the caller.
  */
 static void collect_c_declarations(GPtrArray *out, GHashTable *seen, const char *text, const char *prefix, guint max_results) {
-    if (!text) return;
+    if (!out || !seen || !text || !prefix) return;
     const char *p = text;
     while (*p && out->len < max_results) {
         const char *line_start = p;
         const char *line_end = strchr(p, '\n');
         if (!line_end) line_end = p + strlen(p);
         gsize len = (gsize)(line_end - line_start);
-        if (len > CLEAF_INDEX_MAX_LINE) len = CLEAF_INDEX_MAX_LINE;
+        if (len > GRAPTOS_INDEX_MAX_LINE) len = GRAPTOS_INDEX_MAX_LINE;
         char *line = g_strndup(line_start, len);
         char *trim = g_strstrip(line);
 
@@ -166,6 +228,11 @@ static void collect_c_declarations(GPtrArray *out, GHashTable *seen, const char 
 
 /**
  * @brief Add file path.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param paths The paths supplied by the caller.
+ * @param seen The seen supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean add_file_path(GPtrArray *paths, GHashTable *seen, const char *path) {
     if (!paths || !seen || !path) return FALSE;
@@ -182,13 +249,21 @@ static gboolean add_file_path(GPtrArray *paths, GHashTable *seen, const char *pa
 
 /**
  * @brief Collect project files rec.
+ * @details The index intentionally skips build/vendor/cache directories. They
+ *          are large, noisy, and usually generated, so indexing them would make
+ *          local references slower without improving the editor much.
+ * @param paths The paths supplied by the caller.
+ * @param seen The seen supplied by the caller.
+ * @param dir The dir supplied by the caller.
+ * @param depth The depth supplied by the caller.
+ * @param syntaxes The syntaxes supplied by the caller.
  */
 static void collect_project_files_rec(GPtrArray *paths, GHashTable *seen, const char *dir, guint depth, GPtrArray *syntaxes) {
-    if (!paths || !seen || !dir || depth > 8u || paths->len >= CLEAF_INDEX_MAX_PROJECT_FILES) return;
+    if (!paths || !seen || !dir || depth > 8u || paths->len >= GRAPTOS_INDEX_MAX_PROJECT_FILES) return;
     GDir *gdir = g_dir_open(dir, 0, NULL);
     if (!gdir) return;
     const char *name = NULL;
-    while ((name = g_dir_read_name(gdir)) != NULL && paths->len < CLEAF_INDEX_MAX_PROJECT_FILES) {
+    while ((name = g_dir_read_name(gdir)) != NULL && paths->len < GRAPTOS_INDEX_MAX_PROJECT_FILES) {
         if (strcmp(name, "build") == 0 || strcmp(name, "node_modules") == 0 || strcmp(name, ".git") == 0 ||
             strcmp(name, "dist") == 0 || strcmp(name, "target") == 0 || strcmp(name, "__pycache__") == 0 ||
             strcmp(name, ".cache") == 0 || strcmp(name, ".venv") == 0) continue;
@@ -205,13 +280,17 @@ static void collect_project_files_rec(GPtrArray *paths, GHashTable *seen, const 
 
 /**
  * @brief Collect project files for window.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param paths The paths supplied by the caller.
+ * @param seen The seen supplied by the caller.
+ * @param win The win supplied by the caller.
  */
 static void collect_project_files_for_window(GPtrArray *paths,
                                              GHashTable *seen,
                                              EditorWindow *win) {
     if (!paths || !seen || !win) return;
     guint count = project_root_count(win);
-    for (guint i = 0u; i < count && paths->len < CLEAF_INDEX_MAX_PROJECT_FILES; i++) {
+    for (guint i = 0u; i < count && paths->len < GRAPTOS_INDEX_MAX_PROJECT_FILES; i++) {
         const char *root = project_root_at(win, i);
         if (root) collect_project_files_rec(paths, seen, root, 0u, win->syntaxes);
     }
@@ -219,6 +298,12 @@ static void collect_project_files_for_window(GPtrArray *paths,
 
 /**
  * @brief Find in projects.
+ * @details Import and reference fallbacks often start from a basename. We scan
+ *          indexed project files for that name so local navigation works even
+ *          before an LSP server is configured.
+ * @param win The win supplied by the caller.
+ * @param basename The basename supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *find_in_projects(EditorWindow *win, const char *basename) {
     if (!win || !basename) return NULL;

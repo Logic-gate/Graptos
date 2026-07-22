@@ -1,6 +1,12 @@
 /**
  * @file src/app/app_file_search_actions.inc.c
- * @brief Cleaf app file search actions module.
+ * @brief Graptoς app file search actions module.
+ * @details The app window is the meeting point for most features. We keep that coordination
+ *          here so editor tabs, project state, dialogs, terminals, Git, and AI do not all
+ *          learn about each other directly.
+ * @param win The win supplied by the caller.
+ * @param visible The visible supplied by the caller.
+ * @param replace_mode The replace mode supplied by the caller.
  */
 
 void set_search_panel(EditorWindow *win, gboolean visible, gboolean replace_mode) {
@@ -23,6 +29,9 @@ void set_search_panel(EditorWindow *win, gboolean visible, gboolean replace_mode
 
 /**
  * @brief Action new.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_new(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -34,13 +43,16 @@ void action_new(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action open.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_open(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
     if (!win) return;
 
-    char *filename = cleaf_open_file_dialog(app_window_gtk(win), "Open File");
+    char *filename = graptos_open_file_dialog(app_window_gtk(win), "Open File");
     if (filename) {
         (void)app_window_open_file(win, filename);
         g_free(filename);
@@ -50,18 +62,22 @@ void action_open(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action open folder.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_open_folder(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
     if (!win) return;
 
-    char *folder = cleaf_select_folder_dialog(app_window_gtk(win),
+    char *folder = graptos_select_folder_dialog(app_window_gtk(win),
                                               "Open Project Folder");
     if (!folder) return;
 
     project_tree_load_folder(win, folder);
     if (win->project_revealer) {
+        gtk_widget_set_visible(win->project_revealer, TRUE);
         gtk_revealer_set_reveal_child(GTK_REVEALER(win->project_revealer),
                                       TRUE);
     }
@@ -76,34 +92,39 @@ void action_open_folder(GtkWidget *widget, gpointer user_data) {
 }
 
 /**
- * @brief Cleaf executable path.
+ * @brief Graptoς executable path.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
-static char *cleaf_executable_path(void) {
+static char *graptos_executable_path(void) {
     g_autoptr(GError) error = NULL;
     char *path = g_file_read_link("/proc/self/exe", &error);
     if (path) return path;
 
     const char *prgname = g_get_prgname();
     if (prgname && prgname[0] != '\0') return g_strdup(prgname);
-    return g_strdup("cleaf");
+    return g_strdup("graptos");
 }
 
 /**
  * @brief Action open folder new instance.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_open_folder_new_instance(GtkWidget *widget, gpointer user_data) {
     (void)widget;
     EditorWindow *win = user_data;
     if (!win) return;
 
-    g_autofree char *folder = cleaf_select_folder_dialog(app_window_gtk(win),
+    g_autofree char *folder = graptos_select_folder_dialog(app_window_gtk(win),
                                                          "Open Folder in New Instance");
     if (!folder) return;
 
-    g_autofree char *exe = cleaf_executable_path();
+    g_autofree char *exe = graptos_executable_path();
     if (!exe) {
         app_window_set_error_status(win, "Could not launch instance",
-                                    "Cleaf could not determine its executable path.");
+                                    "Graptoς could not determine its executable path.");
         return;
     }
 
@@ -125,6 +146,9 @@ void action_open_folder_new_instance(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action save.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_save(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -135,6 +159,9 @@ void action_save(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action save as.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_save_as(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -145,6 +172,9 @@ void action_save_as(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action show find.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_show_find(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -154,6 +184,9 @@ void action_show_find(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action show replace.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_show_replace(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -163,6 +196,9 @@ void action_show_replace(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action hide search.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_hide_search(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -172,6 +208,9 @@ void action_hide_search(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action find next.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_find_next(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -184,6 +223,9 @@ void action_find_next(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action find prev.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_find_prev(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -196,6 +238,9 @@ void action_find_prev(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action replace.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_replace(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -209,6 +254,9 @@ void action_replace(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action replace all.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_replace_all(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -222,6 +270,9 @@ void action_replace_all(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action comment.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_comment(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -232,6 +283,9 @@ void action_comment(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action reload syntax.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_reload_syntax(GtkWidget *widget, gpointer user_data) {
     // Syntax definitions are runtime files, so reload them without restarting the editor
@@ -242,6 +296,9 @@ void action_reload_syntax(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action syntax diagnostics.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_syntax_diagnostics(GtkWidget *widget, gpointer user_data) {
     //Should add functional diagnostics. This is just for show.
@@ -251,4 +308,3 @@ void action_syntax_diagnostics(GtkWidget *widget, gpointer user_data) {
     dialog_info(app_window_gtk(win), "Syntax Diagnostics", diag);
     g_free(diag);
 }
-

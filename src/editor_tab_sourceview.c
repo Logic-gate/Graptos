@@ -1,12 +1,18 @@
 /**
  * @file src/editor_tab_sourceview.c
- * @brief Cleaf editor tab sourceview module.
+ * @brief Graptoς editor tab sourceview module.
+ * @details GtkSourceView is the seam between our syntax/theme rules and GTK rendering. We
+ *          keep that seam narrow so highlight fixes do not leak into unrelated editor
+ *          behavior.
  */
 
 #include "editor_tab_private.h"
 
 /**
  * @brief Source language id for syntax.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param syntax The syntax definition used by the editor path.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static const char *source_language_id_for_syntax(SyntaxDef *syntax) {
     if (!syntax || !syntax->name) return NULL;
@@ -35,6 +41,9 @@ static const char *source_language_id_for_syntax(SyntaxDef *syntax) {
 
 /**
  * @brief Source language for tab.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static GtkSourceLanguage *source_language_for_tab(EditorTab *tab) {
     GtkSourceLanguageManager *manager = gtk_source_language_manager_get_default();
@@ -55,6 +64,9 @@ static GtkSourceLanguage *source_language_for_tab(EditorTab *tab) {
 
 /**
  * @brief Colour is dark.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param colour The colour supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean colour_is_dark(const char *colour) {
     GdkRGBA rgba;
@@ -67,6 +79,9 @@ static gboolean colour_is_dark(const char *colour) {
 
 /**
  * @brief Source style scheme for window.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param win The win supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static GtkSourceStyleScheme *source_style_scheme_for_window(EditorWindow *win) {
     GtkSourceStyleSchemeManager *manager =
@@ -91,6 +106,9 @@ static GtkSourceStyleScheme *source_style_scheme_for_window(EditorWindow *win) {
 
 /**
  * @brief Source parent scheme id for window.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param win The win supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static const char *source_parent_scheme_id_for_window(EditorWindow *win) {
     GtkSourceStyleSchemeManager *manager =
@@ -113,6 +131,10 @@ static const char *source_parent_scheme_id_for_window(EditorWindow *win) {
 
 /**
  * @brief String contains ci.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param text The text fragment supplied by the caller.
+ * @param needle The needle supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean string_contains_ci(const char *text, const char *needle) {
     if (!text || !needle || needle[0] == '\0') return FALSE;
@@ -123,9 +145,18 @@ static gboolean string_contains_ci(const char *text, const char *needle) {
     g_free(lower_needle);
     return found;
 }
+/**
+ * @brief Gtksource styles for yaml rule.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param rule_name The rule name supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
+ */
 
 /**
  * @brief Style names add.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param names The names supplied by the caller.
+ * @param name The name supplied by the caller.
  */
 static void style_names_add(GPtrArray *names, const char *name) {
     if (!names || !name || name[0] == '\0') return;
@@ -136,8 +167,16 @@ static void style_names_add(GPtrArray *names, const char *name) {
     g_ptr_array_add(names, g_strdup(name));
 }
 
-/*
- * YAML rule names are Cleaf concepts, while GtkSourceView exposes stable style
+/**
+ * @brief Map a Graptoς YAML rule name to GtkSourceView style IDs.
+ * @details YAML rule names are Graptoς concepts, while GtkSourceView exposes
+ *          stable style IDs such as def:keyword or markdown:header. This
+ *          mapping lets existing YAML files keep their semantic names without
+ *          reintroducing a second regex-based highlighter.
+ * @param rule_name The syntax rule name from a Graptoς YAML file.
+ * @return A newly allocated string array of GtkSourceView style IDs.
+ *
+ * YAML rule names are Graptoς concepts, while GtkSourceView exposes stable style
  * IDs such as def:keyword or markdown:header.  This mapping lets existing YAML
  * files keep their semantic names without reintroducing a second regex-based
  * highlighter.
@@ -245,15 +284,27 @@ static GPtrArray *gtksource_styles_for_yaml_rule(const char *rule_name) {
 
 /**
  * @brief Append xml escaped.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param out Output storage filled when the lookup succeeds.
+ * @param text The text fragment supplied by the caller.
  */
 static void append_xml_escaped(GString *out, const char *text) {
     char *escaped = g_markup_escape_text(text ? text : "", -1);
+/**
+ * @brief Yaml override style dir.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
+ */
     g_string_append(out, escaped ? escaped : "");
     g_free(escaped);
 }
 
 /**
  * @brief Append style from rule.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param xml The xml supplied by the caller.
+ * @param style_name The style name supplied by the caller.
+ * @param rule The rule supplied by the caller.
  */
 static void append_style_from_rule(GString *xml, const char *style_name, SyntaxRule *rule) {
     if (!xml || !style_name || !rule || !rule->color || rule->color[0] == '\0') return;
@@ -268,19 +319,29 @@ static void append_style_from_rule(GString *xml, const char *style_name, SyntaxR
     g_string_append(xml, "/>\n");
 }
 
-/*
+/**
+ * @brief Return the cache directory for generated YAML style overrides.
+ * @details GtkSourceView loads style schemes from files, not arbitrary in-memory
+ *          CSS. Graptoς writes override schemes under the user cache directory
+ *          so config and YAML colors can be represented without modifying
+ *          system language data.
+ * @return An owned directory path, or NULL when no cache base is available.
+ *
  * GtkSourceView loads style schemes from files, not arbitrary in-memory CSS.
- * Generate Cleaf override schemes under the user cache directory so config and
+ * Generate Graptoς override schemes under the user cache directory so config and
  * YAML colors can be represented without modifying system language data.
  */
 static char *yaml_override_style_dir(void) {
     const char *base = g_get_user_cache_dir();
     if (!base || base[0] == '\0') return NULL;
-    return g_build_filename(base, "cleaf", "gtksourceview", "styles", NULL);
+    return g_build_filename(base, "graptos", "gtksourceview", "styles", NULL);
 }
 
 /**
  * @brief Style slug from syntax name.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param name The name supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *style_slug_from_syntax_name(const char *name) {
     char *lower = g_ascii_strdown(name && name[0] ? name : "plain", -1);
@@ -293,6 +354,10 @@ static char *style_slug_from_syntax_name(const char *name) {
 
 /**
  * @brief Effective colour.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param value The value being parsed, stored, or applied.
+ * @param fallback The fallback supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static const char *effective_colour(const char *value, const char *fallback) {
     return (value && value[0] == '#') ? value : fallback;
@@ -300,6 +365,9 @@ static const char *effective_colour(const char *value, const char *fallback) {
 
 /**
  * @brief Source yaml override scheme for tab.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static GtkSourceStyleScheme *source_yaml_override_scheme_for_tab(EditorTab *tab) {
     if (!tab || !tab->win) return NULL;
@@ -314,7 +382,7 @@ static GtkSourceStyleScheme *source_yaml_override_scheme_for_tab(EditorTab *tab)
     const char *syntax_name = (tab->active_syntax && tab->active_syntax->name) ?
         tab->active_syntax->name : "plain";
     g_autofree char *slug = style_slug_from_syntax_name(syntax_name);
-    g_autofree char *id = g_strdup_printf("cleaf-config-%s-%s-%s",
+    g_autofree char *id = g_strdup_printf("graptos-config-%s-%s-%s",
                                           dark ? "dark" : "light",
                                           tab->win->use_yaml_style_overrides ? "yaml" : "plain",
                                           slug ? slug : "plain");
@@ -340,10 +408,10 @@ static GtkSourceStyleScheme *source_yaml_override_scheme_for_tab(EditorTab *tab)
     g_string_append(xml, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
     const char *parent_id = source_parent_scheme_id_for_window(tab->win);
     g_string_append_printf(xml,
-        "<style-scheme id=\"%s\" _name=\"Cleaf Config\" version=\"1.0\" parent-scheme=\"%s\">\n",
+        "<style-scheme id=\"%s\" _name=\"Graptoς Config\" version=\"1.0\" parent-scheme=\"%s\">\n",
         id, parent_id ? parent_id : "classic");
-    g_string_append(xml, "  <author>Cleaf</author>\n");
-    g_string_append(xml, "  <description>GtkSourceView highlighting using Cleaf config colours and optional YAML overrides.</description>\n");
+    g_string_append(xml, "  <author>Graptoς</author>\n");
+    g_string_append(xml, "  <description>GtkSourceView highlighting using Graptoς config colours and optional YAML overrides.</description>\n");
     g_string_append_printf(xml,
         "  <style name=\"text\" foreground=\"%s\" background=\"%s\"/>\n",
         fg, bg);
@@ -387,6 +455,11 @@ static GtkSourceStyleScheme *source_yaml_override_scheme_for_tab(EditorTab *tab)
     }
 
     GtkSourceStyleSchemeManager *manager = gtk_source_style_scheme_manager_get_default();
+/**
+ * @brief Tab update highlight engine.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ */
     GtkSourceStyleScheme *scheme = NULL;
     if (manager) {
         static gboolean search_path_added = FALSE;
@@ -406,17 +479,31 @@ static GtkSourceStyleScheme *source_yaml_override_scheme_for_tab(EditorTab *tab)
 }
 
 /**
- * @brief Clear cleaf transient tags.
+ * @brief Clear graptos transient tags.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
-static void clear_cleaf_transient_tags(EditorTab *tab) {
+static void clear_graptos_transient_tags(EditorTab *tab) {
     if (!tab || !tab->buffer) return;
     syntax_clear(tab->buffer, tab->win ? tab->win->syntaxes : NULL);
     if (tab->selection_matches_active) clear_selection_matches(tab);
-    if (tab->diagnostics_active) clear_syntax_diagnostics(tab);
+    if (tab->diagnostics_active &&
+        (!tab->active_syntax ||
+         !tab->active_syntax->lsp_command ||
+         tab->active_syntax->lsp_command[0] == '\0')) {
+        clear_syntax_diagnostics(tab);
+    }
     tab->custom_highlight_active = FALSE;
 }
 
-/*
+/**
+ * @brief Refresh the GtkSourceView language and style engine for a tab.
+ * @details Resetting language and scheme as one operation avoids mixed style
+ *          state where old text keeps one scheme while newly typed text uses
+ *          another. The transient Graptoς tags are cleared before the new
+ *          engine is applied so the buffer redraw starts from a clean base.
+ * @param tab The editor tab whose source buffer should be refreshed.
+ *
  * Reset language and scheme as one operation.  GtkSourceView otherwise keeps
  * parts of the old style state until later invalidation, which made old text
  * use one scheme while newly typed text used another.
@@ -424,8 +511,8 @@ static void clear_cleaf_transient_tags(EditorTab *tab) {
 void editor_tab_update_highlight_engine(EditorTab *tab) {
     if (!tab || !tab->source_buffer) return;
 
-    cleaf_source_cancel(&tab->highlight_timeout);
-    clear_cleaf_transient_tags(tab);
+    graptos_source_cancel(&tab->highlight_timeout);
+    clear_graptos_transient_tags(tab);
 
     gtk_source_buffer_set_highlight_syntax(tab->source_buffer, FALSE);
     gtk_source_buffer_set_language(tab->source_buffer, NULL);

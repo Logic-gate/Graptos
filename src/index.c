@@ -1,6 +1,9 @@
 /**
  * @file src/index.c
  * @brief Project/reference index public API and implementation composition unit.
+ * @details The index is our local memory of the project. It trades perfect semantic
+ *          knowledge for speed and predictability, which is the right fallback when
+ *          external tooling is absent or incomplete.
  */
 
 #include "index.h"
@@ -17,19 +20,19 @@
  * These caps keep project indexing from competing with text input on large
  * repositories or generated files.
  */
-#define CLEAF_INDEX_MAX_FILE_BYTES (768u * 1024u)
+#define GRAPTOS_INDEX_MAX_FILE_BYTES (768u * 1024u)
 /**
- * @brief Cleaf index max project files macro.
+ * @brief Graptoς index max project files macro.
  */
-#define CLEAF_INDEX_MAX_PROJECT_FILES 600u
+#define GRAPTOS_INDEX_MAX_PROJECT_FILES 600u
 /**
- * @brief Cleaf index max include depth macro.
+ * @brief Graptoς index max include depth macro.
  */
-#define CLEAF_INDEX_MAX_INCLUDE_DEPTH 2u
+#define GRAPTOS_INDEX_MAX_INCLUDE_DEPTH 2u
 /**
- * @brief Cleaf index max line macro.
+ * @brief Graptoς index max line macro.
  */
-#define CLEAF_INDEX_MAX_LINE 512u
+#define GRAPTOS_INDEX_MAX_LINE 512u
 
 #include "index/index_collect.inc.c"
 #include "index/index_candidates.inc.c"

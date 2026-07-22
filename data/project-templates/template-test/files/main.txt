@@ -1,0 +1,4 @@
+Project: ${project_name}
+Greeting: ${greeting}
+Author: ${author}
+Destination: ${project_dir}

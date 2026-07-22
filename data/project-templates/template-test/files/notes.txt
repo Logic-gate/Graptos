@@ -1,0 +1,5 @@
+Notes are enabled for ${project_name}.
+
+This file is controlled by:
+
+when: include_notes

@@ -1,6 +1,9 @@
 /**
  * @file src/editor_tab_io.c
- * @brief Cleaf editor tab io module.
+ * @brief Graptoς editor tab io module.
+ * @details Saving is not just writing bytes. Backups, autosave, disk errors, and title
+ *          state all depend on whether the filesystem operation really succeeded, so file
+ *          I/O stays separate from normal editing.
  */
 
 #include "editor_tab_private.h"
@@ -11,6 +14,11 @@
 
 /**
  * @brief Write all fd.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param fd The fd supplied by the caller.
+ * @param data The callback context passed by the caller.
+ * @param len The len supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean write_all_fd(int fd, const char *data, gsize len) {
     const char *cursor = data;
@@ -32,6 +40,11 @@ gboolean write_all_fd(int fd, const char *data, gsize len) {
 
 /**
  * @brief Write text atomic.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param path The filesystem path supplied by the caller.
+ * @param text The text fragment supplied by the caller.
+ * @param error Return location for an optional error; left untouched on success unless GTK sets it.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean write_text_atomic(const char *path, const char *text, GError **error) {
     if (!path || path[0] == '\0' || !text) return FALSE;
@@ -48,7 +61,7 @@ gboolean write_text_atomic(const char *path, const char *text, GError **error) {
     int fd = -1;
     for (guint attempt = 0u; attempt < 100u; attempt++) {
         g_free(tmp_path);
-        tmp_path = g_strdup_printf("%s/.cleaf-save-%ld-%u.tmp", dir, (long)getpid(), attempt);
+        tmp_path = g_strdup_printf("%s/.graptos-save-%ld-%u.tmp", dir, (long)getpid(), attempt);
         fd = open(tmp_path, O_CREAT | O_EXCL | O_WRONLY, mode);
         if (fd >= 0) break;
         if (errno != EEXIST) break;
@@ -88,12 +101,15 @@ gboolean write_text_atomic(const char *path, const char *text, GError **error) {
 
 /**
  * @brief Autosave path for tab.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 char *autosave_path_for_tab(EditorTab *tab) {
     if (!tab) return NULL;
     const char *cache = g_get_user_cache_dir();
     if (!cache) return NULL;
-    g_autofree char *dir = g_build_filename(cache, "cleaf", "autosave", NULL);
+    g_autofree char *dir = g_build_filename(cache, "graptos", "autosave", NULL);
     if (g_mkdir_with_parents(dir, 0700) != 0) {
         return NULL;
     }
@@ -111,6 +127,8 @@ char *autosave_path_for_tab(EditorTab *tab) {
 
 /**
  * @brief Cleanup legacy tilde backup.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param path The filesystem path supplied by the caller.
  */
 static void cleanup_legacy_tilde_backup(const char *path) {
     if (!path || path[0] == '\0') return;
@@ -121,7 +139,33 @@ static void cleanup_legacy_tilde_backup(const char *path) {
 }
 
 /**
+ * @brief Return whether the buffer already matches a file on disk.
+ * @details Autosave should be quiet when the modified flag is stale but the
+ *          actual text already reached disk. Comparing before writing avoids
+ *          refreshing timestamps, Git state, LSP saves, and status messages for
+ *          a document that has no real pending changes.
+ * @param tab The editor tab whose buffer is compared.
+ * @param path The filesystem path to read.
+ * @return TRUE when disk contents and buffer text are identical.
+ */
+static gboolean editor_tab_file_matches_buffer(EditorTab *tab,
+                                               const char *path) {
+    if (!tab || !path || path[0] == '\0') return FALSE;
+    g_autofree char *disk = NULL;
+    gsize disk_len = 0u;
+    if (!g_file_get_contents(path, &disk, &disk_len, NULL)) return FALSE;
+    g_autofree char *text = buffer_text(tab);
+    if (!text) return FALSE;
+    gsize text_len = strlen(text);
+    return disk_len == text_len && memcmp(disk, text, text_len) == 0;
+}
+
+/**
  * @brief Editor tab load file.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param path The filesystem path supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean editor_tab_load_file(EditorTab *tab, const char *path) {
     if (!tab || !path) return FALSE;
@@ -129,18 +173,24 @@ gboolean editor_tab_load_file(EditorTab *tab, const char *path) {
     gsize length = 0;
     g_autoptr(GError) error = NULL;
     if (!g_file_get_contents(path, &contents, &length, &error)) {
-        app_window_set_error_status(tab->win, "Could not open file",
-                                    error ? error->message : path);
+        app_window_report_error(tab->win, "Could not open file",
+                                error ? error->message : path, TRUE);
         return FALSE;
     }
     if (length > (gsize)G_MAXINT) {
-        app_window_set_error_status(tab->win, "File too large",
-                                    "This build refuses to load files larger than GTK's text-buffer insertion limit.");
+        app_window_report_error(
+            tab->win,
+            "File too large",
+            "This build refuses to load files larger than GTK's text-buffer insertion limit.",
+            TRUE);
         return FALSE;
     }
     if (!g_utf8_validate(contents, (gssize)length, NULL)) {
-        app_window_set_error_status(tab->win, "Unsupported encoding",
-                                    "Cleaf currently opens UTF-8 text files only. Convert the file to UTF-8 first.");
+        app_window_report_error(
+            tab->win,
+            "Unsupported encoding",
+            "Graptoς currently opens UTF-8 text files only. Convert the file to UTF-8 first.",
+            TRUE);
         return FALSE;
     }
 
@@ -148,6 +198,8 @@ gboolean editor_tab_load_file(EditorTab *tab, const char *path) {
     gtk_text_buffer_set_text(tab->buffer, contents, (gint)length);
     tab->applying_change = FALSE;
     g_free(tab->file_path);
+    g_clear_pointer(&tab->display_title, g_free);
+    g_clear_pointer(&tab->display_title_markup, g_free);
     tab->file_path = g_canonicalize_filename(path, NULL);
     cleanup_legacy_tilde_backup(tab->file_path);
     tab->modified = FALSE;
@@ -158,16 +210,22 @@ gboolean editor_tab_load_file(EditorTab *tab, const char *path) {
     update_gutter_width(tab);
     update_minimap_text(tab);
     editor_tab_auto_select_syntax(tab);
+    if (tab->win && tab->win->lsp_client) lsp_client_document_opened(tab->win->lsp_client, tab);
+    editor_tab_schedule_color_literals(tab);
     editor_tab_update_title(tab);
     editor_tab_update_status(tab);
     app_window_update_ui(tab->win);
-    cleaf_git_refresh_and_rebuild(tab->win);
+    graptos_git_refresh_and_rebuild(tab->win);
     return TRUE;
 }
 
 
 /**
  * @brief Write backup if needed.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param path The filesystem path supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean write_backup_if_needed(EditorTab *tab, const char *path) {
     if (!tab || !tab->backup_enabled || !path || !g_file_test(path, G_FILE_TEST_EXISTS)) return TRUE;
@@ -181,10 +239,10 @@ gboolean write_backup_if_needed(EditorTab *tab, const char *path) {
 
     g_autofree char *dir = g_path_get_dirname(path);
     g_autofree char *base = g_path_get_basename(path);
-    g_autofree char *backup_dir = g_build_filename(dir, ".cleaf-backups", NULL);
+    g_autofree char *backup_dir = g_build_filename(dir, ".graptos-backups", NULL);
     if (g_mkdir_with_parents(backup_dir, 0700) != 0) {
         g_autofree char *msg = g_strdup_printf("Could not create backup folder %s: %s", backup_dir, g_strerror(errno));
-        app_window_set_error_status(tab->win, "Backup failed", msg);
+        app_window_report_error(tab->win, "Backup failed", msg, TRUE);
         return FALSE;
     }
 
@@ -201,7 +259,7 @@ gboolean write_backup_if_needed(EditorTab *tab, const char *path) {
     gboolean ok = write_text_atomic(backup_path, old, &error);
     if (!ok) {
         g_autofree char *msg = g_strdup_printf("Could not write backup %s: %s", backup_path, error ? error->message : "unknown error");
-        app_window_set_error_status(tab->win, "Backup failed", msg);
+        app_window_report_error(tab->win, "Backup failed", msg, TRUE);
     }
 
     return ok;
@@ -210,6 +268,12 @@ gboolean write_backup_if_needed(EditorTab *tab, const char *path) {
 
 /**
  * @brief Save to path.
+ * @details Save updates more than the file on disk. Once the atomic write
+ *          succeeds, the tab path, syntax choice, undo baseline, LSP document,
+ *          Git status, and window controls all need to agree on the new truth.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param path The filesystem path supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean save_to_path(EditorTab *tab, const char *path) {
     if (!tab || !path || path[0] == '\0') return FALSE;
@@ -229,11 +293,13 @@ gboolean save_to_path(EditorTab *tab, const char *path) {
     g_autoptr(GError) error = NULL;
     gboolean ok = write_text_atomic(stable_path, text, &error);
     if (!ok) {
-        app_window_set_error_status(tab->win, "Could not save file",
-                                    error ? error->message : stable_path);
+        app_window_report_error(tab->win, "Could not save file",
+                                error ? error->message : stable_path, TRUE);
         return FALSE;
     }
     g_free(tab->file_path);
+    g_clear_pointer(&tab->display_title, g_free);
+    g_clear_pointer(&tab->display_title_markup, g_free);
     tab->file_path = g_canonicalize_filename(stable_path, NULL);
     cleanup_legacy_tilde_backup(tab->file_path);
     tab->modified = FALSE;
@@ -241,16 +307,24 @@ gboolean save_to_path(EditorTab *tab, const char *path) {
     tab->low_latency_mode_active = FALSE;
     reset_undo_state(tab);
     editor_tab_auto_select_syntax(tab);
+    if (tab->win && tab->win->lsp_client) {
+        lsp_client_document_opened(tab->win->lsp_client, tab);
+        lsp_client_document_saved(tab->win->lsp_client, tab);
+    }
     editor_tab_update_title(tab);
     editor_tab_update_status(tab);
     app_window_update_ui(tab->win);
-    cleaf_git_refresh_and_rebuild(tab->win);
+    graptos_git_refresh_and_rebuild(tab->win);
     return TRUE;
 }
 
 
 /**
  * @brief Editor tab save.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param force_dialog The force dialog supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean editor_tab_save(EditorTab *tab, gboolean force_dialog) {
     if (!tab) return FALSE;
@@ -260,10 +334,11 @@ gboolean editor_tab_save(EditorTab *tab, gboolean force_dialog) {
         return FALSE;
     }
     if (!force_dialog && tab->file_path) {
+        if (!tab->modified) return TRUE;
         return save_to_path(tab, tab->file_path);
     }
 
-    g_autofree char *filename = cleaf_save_file_dialog(app_window_gtk(tab->win),
+    g_autofree char *filename = graptos_save_file_dialog(app_window_gtk(tab->win),
                                                        "Save File");
     if (!filename) return FALSE;
 
@@ -272,59 +347,33 @@ gboolean editor_tab_save(EditorTab *tab, gboolean force_dialog) {
 
 
 /**
- * @brief Close dialog button.
- */
-static GtkWidget *close_dialog_button(const char *label, int response) {
-    return cleaf_flat_button_new(label, NULL,
-                                 G_CALLBACK(cleaf_modal_window_respond),
-                                 GINT_TO_POINTER(response));
-}
-
-/**
  * @brief Editor tab confirm close.
+ * @details Closing is the last chance to protect unsaved text. The dialog is
+ *          deliberately synchronous because the caller must know immediately
+ *          whether it can remove the notebook page and free the tab.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean editor_tab_confirm_close(EditorTab *tab) {
     if (!tab || !tab->modified) return TRUE;
 
     g_autofree char *base = editor_tab_basename(tab);
     g_autofree char *title = g_strdup_printf("Save changes to %s?", base);
-
-    GtkWidget *dialog = gtk_window_new();
-    gtk_widget_add_css_class(dialog, "cleaf-window");
-    gtk_window_set_title(GTK_WINDOW(dialog), "Unsaved Changes");
-    gtk_window_set_default_size(GTK_WINDOW(dialog), 460, 170);
-    gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
-    gtk_window_set_transient_for(GTK_WINDOW(dialog), app_window_gtk(tab->win));
-
-    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
-    gtk_widget_add_css_class(box, "cleaf-root");
-    cleaf_set_all_margins(box, 14);
-    gtk_window_set_child(GTK_WINDOW(dialog), box);
-
-    GtkWidget *title_label = gtk_label_new(title);
-    gtk_label_set_xalign(GTK_LABEL(title_label), 0.0f);
-    gtk_widget_add_css_class(title_label, "cleaf-menu-title");
-    gtk_box_append(GTK_BOX(box), title_label);
-
-    GtkWidget *detail = gtk_label_new(
-        "Unsaved changes will be lost if you discard them.");
-    gtk_label_set_xalign(GTK_LABEL(detail), 0.0f);
-    gtk_label_set_wrap(GTK_LABEL(detail), TRUE);
-    gtk_box_append(GTK_BOX(box), detail);
-
-    GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-    gtk_widget_set_halign(row, GTK_ALIGN_END);
-    gtk_box_append(GTK_BOX(row),
-                   close_dialog_button("Cancel", GTK_RESPONSE_CANCEL));
-    gtk_box_append(GTK_BOX(row),
-                   close_dialog_button("Discard", GTK_RESPONSE_REJECT));
-    gtk_box_append(GTK_BOX(row),
-                   close_dialog_button("Save", GTK_RESPONSE_ACCEPT));
-    gtk_box_append(GTK_BOX(box), row);
-
-    int response = cleaf_modal_window_run(GTK_WINDOW(dialog),
-                                          GTK_RESPONSE_CANCEL);
-    cleaf_widget_destroy(dialog);
+    GraptosDialogAction actions[] = {
+        { "Cancel", "Return to editing", GTK_RESPONSE_CANCEL, FALSE, TRUE },
+        { "Discard", "Close without saving", GTK_RESPONSE_REJECT, TRUE, FALSE },
+        { "Save", "Save and close", GTK_RESPONSE_ACCEPT, FALSE, FALSE },
+    };
+    int response = dialog_run_message(
+        app_window_gtk(tab->win),
+        "Unsaved Changes",
+        title,
+        "Unsaved changes will be lost if you discard them.",
+        460,
+        170,
+        actions,
+        G_N_ELEMENTS(actions),
+        GTK_RESPONSE_CANCEL);
 
     if (response == GTK_RESPONSE_ACCEPT) return editor_tab_save(tab, FALSE);
     if (response == GTK_RESPONSE_REJECT) return TRUE;
@@ -334,10 +383,24 @@ gboolean editor_tab_confirm_close(EditorTab *tab) {
 
 /**
  * @brief Editor tab auto save.
+ * @details Named files use the normal save path so LSP, Git, and title state
+ *          are refreshed. Untitled buffers go to an autosave file instead, so
+ *          we do not silently decide a permanent filename for the user.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean editor_tab_auto_save(EditorTab *tab) {
     if (!tab || !tab->modified) return TRUE;
-    if (tab->file_path) return save_to_path(tab, tab->file_path);
+    if (tab->file_path) {
+        if (editor_tab_file_matches_buffer(tab, tab->file_path)) {
+            tab->modified = FALSE;
+            editor_tab_update_title(tab);
+            editor_tab_update_status(tab);
+            app_window_update_ui(tab->win);
+            return TRUE;
+        }
+        return save_to_path(tab, tab->file_path);
+    }
 
     g_autofree char *path = autosave_path_for_tab(tab);
     if (!path) return FALSE;
@@ -345,8 +408,8 @@ gboolean editor_tab_auto_save(EditorTab *tab) {
     g_autoptr(GError) error = NULL;
     gboolean ok = write_text_atomic(path, text, &error);
     if (!ok) {
-        app_window_set_error_status(tab->win, "Auto-save failed",
-                                    error ? error->message : path);
+        app_window_report_error(tab->win, "Auto-save failed",
+                                error ? error->message : path, FALSE);
     } else if (tab->win) {
         g_autofree char *status = g_strdup_printf("Auto-saved unsaved buffer to %s", path);
         app_window_set_status(tab->win, status);

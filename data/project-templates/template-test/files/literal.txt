@@ -1,0 +1,3 @@
+This file is copied with render: false.
+The placeholder below should stay literal:
+${project_name}

@@ -1,12 +1,26 @@
 /**
  * @file src/index/index_candidates.inc.c
- * @brief Cleaf index candidates module.
+ * @brief Graptoς index candidates module.
+ * @details The index is our local memory of the project. It trades perfect semantic
+ *          knowledge for speed and predictability, which is the right fallback when
+ *          external tooling is absent or incomplete.
+ * @param paths The paths supplied by the caller.
+ * @param seen The seen supplied by the caller.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param text The text fragment supplied by the caller.
+ * @param depth The depth supplied by the caller.
  */
 
 static void collect_include_paths_from_text(GPtrArray *paths, GHashTable *seen, EditorTab *tab, const char *text, guint depth);
 
 /**
  * @brief Add include candidate.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param paths The paths supplied by the caller.
+ * @param seen The seen supplied by the caller.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param name The name supplied by the caller.
+ * @param system_include The system include supplied by the caller.
  */
 static void add_include_candidate(GPtrArray *paths, GHashTable *seen, EditorTab *tab, const char *name, gboolean system_include) {
     if (!paths || !seen || !tab || !name || name[0] == '\0') return;
@@ -38,9 +52,15 @@ static void add_include_candidate(GPtrArray *paths, GHashTable *seen, EditorTab 
 
 /**
  * @brief Collect include paths from text.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param paths The paths supplied by the caller.
+ * @param seen The seen supplied by the caller.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param text The text fragment supplied by the caller.
+ * @param depth The depth supplied by the caller.
  */
 static void collect_include_paths_from_text(GPtrArray *paths, GHashTable *seen, EditorTab *tab, const char *text, guint depth) {
-    if (!paths || !seen || !tab || !text || depth > CLEAF_INDEX_MAX_INCLUDE_DEPTH) return;
+    if (!paths || !seen || !tab || !text || depth > GRAPTOS_INDEX_MAX_INCLUDE_DEPTH) return;
     const char *p = text;
     while (*p) {
         const char *line_end = strchr(p, '\n');
@@ -83,6 +103,10 @@ static void collect_include_paths_from_text(GPtrArray *paths, GHashTable *seen, 
 
 /**
  * @brief Sort strings.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param a Pointer to the first candidate string pointer.
+ * @param b Pointer to the second candidate string pointer.
+ * @return The computed value requested by the caller.
  */
 static gint sort_strings(gconstpointer a, gconstpointer b) {
     const char *sa = *(char * const *)a;
@@ -92,11 +116,16 @@ static gint sort_strings(gconstpointer a, gconstpointer b) {
 
 /**
  * @brief Index candidates for tab.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param prefix The prefix supplied by the caller.
+ * @param max_results The max results supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 GPtrArray *index_candidates_for_tab(EditorTab *tab, const char *prefix, guint max_results) {
     if (max_results == 0u) max_results = 64u;
     GPtrArray *out = g_ptr_array_new_with_free_func(g_free);
-    if (!tab || !prefix || strlen(prefix) < 2u) return out;
+    if (!index_tab_available(tab) || !prefix || strlen(prefix) < 2u) return out;
     GHashTable *seen_words = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
 
     char *text = tab_text(tab);
@@ -123,4 +152,3 @@ GPtrArray *index_candidates_for_tab(EditorTab *tab, const char *prefix, guint ma
     g_free(text);
     return out;
 }
-

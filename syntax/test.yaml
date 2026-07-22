@@ -1,0 +1,510 @@
+# Graptoς test syntax definition.
+#
+# This file is intentionally verbose. It documents the syntax-definition shape
+# by example and gives us a harmless language that can be opened with a
+# `.graptos-test` file when parser/highlighter behavior needs manual testing.
+
+# Human-readable language name shown in Syntax menus and diagnostics.
+name: Graptoς Syntax Test
+
+# File extensions that activate this syntax.
+#
+# Options/shape:
+# - Use a YAML list of dot-prefixed extensions: [.c, .h, .zig].
+# - Extension matching is path-based and does not include the filename dot in
+#   user-visible language names.
+# - Keep entries lowercase unless a language genuinely needs case-sensitive
+#   file naming.
+#
+# The fake extension keeps this definition from taking over normal project
+# files.
+extensions: [.graptos-test]
+
+# Single-line comment marker.
+#
+# Options/shape:
+# - Any string token may be used: "#", "//", ";", "--", "%", "<!--".
+# - Use an empty string when the language has no line comment form.
+# - This is not a list; Graptoς currently has one primary line-comment marker
+#   per syntax.
+#
+# Diagnostics, formatter protection, and the comment/uncomment action use this
+# value.
+line_comment: "#"
+
+# Icon policy used by the project tree.
+#
+# Options/shape:
+# - `mime`: use the platform MIME/icon-theme lookup.
+# - Any other non-empty value is treated as a literal icon/badge name by callers
+#   that choose to render syntax-provided icons.
+# - Empty or missing falls back to `mime`.
+#
+# Most bundled syntaxes use `mime` because the project tree already has strong
+# extension and content-type icon fallbacks.
+icon: mime
+
+# Exact filenames that activate this syntax even when the extension does not
+# match.
+#
+# Options/shape:
+# - Use a YAML list of basenames: [Makefile, Dockerfile, README].
+# - Do not include directory names.
+# - Empty means extension matching only.
+#
+# This is empty because the test syntax should be opt-in only.
+filenames: []
+
+# Enables Graptoς's lightweight symbol index for files using this syntax.
+#
+# Options:
+# - true: project search/reference indexing may scan this language.
+# - false: skip this language in the lightweight index.
+index: true
+
+# Import resolver style.
+#
+# Options currently used by bundled syntaxes:
+# - `generic`: path-like import resolution.
+# - `c_include`: C/C++ `#include` style resolution.
+# - `python_module`: Python module/path resolution.
+# - `zig_import`: Zig `@import("path")` style resolution.
+#
+# Other values are parsed but only become useful when the resolver implements
+# them. `generic` is the safe default for test and data syntaxes.
+import_style: generic
+
+# Optional language-server command.
+#
+# Options/shape:
+# - Empty or missing disables LSP for this syntax.
+# - A bare executable name uses PATH lookup, e.g. `clangd`, `zls`, `pylsp`.
+# - An absolute path pins a specific server binary.
+#
+# Empty keeps LSP disabled for this test language while still documenting where
+# a real language would declare it.
+lsp_command:
+
+# Optional LSP language id sent in textDocument/didOpen.
+#
+# Options/shape:
+# - Empty means Graptoς falls back to the lowercased syntax name.
+# - Common values include `c`, `cpp`, `zig`, `python`, `rust`, `go`,
+#   `javascript`, `typescript`, `html`, `css`, `json`, `yaml`, and `toml`.
+#
+# Empty here because the test language does not have a language server.
+lsp_language_id:
+
+# Optional arguments appended after lsp_command when spawning the server.
+#
+# Options/shape:
+# - YAML list of command arguments.
+# - Examples: [lsp, stdio], [--stdio], [].
+# - Do not include the command itself here; use lsp_command for that.
+lsp_args: []
+
+# Static completion words merged into the Graptoς completion list. These are
+# deliberately artificial so it is obvious when the test syntax is active.
+completions: [alpha, beta, gamma, TODO, NOTE, sample_function, TestSymbol]
+
+# Enables indentation hints from indent_openers and indent_closers.
+#
+# Options:
+# - true: Graptoς may infer indentation from this syntax.
+# - false: no syntax-driven auto-indent.
+auto_indent: true
+
+# Tokens that increase indentation after the line containing them.
+#
+# Options/shape:
+# - YAML list of strings.
+# - Common values: ["{"], [":"], ["do"].
+# - Empty means this syntax has no opener-driven indentation.
+indent_openers: ["{"]
+
+# Tokens that decrease indentation before the line containing them.
+#
+# Options/shape:
+# - YAML list of strings.
+# - Common values: ["}"], ["end"], [].
+# - The token normally appears as the first non-space text on the line.
+indent_closers: ["}"]
+
+# Character pairs inserted by the editor when the opening character is typed.
+#
+# Options/shape:
+# - YAML list of `open=>close` strings.
+# - Common pairs: "(=>)", "{=>}", "[=>]", '"=>"', "'=>'".
+# - Empty disables syntax-specific pairs and lets editor fallback pairs decide.
+#
+# The `open=>close` form is the internal Graptoς close-pair format.
+close_pairs: ["(=>)", "{=>}", "[=>]", '"=>"', "'=>'"]
+
+# Whole-line pairs inserted for languages with line-oriented constructs.
+#
+# Options/shape:
+# - YAML list of `open=>close` strings.
+# - Example from C-style includes: ["#include <=>>"].
+# - Empty means no line-local close-pair diagnostics/insertions.
+#
+# Empty here because this test language has no include-style line pair.
+line_close_pairs: []
+
+# Statement terminators used by syntax diagnostics and the formatter when
+# formatting is enabled.
+#
+# Options/shape:
+# - YAML list of strings.
+# - Common values: [";"], [], [";","}"].
+# - Empty disables missing-terminator diagnostics.
+statement_required_enders: [";"]
+
+# Lines beginning with these prefixes are exempt from missing-statement-ending
+# diagnostics.
+#
+# Options/shape:
+# - YAML list of string prefixes.
+# - Common examples: ["#", "@", "if ", "for ", "while ", "return"].
+# - These are diagnostic hints, not formatter layout rules.
+statement_exempt_prefixes: ["#", "@", "if ", "while ", "for ", "function "]
+
+# Lines ending with these suffixes are treated as complete even without a
+# required statement ender.
+#
+# Options/shape:
+# - YAML list of string suffixes.
+# - Common examples: ["{", "}", ")", "]", ":" , "\\"].
+# - These are diagnostic hints, not formatter layout rules.
+statement_exempt_suffixes: ["{", "}", ")", "]"]
+
+# Keywords that introduce import/path references.
+#
+# Options/shape:
+# - YAML list of words or tokens.
+# - Common values: [include], [import], [require], [use].
+import_keywords: [include, import]
+
+# Keywords used by languages with `from X import Y` style imports.
+#
+# Options/shape:
+# - YAML list of words.
+# - Common value: [from].
+# - Empty for languages without from/import syntax.
+import_from_keywords: [from]
+
+# Keywords that introduce imported members from a module.
+#
+# Options/shape:
+# - YAML list of words.
+# - Common value: [import].
+# - Empty when the resolver should not attempt member extraction.
+import_member_keywords: [import]
+
+# Search roots for import resolution. `.` means the current project or file
+# directory is considered first.
+#
+# Options/shape:
+# - YAML list of paths.
+# - Relative paths are resolved from project/file context.
+# - Environment placeholders such as $VIRTUAL_ENV are supported by resolver
+#   code that expands configured roots.
+import_roots: [.]
+
+# Environment variables that can add import search roots.
+#
+# Options/shape:
+# - YAML list of environment variable names.
+# - Values may contain platform path lists.
+import_env: [GRAPTOS_TEST_PATH]
+
+# File extensions considered while resolving imports.
+#
+# Options/shape:
+# - YAML list of extensions.
+# - Include the dot: [.h, .hpp, .py, .zig].
+import_extensions: [.graptos-test, .txt]
+
+# Files treated as module/member entry points inside an import directory.
+#
+# Options/shape:
+# - YAML list of basenames.
+# - Common examples: [__init__.py], [mod.rs], [index.js].
+import_member_files: [index.graptos-test]
+
+# Whether import resolution should drop extensions when comparing module names.
+#
+# Options:
+# - true: `foo.py` may be suggested as/imported as `foo`.
+# - false: keep extension text visible.
+import_strip_extensions: true
+
+# Whether dotted module names should be converted into paths.
+#
+# Options:
+# - true: `a.b` may resolve as `a/b`.
+# - false: dots are kept as literal module text.
+import_dot_modules: true
+
+# Optional static module/member map. The `module=a|b` form lets autocomplete
+# offer `a` and `b` after a module-like prefix.
+#
+# Options/shape:
+# - YAML list of `module=member|member|member` rows.
+# - Empty disables static module member completions.
+import_static_modules: [test=alpha|beta|gamma]
+
+# Formatter settings are optional. This test syntax enables a conservative
+# C-like profile so Ctrl+J can be tested against fake code without touching
+# real language definitions.
+formatting:
+  # Master switch.
+  #
+  # Options:
+  # - true: Ctrl+J may format this syntax.
+  # - false: Ctrl+J returns without edits.
+  # - Missing formatting section: formatting is disabled.
+  enabled: true
+
+  # Formatting target policy.
+  #
+  # Options:
+  # - selection_or_block: format selected text when present; otherwise format
+  #   the surrounding block.
+  scope: selection_or_block
+
+  # Generic formatter profile. `brace_semicolon` is the C-like Graptoς profile
+  # for brace-delimited languages with semicolon-terminated statements.
+  #
+  # Valid options:
+  # - brace_semicolon
+  # - brace_optional_semicolon
+  # - indent_colon
+  # - markup
+  # - data
+  # - plain
+  profile: brace_semicolon
+
+  # Block style used by the formatter. `braces` means structural blocks are
+  # delimited by opener/closer tokens such as `{` and `}`.
+  #
+  # Valid options:
+  # - braces
+  # - indent
+  # - tags
+  # - none
+  block_style: braces
+
+  # Statement layout policy. `semicolon` allows statement_required_enders to
+  # create physical line breaks.
+  #
+  # Valid options:
+  # - semicolon
+  # - optional_semicolon
+  # - newline
+  # - none
+  statement_style: semicolon
+
+  # Opening brace placement.
+  #
+  # Valid options:
+  # - attach
+  # - allman
+  # - stroustrup
+  brace_style: attach
+
+  # Splits `a(); b();` into separate physical lines when safe.
+  #
+  # Options: true or false.
+  one_statement_per_line: true
+
+  # Inserts a space before a configured block opener, e.g. `if (x) {`.
+  #
+  # Options: true or false.
+  space_before_block_opener: true
+
+  # Inserts one space after commas outside protected regions.
+  #
+  # Options: true or false.
+  space_after_comma: true
+
+  # Inserts a space after control keywords such as `if` and `while`.
+  #
+  # Options: true or false.
+  space_after_control_keyword: true
+
+  # Normalizes spacing around configured binary operators.
+  #
+  # Options: true or false.
+  space_around_binary_operators: true
+
+  # Normalizes spacing around configured word-style logical operators.
+  #
+  # Options: true or false.
+  space_around_logical_operators: true
+
+  # Word-style logical operators for spacing normalization.
+  #
+  # Options/shape:
+  # - YAML list of strings.
+  # - Examples: [and, or], ["&&", "||"], [].
+  logical_operators: [and, or]
+
+  # Symbol operators for spacing normalization.
+  #
+  # Options/shape:
+  # - YAML list of strings.
+  # - The formatter only spaces operators listed here.
+  binary_operators: ["+", "-", "*", "/", "%", "=", "==", "!=", "<", ">", "<=", ">="]
+
+  # Prefix operators that should not be spaced like binary operators.
+  #
+  # Options/shape:
+  # - YAML list of strings.
+  # - Examples: ["!", "~"], ["not"], [].
+  unary_prefix_operators: ["!", "-"]
+
+  # Syntax scopes that the formatter must copy without structural changes.
+  #
+  # Supported protected scopes in the formatter:
+  # - comment
+  # - string
+  # - character
+  # - preprocessor
+  #
+  # Missing or empty means the formatter falls back to protecting its defaults.
+  protected_scopes: [comment, string, character, preprocessor]
+
+  # Pointer alignment style for declaration-like `*` tokens.
+  #
+  # Valid options:
+  # - name: `char *text`
+  # - type: `char* text`
+  # - middle: `char * text`
+  pointer_alignment: name
+
+  # Extra indentation width for wrapped/continued expressions.
+  #
+  # Options/shape:
+  # - Unsigned integer.
+  # - This is not the normal tab width; normal indent width comes from editor
+  #   preferences.
+  continuation_indent: 4
+
+  # Preferred maximum column before comma-wrap behavior may split a line.
+  #
+  # Options/shape:
+  # - Unsigned integer.
+  # - 0 disables column-based wrapping.
+  max_column: 100
+
+  # Allows wrapping after commas when max_column is exceeded.
+  #
+  # Options: true or false.
+  wrap_after_comma: true
+
+  # Switch/case indentation offset. Zero keeps case labels aligned with the
+  # switch body policy used by Graptoς's default C style.
+  #
+  # Options/shape:
+  # - Signed integer.
+  case_indent: 0
+
+  # Preserves blank lines instead of collapsing all vertical space.
+  #
+  # Options: true or false.
+  preserve_blank_lines: true
+
+  # Maximum consecutive blank lines to preserve. Zero means no extra blank
+  # lines are kept by this test profile.
+  #
+  # Options/shape:
+  # - Unsigned integer.
+  max_blank_lines: 0
+
+  # Controls whether `{ }` may become `{}`. Disabled to avoid compacting blocks
+  # during tests.
+  #
+  # Options: true or false.
+  collapse_empty_blocks: false
+
+# Highlighting rules are evaluated by the syntax highlighter. Rule order matters
+# because broad patterns can visually overlap narrower ones.
+rules:
+  # Full-line and inline comments.
+  #
+  # Rule fields:
+  # - name: unique-ish label used in diagnostics and debugging.
+  # - scope: optional semantic category. Formatter-recognized scopes are
+  #   comment, string, character, and preprocessor. Other scope names are
+  #   allowed but currently only act as metadata.
+  # - pattern: GLib/GRegex pattern.
+  # - color: CSS-style color string.
+  # - bold, italic, underline: optional booleans.
+  - name: comment
+    scope: comment
+    pattern: "#.*$"
+    color: "#6A9955"
+    italic: true
+
+  # Double-quoted and single-quoted strings, including escaped characters.
+  - name: string
+    scope: string
+    pattern: "\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'"
+    color: "#CE9178"
+
+  # Character literals. This exists separately from string so formatter tests
+  # can verify the `character` protected scope.
+  - name: character
+    scope: character
+    pattern: "'(?:\\\\.|[^'\\\\])'"
+    color: "#D7BA7D"
+
+  # Preprocessor-like line. This documents the protected preprocessor scope
+  # even though the test language is not C.
+  - name: preprocessor
+    scope: preprocessor
+    pattern: "^[[:space:]]*@[A-Za-z_][A-Za-z0-9_]*.*$"
+    color: "#C586C0"
+    bold: true
+
+  # Keywords for fake control flow and declarations.
+  - name: keyword
+    pattern: "(?<![A-Za-z0-9_])(if|else|while|for|return|function|let|const|include|import|from|and|or|not)(?![A-Za-z0-9_])"
+    color: "#569CD6"
+    bold: true
+
+  # Function calls, detected by an identifier followed by an opening parenthesis.
+  - name: function-call
+    pattern: (?<![A-Za-z0-9_])[A-Za-z_][A-Za-z0-9_]*[[:space:]]*(?=\()
+    color: "#DCDCAA"
+
+  # Type-like names that start with an uppercase letter.
+  - name: type-name
+    pattern: "(?<![A-Za-z0-9_])[A-Z][A-Za-z0-9_]*(?![A-Za-z0-9_])"
+    color: "#4EC9B0"
+
+  # Decimal and floating-point numbers.
+  - name: number
+    pattern: "(?<![A-Za-z0-9_])-?[0-9]+(?:\\.[0-9]+)?(?![A-Za-z0-9_])"
+    color: "#B5CEA8"
+
+  # Operators used by the formatter spacing tests.
+  - name: operator
+    pattern: (==|!=|<=|>=|&&|\|\||[+\-*/%=<>])
+    color: "#D4D4D4"
+
+  # Brackets and braces for structural highlighting.
+  - name: bracket
+    pattern: "[(){}\\[\\]]"
+    color: "#FFD700"
+
+  # Punctuation that appears in common formatter cases.
+  - name: punctuation
+    pattern: "[,;.:]"
+    color: "#D4D4D4"
+
+  # Conventional notes inside comments or test text.
+  - name: todo-note
+    pattern: "(?<![A-Za-z0-9_])(TODO|FIXME|BUG|HACK|NOTE|XXX|REVIEW)(?![A-Za-z0-9_])"
+    color: "#D7BA7D"
+    bold: true

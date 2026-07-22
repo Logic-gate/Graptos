@@ -1,0 +1,49 @@
+version: 1
+id: rust-cli
+name: Rust Command-Line Application
+description: Cargo-based Rust application with a small library surface for tests.
+language: Rust
+
+variables:
+  crate_name:
+    label: Crate name
+    type: text
+    default: ${project_ident}
+
+  initialize_git:
+    label: Initialize Git repository
+    type: boolean
+    default: true
+
+  license:
+    label: License
+    type: choice
+    values: [AGPL-3.0, MIT, Apache-2.0]
+    default: AGPL-3.0
+
+directories:
+  - src
+
+files:
+  - path: Cargo.toml
+    template: files/Cargo.toml
+
+  - path: src/main.rs
+    template: files/main.rs
+
+  - path: src/lib.rs
+    template: files/lib.rs
+
+  - path: README.md
+    template: files/README.md
+
+  - path: .gitignore
+    template: files/gitignore
+
+actions:
+  - type: git-init
+    when: initialize_git
+
+open:
+  project: .
+  file: src/main.rs

@@ -1,0 +1,31 @@
+version: 1
+id: c-minimal
+name: C Minimal
+description: Small C program with a Makefile.
+language: C
+
+variables:
+  executable_name:
+    label: Executable name
+    type: text
+    default: ${project_slug}
+
+  initialize_git:
+    label: Initialize Git repository
+    type: boolean
+    default: true
+
+files:
+  - path: main.c
+    template: files/main.c
+
+  - path: Makefile
+    template: files/Makefile
+
+actions:
+  - type: git-init
+    when: initialize_git
+
+open:
+  project: .
+  file: main.c

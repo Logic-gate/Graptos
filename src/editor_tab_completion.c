@@ -1,98 +1,304 @@
 /**
  * @file src/editor_tab_completion.c
- * @brief Cleaf editor tab completion module.
+ * @brief Graptoς editor tab completion module.
+ * @details Completion has to feel instant even when LSP is slow or missing. We keep the
+ *          local fallback and UI merge logic close to the tab, then let smarter providers
+ *          feed into it when they have useful answers.
  */
 
 #include "editor_tab_private.h"
 
 /**
  * @brief Completion add row with detail.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param word The symbol text being matched.
+ * @param detail The detail supplied by the caller.
  */
 static void completion_add_row_with_detail(EditorTab *tab, const char *word, const char *detail);
+/**
+ * @brief Completion add source header.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param label_text The label text supplied by the caller.
+ */
+static void completion_add_source_header(EditorTab *tab, const char *label_text);
+
+/**
+ * @brief Completion result source.
+ */
+typedef enum {
+    COMPLETION_SOURCE_GRAPTOS, /**< Graptoς YAML/index/import source. */
+    COMPLETION_SOURCE_LSP /**< Language Server Protocol source. */
+} CompletionSource;
+
+/**
+ * @brief Completion candidate with source metadata.
+ */
+typedef struct {
+    char *word; /**< Insertable completion text. */
+    CompletionSource source; /**< Candidate source. */
+} CompletionCandidate;
+
+/**
+ * @brief Free a completion candidate.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param data The callback context passed by the caller.
+ */
+static void completion_candidate_free(gpointer data) {
+    CompletionCandidate *candidate = data;
+    if (!candidate) return;
+    g_free(candidate->word);
+    g_free(candidate);
+}
+
+/**
+ * @brief Member access completion context.
+ */
+typedef struct {
+    gboolean active; /**< Whether member completion is active. */
+    char *base; /**< Visible base before the dot. */
+    char *prefix; /**< Member prefix after the dot. */
+} MemberCompletionContext;
 
 /**
  * @brief Completion contains.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param items The items supplied by the caller.
+ * @param word The symbol text being matched.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean completion_contains(GPtrArray *items, const char *word) {
     if (!items || !word) return FALSE;
     for (guint i = 0u; i < items->len; i++) {
-        const char *existing = g_ptr_array_index(items, i);
-        if (existing && strcmp(existing, word) == 0) return TRUE;
+        CompletionCandidate *existing = g_ptr_array_index(items, i);
+        if (existing && existing->word && strcmp(existing->word, word) == 0) return TRUE;
     }
     return FALSE;
 }
 
 /**
- * @brief Completion copy candidates.
+ * @brief Add a sourced completion candidate.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param items The items supplied by the caller.
+ * @param word The symbol text being matched.
+ * @param source The source supplied by the caller.
  */
-static void completion_copy_candidates(GPtrArray *dst, GPtrArray *src) {
+static void completion_add_sourced(GPtrArray *items,
+                                   const char *word,
+                                   CompletionSource source) {
+    if (!items || !word || word[0] == '\0') return;
+    if (completion_contains(items, word)) return;
+    CompletionCandidate *candidate = g_new0(CompletionCandidate, 1);
+    if (!candidate) return;
+    candidate->word = g_strdup(word);
+    candidate->source = source;
+    g_ptr_array_add(items, candidate);
+}
+
+/**
+ * @brief Completion copy candidates.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param dst The dst supplied by the caller.
+ * @param src The src supplied by the caller.
+ * @param source The source supplied by the caller.
+ */
+static void completion_copy_candidates(GPtrArray *dst,
+                                       GPtrArray *src,
+                                       CompletionSource source) {
     if (!dst || !src) return;
     for (guint i = 0u; i < src->len; i++) {
         const char *candidate = g_ptr_array_index(src, i);
-        if (candidate && candidate[0] != '\0') {
-            g_ptr_array_add(dst, g_strdup(candidate));
-        }
+        completion_add_sourced(dst, candidate, source);
     }
 }
 
 /**
  * @brief Completion merge imports.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param dst The dst supplied by the caller.
+ * @param imports The imports supplied by the caller.
+ * @param source The source supplied by the caller.
  */
-static void completion_merge_imports(GPtrArray *dst, GPtrArray *imports) {
+static void completion_merge_imports(GPtrArray *dst,
+                                     GPtrArray *imports,
+                                     CompletionSource source) {
     if (!dst || !imports) return;
     for (guint i = 0u; i < imports->len; i++) {
         const char *candidate = g_ptr_array_index(imports, i);
-        if (!candidate || candidate[0] == '\0') continue;
-        if (!completion_contains(dst, candidate)) {
-            g_ptr_array_add(dst, g_strdup(candidate));
-        }
+        completion_add_sourced(dst, candidate, source);
     }
 }
 
 /**
+ * @brief Clear a member completion context.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param ctx The ctx supplied by the caller.
+ */
+static void member_completion_context_clear(MemberCompletionContext *ctx) {
+    if (!ctx) return;
+    g_clear_pointer(&ctx->base, g_free);
+    g_clear_pointer(&ctx->prefix, g_free);
+    ctx->active = FALSE;
+}
+
+/**
+ * @brief Read the identifier immediately before an iterator.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param iter The text iterator that anchors the lookup.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
+ */
+static char *identifier_before_iter(GtkTextIter *iter) {
+    if (!iter) return NULL;
+    GtkTextIter start = *iter;
+    while (!gtk_text_iter_starts_line(&start)) {
+        GtkTextIter prev = start;
+        if (!gtk_text_iter_backward_char(&prev)) break;
+        gunichar ch = gtk_text_iter_get_char(&prev);
+        if (!completion_is_word_char(ch)) break;
+        start = prev;
+    }
+    if (gtk_text_iter_equal(&start, iter)) return NULL;
+    return gtk_text_buffer_get_text(gtk_text_iter_get_buffer(iter),
+                                    &start,
+                                    iter,
+                                    FALSE);
+}
+
+/**
+ * @brief Detect member access completion before the cursor.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param buffer The text buffer used for the operation.
+ * @param prefix_start The prefix start supplied by the caller.
+ * @param prefix The prefix supplied by the caller.
+ * @param ctx The ctx supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
+ */
+static gboolean member_completion_context_at_cursor(GtkTextBuffer *buffer,
+                                                    GtkTextIter *prefix_start,
+                                                    const char *prefix,
+                                                    MemberCompletionContext *ctx) {
+    if (!buffer || !prefix_start || !ctx) return FALSE;
+
+    GtkTextIter dot = *prefix_start;
+    if (!gtk_text_iter_backward_char(&dot)) return FALSE;
+    if (gtk_text_iter_get_char(&dot) != (gunichar)'.') return FALSE;
+
+    GtkTextIter base_end = dot;
+    char *base = identifier_before_iter(&base_end);
+    if (!base || base[0] == '\0') {
+        g_free(base);
+        return FALSE;
+    }
+
+    ctx->active = TRUE;
+    ctx->base = base;
+    ctx->prefix = g_strdup(prefix ? prefix : "");
+    return TRUE;
+}
+
+/**
  * @brief Completion merge indexed.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param dst The dst supplied by the caller.
+ * @param prefix The prefix supplied by the caller.
  */
 static void completion_merge_indexed(EditorTab *tab, GPtrArray *dst,
                                      const char *prefix) {
     if (!tab || !dst || !prefix) return;
     GPtrArray *indexed = index_candidates_for_tab(
-        tab, prefix, CLEAF_COMPLETION_DEFAULT_MAX_RESULTS);
+        tab, prefix, GRAPTOS_COMPLETION_DEFAULT_MAX_RESULTS);
     if (!indexed) return;
 
     for (guint i = 0u; i < indexed->len; i++) {
-        completion_candidates_add(dst, g_ptr_array_index(indexed, i),
-                                  prefix,
-                                  CLEAF_COMPLETION_DEFAULT_MAX_RESULTS);
+            completion_add_sourced(dst,
+                                   g_ptr_array_index(indexed, i),
+                                   COMPLETION_SOURCE_GRAPTOS);
     }
     g_ptr_array_free(indexed, TRUE);
 }
 
 /**
  * @brief Completion build candidates.
+ * @details LSP gets first chance because it has real language knowledge. Local
+ *          Graptoς candidates stay in the same list as a fallback, and source
+ *          headers are preserved so the user can see which engine answered.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param prefix The prefix supplied by the caller.
+ * @param import_context The import context supplied by the caller.
+ * @param member_context The member context supplied by the caller.
+ * @param imports The imports supplied by the caller.
+ * @param manual The manual supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static GPtrArray *completion_build_candidates(EditorTab *tab,
                                               const char *prefix,
                                               gboolean import_context,
+                                              gboolean member_context,
                                               GPtrArray *imports,
                                               gboolean manual) {
-    if (import_context) {
-        GPtrArray *items = g_ptr_array_new_with_free_func(g_free);
-        completion_copy_candidates(items, imports);
+    GPtrArray *lsp_items = NULL;
+    if (tab->win && tab->win->lsp_client && tab->file_path) {
+        lsp_items = lsp_client_completion_candidates(
+            tab->win->lsp_client,
+            tab,
+            prefix,
+            member_context,
+            GRAPTOS_COMPLETION_DEFAULT_MAX_RESULTS);
+    }
+    guint lsp_item_count = lsp_items ? lsp_items->len : 0u;
+
+    if (import_context || member_context) {
+        GPtrArray *items = g_ptr_array_new_with_free_func(completion_candidate_free);
+        completion_copy_candidates(items, lsp_items, COMPLETION_SOURCE_LSP);
+        completion_copy_candidates(items, imports, COMPLETION_SOURCE_GRAPTOS);
+        if (lsp_items) g_ptr_array_free(lsp_items, TRUE);
+        if (tab->win && tab->win->debug_mode) {
+            g_message("LSP completion UI: prefix=%s lsp_first_items=%u final_items=%u manual=%d import=%d member=%d",
+                      prefix ? prefix : "",
+                      lsp_item_count,
+                      items ? items->len : 0u,
+                      manual ? 1 : 0,
+                      import_context ? 1 : 0,
+                      member_context ? 1 : 0);
+        }
         return items;
     }
 
-    GPtrArray *items = completion_candidates_new(
-        tab->buffer, tab->active_syntax, prefix,
-        CLEAF_COMPLETION_DEFAULT_MAX_RESULTS);
+    GPtrArray *items = g_ptr_array_new_with_free_func(completion_candidate_free);
     if (!items) return NULL;
 
-    completion_merge_imports(items, imports);
+    completion_copy_candidates(items, lsp_items, COMPLETION_SOURCE_LSP);
+    if (lsp_items) g_ptr_array_free(lsp_items, TRUE);
+
+    if (items->len == 0u) {
+        GPtrArray *yaml_items = completion_candidates_new(
+            tab->buffer, tab->active_syntax, prefix,
+            GRAPTOS_COMPLETION_DEFAULT_MAX_RESULTS);
+        completion_merge_imports(items, yaml_items, COMPLETION_SOURCE_GRAPTOS);
+        if (yaml_items) g_ptr_array_free(yaml_items, TRUE);
+    }
+    completion_merge_imports(items, imports, COMPLETION_SOURCE_GRAPTOS);
     if (manual) completion_merge_indexed(tab, items, prefix);
+    if (tab->win && tab->win->debug_mode) {
+        g_message("LSP completion UI: prefix=%s lsp_first_items=%u final_items=%u manual=%d import=%d member=%d",
+                  prefix ? prefix : "",
+                  lsp_item_count,
+                  items ? items->len : 0u,
+                  manual ? 1 : 0,
+                  import_context ? 1 : 0,
+                  member_context ? 1 : 0);
+    }
     return items;
 }
 
 /**
  * @brief Completion line has word boundary.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param line The zero-based or display line handled by the caller, matching the surrounding API.
+ * @param word The symbol text being matched.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean completion_line_has_word_boundary(const char *line,
                                                  const char *word) {
@@ -113,6 +319,10 @@ static gboolean completion_line_has_word_boundary(const char *line,
 
 /**
  * @brief Completion line looks like definition.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param trim The trim supplied by the caller.
+ * @param word The symbol text being matched.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean completion_line_looks_like_definition(const char *trim,
                                                      const char *word) {
@@ -133,6 +343,9 @@ static gboolean completion_line_looks_like_definition(const char *trim,
 
 /**
  * @brief Completion clean comment line.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param line The zero-based or display line handled by the caller, matching the surrounding API.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *completion_clean_comment_line(const char *line) {
     if (!line) return NULL;
@@ -163,6 +376,10 @@ static char *completion_clean_comment_line(const char *line) {
 
 /**
  * @brief Completion detail from current buffer.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param word The symbol text being matched.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *completion_detail_from_current_buffer(EditorTab *tab,
                                                    const char *word) {
@@ -211,6 +428,10 @@ static char *completion_detail_from_current_buffer(EditorTab *tab,
 
 /**
  * @brief Completion update popup size.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param row_count The row count supplied by the caller.
+ * @param has_details The has details supplied by the caller.
  */
 static void completion_update_popup_size(EditorTab *tab,
                                          guint row_count,
@@ -229,6 +450,11 @@ static void completion_update_popup_size(EditorTab *tab,
 
 /**
  * @brief Completion populate rows.
+ * @details Detail rows are useful, but scanning the current buffer for every
+ *          candidate gets expensive quickly. We add details only for the first
+ *          few visible items so the popover stays fast while still feeling rich.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param candidates The candidates supplied by the caller.
  */
 static void completion_populate_rows(EditorTab *tab, GPtrArray *candidates) {
     completion_clear_rows(tab);
@@ -238,24 +464,41 @@ static void completion_populate_rows(EditorTab *tab, GPtrArray *candidates) {
     }
     gboolean has_details = FALSE;
     gboolean allow_details = tab && tab->buffer && editor_tab_live_features_allowed(tab);
+    CompletionSource last_source = (CompletionSource)-1;
+    guint data_rows = 0u;
     for (guint i = 0u; i < candidates->len; i++) {
-        const char *word = g_ptr_array_index(candidates, i);
+        CompletionCandidate *candidate = g_ptr_array_index(candidates, i);
+        if (!candidate || !candidate->word) continue;
+        if (candidate->source != last_source) {
+            completion_add_source_header(tab,
+                                         candidate->source == COMPLETION_SOURCE_LSP
+                                             ? "LSP"
+                                             : "Graptoς");
+            last_source = candidate->source;
+        }
+        const char *word = candidate->word;
         char *detail = allow_details && i < 10u
             ? completion_detail_from_current_buffer(tab, word)
             : NULL;
         if (detail && detail[0] != '\0') has_details = TRUE;
         completion_add_row_with_detail(tab, word, detail);
+        data_rows++;
         g_free(detail);
     }
-    completion_update_popup_size(tab, candidates ? candidates->len : 0u,
+    completion_update_popup_size(tab, data_rows,
                                  has_details);
 }
 
 /**
  * @brief Completion place popover.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param cursor The cursor supplied by the caller.
+ * @param manual The manual supplied by the caller.
  */
 static void completion_place_popover(EditorTab *tab, GtkTextIter *cursor,
                                      gboolean manual) {
+    (void)cursor;
     if (!tab || !tab->text_view || !tab->popover_parent ||
         !gtk_widget_get_mapped(tab->text_view) ||
         !gtk_widget_get_mapped(tab->popover_parent) ||
@@ -266,28 +509,35 @@ static void completion_place_popover(EditorTab *tab, GtkTextIter *cursor,
         return;
     }
 
-    GdkRectangle location;
-    gtk_text_view_get_iter_location(GTK_TEXT_VIEW(tab->text_view), cursor,
-                                    &location);
-    location.y += location.height;
-    location.width = 1;
-    if (location.height < 1) location.height = 1;
-
-    if (!editor_tab_text_rect_to_popover_parent(tab, &location)) return;
-
-    gtk_popover_set_pointing_to(GTK_POPOVER(tab->completion_popover),
-                                &location);
-    cleaf_popover_show(tab->completion_popover);
+    if (!editor_tab_place_popover_at_cursor(tab, tab->completion_popover)) {
+        return;
+    }
+    graptos_popover_show(tab->completion_popover);
     gtk_widget_grab_focus(tab->text_view);
 
     GtkListBoxRow *first = gtk_list_box_get_row_at_index(
         GTK_LIST_BOX(tab->completion_list), 0);
+    while (first &&
+           !g_object_get_data(G_OBJECT(first), "graptos-completion-word")) {
+/**
+ * @brief Add source header.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param label_text The label text supplied by the caller.
+ */
+        first = gtk_list_box_get_row_at_index(
+            GTK_LIST_BOX(tab->completion_list),
+            gtk_list_box_row_get_index(first) + 1);
+    }
     if (manual && first) gtk_list_box_select_row(
         GTK_LIST_BOX(tab->completion_list), first);
 }
 
 /**
  * @brief Completion is visible.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean completion_is_visible(EditorTab *tab) {
     return tab && tab->completion_popover &&
@@ -296,27 +546,34 @@ gboolean completion_is_visible(EditorTab *tab) {
 
 /**
  * @brief Editor tab hide completion.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void editor_tab_hide_completion(EditorTab *tab) {
     if (!tab) return;
     if (tab->completion_timeout != 0u) {
-        cleaf_source_cancel(&tab->completion_timeout);
+        graptos_source_cancel(&tab->completion_timeout);
     }
-    if (tab->completion_popover) cleaf_popover_hide(tab->completion_popover);
+    if (tab->completion_popover) graptos_popover_hide(tab->completion_popover);
     tab->completion_manual = FALSE;
     g_clear_pointer(&tab->completion_prefix, g_free);
 }
 
 /**
  * @brief Completion clear rows.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void completion_clear_rows(EditorTab *tab) {
     if (!tab || !tab->completion_list) return;
-    cleaf_list_box_clear(tab->completion_list);
+    graptos_list_box_clear(tab->completion_list);
 }
 
 /**
  * @brief Completion insert word.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param word The symbol text being matched.
  */
 void completion_insert_word(EditorTab *tab, const char *word) {
     if (!tab || tab->locked || !word || word[0] == '\0') return;
@@ -341,18 +598,51 @@ void completion_insert_word(EditorTab *tab, const char *word) {
 
 /**
  * @brief Completion row activated.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param box The box supplied by the caller.
+ * @param row The row supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void completion_row_activated(GtkListBox *box, GtkListBoxRow *row,
                               gpointer user_data) {
     (void)box;
     EditorTab *tab = user_data;
     const char *word = row ? g_object_get_data(
-        G_OBJECT(row), "cleaf-completion-word") : NULL;
+        G_OBJECT(row), "graptos-completion-word") : NULL;
     completion_insert_word(tab, word);
 }
 
 /**
+ * @brief Add a non-selectable completion source header.
+ * @details Graptoς and LSP entries are shown together, so the list needs a
+ *          visible divider that does not behave like a completion candidate.
+ *          Keeping headers as inert rows avoids special cases in navigation.
+ * @param tab The editor tab that owns the completion list.
+ * @param label_text The heading text shown above that source group.
+ */
+static void completion_add_source_header(EditorTab *tab, const char *label_text) {
+    if (!tab || !tab->completion_list || !label_text) return;
+    GtkWidget *row = gtk_list_box_row_new();
+    gtk_widget_set_sensitive(row, FALSE);
+    gtk_widget_set_can_focus(row, FALSE);
+
+    GtkWidget *label = gtk_label_new(label_text);
+    gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
+    gtk_widget_set_margin_start(label, 8);
+    gtk_widget_set_margin_end(label, 8);
+    gtk_widget_set_margin_top(label, 6);
+    gtk_widget_set_margin_bottom(label, 3);
+    gtk_widget_add_css_class(label, "graptos-ref-heading");
+    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
+    gtk_list_box_insert(GTK_LIST_BOX(tab->completion_list), row, -1);
+}
+
+/**
  * @brief Completion add row with detail.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param word The symbol text being matched.
+ * @param detail The detail supplied by the caller.
  */
 static void completion_add_row_with_detail(EditorTab *tab,
                                            const char *word,
@@ -372,7 +662,7 @@ static void completion_add_row_with_detail(EditorTab *tab,
     gtk_widget_set_can_focus(label, FALSE);
     gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
     gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
-    gtk_widget_add_css_class(label, "cleaf-completion-title");
+    gtk_widget_add_css_class(label, "graptos-completion-title");
     gtk_box_append(GTK_BOX(box), label);
 
     if (detail && detail[0] != '\0') {
@@ -380,18 +670,21 @@ static void completion_add_row_with_detail(EditorTab *tab,
         gtk_widget_set_can_focus(detail_label, FALSE);
         gtk_label_set_xalign(GTK_LABEL(detail_label), 0.0f);
         gtk_label_set_ellipsize(GTK_LABEL(detail_label), PANGO_ELLIPSIZE_END);
-        gtk_widget_add_css_class(detail_label, "cleaf-completion-detail");
+        gtk_widget_add_css_class(detail_label, "graptos-completion-detail");
         gtk_box_append(GTK_BOX(box), detail_label);
     }
 
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
-    g_object_set_data_full(G_OBJECT(row), "cleaf-completion-word",
+    g_object_set_data_full(G_OBJECT(row), "graptos-completion-word",
                            g_strdup(word), g_free);
     gtk_list_box_insert(GTK_LIST_BOX(tab->completion_list), row, -1);
 }
 
 /**
  * @brief Completion add row.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param word The symbol text being matched.
  */
 void completion_add_row(EditorTab *tab, const char *word) {
     completion_add_row_with_detail(tab, word, NULL);
@@ -399,6 +692,9 @@ void completion_add_row(EditorTab *tab, const char *word) {
 
 /**
  * @brief Editor tab show completion.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param manual The manual supplied by the caller.
  */
 void editor_tab_show_completion(EditorTab *tab, gboolean manual) {
     if (!tab || !tab->autocomplete_enabled) return;
@@ -411,21 +707,33 @@ void editor_tab_show_completion(EditorTab *tab, gboolean manual) {
     if (!prefix) return;
 
     gboolean is_import = import_completion_tab_is_import_context(tab);
-    if (!manual && !is_import && g_utf8_strlen(prefix, -1) < 2) {
+    MemberCompletionContext member_ctx = {0};
+    gboolean is_member = member_completion_context_at_cursor(tab->buffer,
+                                                             &prefix_start,
+                                                             prefix,
+                                                             &member_ctx);
+    if (!manual && !is_import && !is_member && g_utf8_strlen(prefix, -1) < 2) {
         g_free(prefix);
         editor_tab_hide_completion(tab);
         return;
     }
 
-    GPtrArray *imports = (manual || is_import)
+    GPtrArray *imports = is_member
+        ? import_completion_member_candidates_for_tab(tab,
+                                                      member_ctx.base,
+                                                      member_ctx.prefix,
+                                                      GRAPTOS_COMPLETION_DEFAULT_MAX_RESULTS)
+        : (manual || is_import)
         ? import_completion_candidates_for_tab(tab, prefix,
-                                               CLEAF_COMPLETION_DEFAULT_MAX_RESULTS)
+                                               GRAPTOS_COMPLETION_DEFAULT_MAX_RESULTS)
         : NULL;
     GPtrArray *candidates = completion_build_candidates(tab, prefix,
                                                         is_import,
+                                                        is_member,
                                                         imports,
                                                         manual);
     g_clear_pointer(&imports, g_ptr_array_unref);
+    member_completion_context_clear(&member_ctx);
     if (!candidates || candidates->len == 0u) {
         g_clear_pointer(&candidates, g_ptr_array_unref);
         g_free(prefix);
@@ -443,6 +751,9 @@ void editor_tab_show_completion(EditorTab *tab, gboolean manual) {
 
 /**
  * @brief Completion timeout cb.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param user_data The callback context passed through GTK signal data.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean completion_timeout_cb(gpointer user_data) {
     EditorTab *tab = user_data;
@@ -454,10 +765,14 @@ gboolean completion_timeout_cb(gpointer user_data) {
 
 /**
  * @brief Editor tab schedule completion.
+ * @details Automatic completion is intentionally delayed and bounded. It should
+ *          feel like it appears while typing, not like it is part of the key
+ *          press path, especially on files where local scanning would be noisy.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void editor_tab_schedule_completion(EditorTab *tab) {
     if (!tab || !tab->autocomplete_enabled || !tab->buffer) return;
-    cleaf_source_cancel(&tab->completion_timeout);
+    graptos_source_cancel(&tab->completion_timeout);
 
     /*
      * Automatic completion must never block text input.  It scans text and may
@@ -465,13 +780,13 @@ void editor_tab_schedule_completion(EditorTab *tab) {
      * Manual completion is still available in larger files.
      */
     if (!editor_tab_live_features_allowed(tab) ||
-        (guint)gtk_text_buffer_get_char_count(tab->buffer) > CLEAF_AUTO_COMPLETION_MAX_CHARS) {
-        if (tab->completion_popover) cleaf_popover_hide(tab->completion_popover);
+        (guint)gtk_text_buffer_get_char_count(tab->buffer) > GRAPTOS_AUTO_COMPLETION_MAX_CHARS) {
+        if (tab->completion_popover) graptos_popover_hide(tab->completion_popover);
         return;
     }
 
     tab->completion_timeout = g_timeout_add_full(G_PRIORITY_LOW,
-                                               CLEAF_COMPLETION_DELAY_MS,
+                                               GRAPTOS_COMPLETION_DELAY_MS,
                                                completion_timeout_cb,
                                                tab,
                                                NULL);
@@ -479,6 +794,8 @@ void editor_tab_schedule_completion(EditorTab *tab) {
 
 /**
  * @brief Completion accept selected.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void completion_accept_selected(EditorTab *tab) {
     if (!tab || !tab->completion_list) return;
@@ -486,12 +803,20 @@ void completion_accept_selected(EditorTab *tab) {
     GtkListBoxRow *row = gtk_list_box_get_selected_row(list);
     if (!row) row = gtk_list_box_get_row_at_index(list, 0);
     const char *word = row ? g_object_get_data(
-        G_OBJECT(row), "cleaf-completion-word") : NULL;
+        G_OBJECT(row), "graptos-completion-word") : NULL;
+    while (!word && row) {
+        row = gtk_list_box_get_row_at_index(list,
+                                            gtk_list_box_row_get_index(row) + 1);
+        word = row ? g_object_get_data(G_OBJECT(row), "graptos-completion-word") : NULL;
+    }
     completion_insert_word(tab, word);
 }
 
 /**
  * @brief Completion select delta.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param delta The delta supplied by the caller.
  */
 void completion_select_delta(EditorTab *tab, int delta) {
     if (!tab || !tab->completion_list) return;
@@ -501,5 +826,11 @@ void completion_select_delta(EditorTab *tab, int delta) {
     int next = index + delta;
     if (next < 0) next = 0;
     GtkListBoxRow *next_row = gtk_list_box_get_row_at_index(list, next);
+    while (next_row &&
+           !g_object_get_data(G_OBJECT(next_row), "graptos-completion-word")) {
+        next += delta >= 0 ? 1 : -1;
+        if (next < 0) return;
+        next_row = gtk_list_box_get_row_at_index(list, next);
+    }
     if (next_row) gtk_list_box_select_row(list, next_row);
 }

@@ -1,27 +1,30 @@
 /**
  * @file src/import_complete_private.h
  * @brief Internal import completion data structures.
+ * @details Import completion is intentionally pragmatic. We resolve enough project-local
+ *          structure to be helpful when LSP is unavailable, without pretending this is a
+ *          compiler for every language.
  */
 
-#ifndef CLEAF_IMPORT_COMPLETE_PRIVATE_H
-#define CLEAF_IMPORT_COMPLETE_PRIVATE_H
+#ifndef GRAPTOS_IMPORT_COMPLETE_PRIVATE_H
+#define GRAPTOS_IMPORT_COMPLETE_PRIVATE_H
 
 #include "import_complete.h"
 #include "editor_tab.h"
 #include "syntax.h"
 
 /**
- * @brief Cleaf import max dir entries macro.
+ * @brief Graptoς import max dir entries macro.
  */
-#define CLEAF_IMPORT_MAX_DIR_ENTRIES 4096u
+#define GRAPTOS_IMPORT_MAX_DIR_ENTRIES 4096u
 /**
- * @brief Cleaf import max name macro.
+ * @brief Graptoς import max name macro.
  */
-#define CLEAF_IMPORT_MAX_NAME 160u
+#define GRAPTOS_IMPORT_MAX_NAME 160u
 /**
- * @brief Cleaf import max file bytes macro.
+ * @brief Graptoς import max file bytes macro.
  */
-#define CLEAF_IMPORT_MAX_FILE_BYTES (512u * 1024u)
+#define GRAPTOS_IMPORT_MAX_FILE_BYTES (512u * 1024u)
 
 /**
  * @brief Import complete private type definition.
@@ -47,18 +50,29 @@ typedef struct {
 
 /**
  * @brief Import parse clear.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param ctx The ctx supplied by the caller.
  */
 void import_parse_clear(ImportParse *ctx);
 /**
  * @brief Import parse current line.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param ctx The ctx supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean import_parse_current_line(EditorTab *tab, ImportParse *ctx);
 /**
  * @brief Import collect candidates.
+ * @details Import completion is intentionally heuristic because every language writes imports differently. The comment calls out the guarded parsing path and the ownership of returned candidates.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param ctx The ctx supplied by the caller.
+ * @param out Output storage filled when the lookup succeeds.
+ * @param max_results The max results supplied by the caller.
  */
 void import_collect_candidates(EditorTab *tab,
                                ImportParse *ctx,
                                GPtrArray *out,
                                guint max_results);
 
-#endif /* CLEAF_IMPORT_COMPLETE_PRIVATE_H */
+#endif /* GRAPTOS_IMPORT_COMPLETE_PRIVATE_H */

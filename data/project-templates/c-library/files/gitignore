@@ -1,0 +1,5 @@
+*.o
+*.a
+*.so
+/build/
+/tests/test_${project_ident}

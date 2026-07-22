@@ -1,6 +1,9 @@
 /**
  * @file src/editor_tab_keys.c
- * @brief Cleaf editor tab keys module.
+ * @brief Graptoς editor tab keys module.
+ * @details Key handling sits next to the buffer because indentation, auto-pairs, and
+ *          navigation all mutate text. We keep those edits explicit so GTKSourceView is not
+ *          surprised by hidden side effects.
  */
 
 #include "editor_tab_private.h"
@@ -8,6 +11,11 @@
 
 /**
  * @brief Text between iters.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param buffer The text buffer used for the operation.
+ * @param start The start supplied by the caller.
+ * @param end The end supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *text_between_iters(GtkTextBuffer *buffer,
                                 const GtkTextIter *start,
@@ -18,6 +26,9 @@ static char *text_between_iters(GtkTextBuffer *buffer,
 
 /**
  * @brief Line leading indent.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param line The zero-based or display line handled by the caller, matching the surrounding API.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *line_leading_indent(const char *line) {
     if (!line) return g_strdup("");
@@ -28,6 +39,9 @@ static char *line_leading_indent(const char *line) {
 
 /**
  * @brief Trimmed copy.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param text The text fragment supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *trimmed_copy(const char *text) {
     char *copy = g_strdup(text ? text : "");
@@ -37,6 +51,11 @@ static char *trimmed_copy(const char *text) {
 
 /**
  * @brief Syntax has suffix token.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tokens The tokens supplied by the caller.
+ * @param text The text fragment supplied by the caller.
+ * @param fallback The fallback supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean syntax_has_suffix_token(GPtrArray *tokens,
                                         const char *text,
@@ -54,6 +73,11 @@ static gboolean syntax_has_suffix_token(GPtrArray *tokens,
 
 /**
  * @brief Syntax has prefix token.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tokens The tokens supplied by the caller.
+ * @param text The text fragment supplied by the caller.
+ * @param fallback The fallback supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean syntax_has_prefix_token(GPtrArray *tokens,
                                         const char *text,
@@ -71,6 +95,9 @@ static gboolean syntax_has_prefix_token(GPtrArray *tokens,
 
 /**
  * @brief First indent opener.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static const char *first_indent_opener(EditorTab *tab) {
     if (tab && tab->active_syntax && tab->active_syntax->indent_openers &&
@@ -83,6 +110,9 @@ static const char *first_indent_opener(EditorTab *tab) {
 
 /**
  * @brief First indent closer.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static const char *first_indent_closer(EditorTab *tab) {
     if (tab && tab->active_syntax && tab->active_syntax->indent_closers &&
@@ -95,6 +125,9 @@ static const char *first_indent_closer(EditorTab *tab) {
 
 /**
  * @brief Auto indent enabled.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean auto_indent_enabled(EditorTab *tab) {
     return !tab || !tab->active_syntax || tab->active_syntax->auto_indent;
@@ -102,6 +135,11 @@ static gboolean auto_indent_enabled(EditorTab *tab) {
 
 /**
  * @brief Insert block newline.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param iter The text iterator that anchors the lookup.
+ * @param base_indent The base indent supplied by the caller.
+ * @param unit The unit supplied by the caller.
  */
 static void insert_block_newline(EditorTab *tab,
                                  GtkTextIter *iter,
@@ -125,6 +163,10 @@ static void insert_block_newline(EditorTab *tab,
 
 /**
  * @brief Line before has adjacent indent pair.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param trimmed_before The trimmed before supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean line_before_has_adjacent_indent_pair(EditorTab *tab,
                                                      const char *trimmed_before) {
@@ -147,6 +189,11 @@ static gboolean line_before_has_adjacent_indent_pair(EditorTab *tab,
 
 /**
  * @brief Handle return key.
+ * @details Auto-indent is handled as one user action so undo feels natural.
+ *          The special empty-line case handles `{|}` style pairs by opening a
+ *          block with the cursor on the useful middle line.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean handle_return_key(EditorTab *tab) {
     if (!tab || tab->locked || !tab->buffer || !auto_indent_enabled(tab)) return FALSE;
@@ -203,57 +250,90 @@ static gboolean handle_return_key(EditorTab *tab) {
 
 /**
  * @brief Menu undo.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param w The w supplied by the caller.
+ * @param data The callback context passed by the caller.
  */
 void menu_undo(GtkWidget *w, gpointer data) { (void)w; editor_tab_undo(data); }
 
 /**
  * @brief Menu redo.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param w The w supplied by the caller.
+ * @param data The callback context passed by the caller.
  */
 void menu_redo(GtkWidget *w, gpointer data) { (void)w; editor_tab_redo(data); }
 
 /**
  * @brief Menu cut.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param w The w supplied by the caller.
+ * @param data The callback context passed by the caller.
  */
 void menu_cut(GtkWidget *w, gpointer data) { (void)w; editor_tab_cut_clipboard(data); }
 
 /**
  * @brief Menu copy.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param w The w supplied by the caller.
+ * @param data The callback context passed by the caller.
  */
 void menu_copy(GtkWidget *w, gpointer data) { (void)w; editor_tab_copy_clipboard(data); }
 
 /**
  * @brief Menu paste.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param w The w supplied by the caller.
+ * @param data The callback context passed by the caller.
  */
 void menu_paste(GtkWidget *w, gpointer data) { (void)w; editor_tab_paste_clipboard(data); }
 
 /**
  * @brief Menu select all.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param w The w supplied by the caller.
+ * @param data The callback context passed by the caller.
  */
 void menu_select_all(GtkWidget *w, gpointer data) { (void)w; editor_tab_select_all(data); }
 
 /**
  * @brief Menu cut line.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param w The w supplied by the caller.
+ * @param data The callback context passed by the caller.
  */
 void menu_cut_line(GtkWidget *w, gpointer data) { (void)w; editor_tab_cut_line(data); }
 
 /**
  * @brief Menu paste line.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param w The w supplied by the caller.
+ * @param data The callback context passed by the caller.
  */
 void menu_paste_line(GtkWidget *w, gpointer data) { (void)w; editor_tab_paste_cut_line(data); }
 
 /**
  * @brief Menu comment.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param w The w supplied by the caller.
+ * @param data The callback context passed by the caller.
  */
 void menu_comment(GtkWidget *w, gpointer data) { (void)w; editor_tab_toggle_comment(data); }
 
 /**
  * @brief Menu complete.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param w The w supplied by the caller.
+ * @param data The callback context passed by the caller.
  */
 void menu_complete(GtkWidget *w, gpointer data) { (void)w; editor_tab_show_completion(data, TRUE); }
 
 
 /**
  * @brief Tab unit.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 char *tab_unit(EditorTab *tab) {
     if (!tab || !tab->insert_spaces) return g_strdup("\t");
@@ -265,6 +345,11 @@ char *tab_unit(EditorTab *tab) {
 
 /**
  * @brief Selection line bounds.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param start_line_out Output storage filled when the operation can provide a value.
+ * @param end_line_out Output storage filled when the operation can provide a value.
+ * @param has_selection_out Output storage filled when the operation can provide a value.
  */
 void selection_line_bounds(EditorTab *tab, int *start_line_out, int *end_line_out, gboolean *has_selection_out) {
     GtkTextIter start;
@@ -286,6 +371,8 @@ void selection_line_bounds(EditorTab *tab, int *start_line_out, int *end_line_ou
 
 /**
  * @brief Insert tab or indent.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void insert_tab_or_indent(EditorTab *tab) {
     if (!tab || tab->locked) return;
@@ -317,6 +404,9 @@ void insert_tab_or_indent(EditorTab *tab) {
 
 /**
  * @brief Unindent line.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param line The zero-based or display line handled by the caller, matching the surrounding API.
  */
 void unindent_line(EditorTab *tab, int line) {
     if (!tab || tab->locked || line < 0) return;
@@ -343,6 +433,8 @@ void unindent_line(EditorTab *tab, int line) {
 
 /**
  * @brief Unindent selection or line.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void unindent_selection_or_line(EditorTab *tab) {
     if (!tab || tab->locked) return;
@@ -359,7 +451,235 @@ void unindent_selection_or_line(EditorTab *tab) {
 
 
 /**
+ * @brief Key event is plain editor text.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param state The state supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
+ */
+static gboolean key_event_is_plain_editor_text(GdkModifierType state) {
+    GdkModifierType blocked =
+        GDK_CONTROL_MASK | GDK_ALT_MASK | GDK_META_MASK |
+        GDK_SUPER_MASK | GDK_HYPER_MASK;
+    return (state & blocked) == 0;
+}
+
+/**
+ * @brief Text for keyval.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param keyval The keyval supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
+ */
+static char *text_for_keyval(guint keyval) {
+    gunichar ch = gdk_keyval_to_unicode(keyval);
+    if (ch == 0u || g_unichar_iscntrl(ch)) return NULL;
+
+    char utf8[8] = {0};
+    int len = g_unichar_to_utf8(ch, utf8);
+    if (len <= 0) return NULL;
+    utf8[len] = '\0';
+    return g_strdup(utf8);
+}
+
+/**
+ * @brief Syntax pair matching open text.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param text The text fragment supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
+ */
+static SyntaxPair *syntax_pair_for_open(EditorTab *tab, const char *text) {
+    static SyntaxPair fallback_pairs[] = {
+        { "(", ")" },
+        { "{", "}" },
+        { "[", "]" }
+    };
+
+    if (!text) {
+        return NULL;
+    }
+
+    if (tab && tab->active_syntax && tab->active_syntax->close_pairs &&
+        tab->active_syntax->close_pairs->len > 0u) {
+        for (guint i = 0u; i < tab->active_syntax->close_pairs->len; i++) {
+            SyntaxPair *pair = g_ptr_array_index(tab->active_syntax->close_pairs,
+                                                 i);
+            if (pair && g_strcmp0(pair->open, text) == 0 &&
+                pair->close && pair->close[0] != '\0') {
+                return pair;
+            }
+        }
+        return NULL;
+    }
+
+    for (guint i = 0u; i < G_N_ELEMENTS(fallback_pairs); i++) {
+        if (g_strcmp0(fallback_pairs[i].open, text) == 0) {
+            return &fallback_pairs[i];
+        }
+    }
+    return NULL;
+}
+
+/**
+ * @brief Syntax pair matching close text.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param text The text fragment supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
+ */
+static SyntaxPair *syntax_pair_for_close(EditorTab *tab, const char *text) {
+    static SyntaxPair fallback_pairs[] = {
+        { "(", ")" },
+        { "{", "}" },
+        { "[", "]" }
+    };
+
+    if (!text) {
+        return NULL;
+    }
+
+    if (tab && tab->active_syntax && tab->active_syntax->close_pairs &&
+        tab->active_syntax->close_pairs->len > 0u) {
+        for (guint i = 0u; i < tab->active_syntax->close_pairs->len; i++) {
+            SyntaxPair *pair = g_ptr_array_index(tab->active_syntax->close_pairs,
+                                                 i);
+            if (pair && g_strcmp0(pair->close, text) == 0) return pair;
+        }
+        return NULL;
+    }
+
+    for (guint i = 0u; i < G_N_ELEMENTS(fallback_pairs); i++) {
+        if (g_strcmp0(fallback_pairs[i].close, text) == 0) {
+            return &fallback_pairs[i];
+        }
+    }
+    return NULL;
+}
+
+/**
+ * @brief Cursor is before text.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param text The text fragment supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
+ */
+static gboolean cursor_is_before_text(EditorTab *tab, const char *text) {
+    if (!tab || !tab->buffer || !text || text[0] == '\0') return FALSE;
+
+    GtkTextIter start;
+    GtkTextMark *mark = gtk_text_buffer_get_insert(tab->buffer);
+    gtk_text_buffer_get_iter_at_mark(tab->buffer, &start, mark);
+
+    GtkTextIter end = start;
+    gint chars = (gint)g_utf8_strlen(text, -1);
+    if (chars <= 0 || !gtk_text_iter_forward_chars(&end, chars)) {
+        return FALSE;
+    }
+
+    char *next = gtk_text_buffer_get_text(tab->buffer, &start, &end, FALSE);
+    gboolean same = g_strcmp0(next, text) == 0;
+    g_free(next);
+    return same;
+}
+
+/**
+ * @brief Move cursor forward by text width.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param text The text fragment supplied by the caller.
+ */
+static void move_cursor_over_text(EditorTab *tab, const char *text) {
+    if (!tab || !tab->buffer || !text) return;
+
+    GtkTextIter iter;
+    GtkTextMark *mark = gtk_text_buffer_get_insert(tab->buffer);
+    gtk_text_buffer_get_iter_at_mark(tab->buffer, &iter, mark);
+    gint chars = (gint)g_utf8_strlen(text, -1);
+    if (chars > 0 && gtk_text_iter_forward_chars(&iter, chars)) {
+        gtk_text_buffer_place_cursor(tab->buffer, &iter);
+    }
+}
+
+/**
+ * @brief Insert close pair around cursor or selection.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param pair The pair supplied by the caller.
+ */
+static void insert_close_pair(EditorTab *tab, SyntaxPair *pair) {
+    if (!tab || !tab->buffer || !pair || !pair->open || !pair->close) return;
+
+    GtkTextIter start;
+    GtkTextIter end;
+    gboolean has_selection =
+        gtk_text_buffer_get_selection_bounds(tab->buffer, &start, &end);
+
+    gtk_text_buffer_begin_user_action(tab->buffer);
+    if (has_selection) {
+        gtk_text_buffer_insert(tab->buffer, &end, pair->close, -1);
+        gtk_text_buffer_insert(tab->buffer, &start, pair->open, -1);
+    } else {
+        GtkTextMark *mark = gtk_text_buffer_get_insert(tab->buffer);
+        gtk_text_buffer_get_iter_at_mark(tab->buffer, &start, mark);
+        gtk_text_buffer_insert(tab->buffer, &start, pair->open, -1);
+        GtkTextMark *cursor_mark =
+            gtk_text_buffer_create_mark(tab->buffer, NULL, &start, TRUE);
+        gtk_text_buffer_insert(tab->buffer, &start, pair->close, -1);
+        GtkTextIter cursor;
+        gtk_text_buffer_get_iter_at_mark(tab->buffer, &cursor, cursor_mark);
+        gtk_text_buffer_place_cursor(tab->buffer, &cursor);
+        gtk_text_buffer_delete_mark(tab->buffer, cursor_mark);
+    }
+    gtk_text_buffer_end_user_action(tab->buffer);
+}
+
+/**
+ * @brief Handle close pair key.
+ * @details Close pairs come from syntax data, not hardcoded language rules.
+ *          When the cursor is already before the closer, typing it steps over
+ *          the existing character instead of duplicating it.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param keyval The keyval supplied by the caller.
+ * @param state The state supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
+ */
+static gboolean handle_close_pair_key(EditorTab *tab, guint keyval,
+                                      GdkModifierType state) {
+    if (!tab || tab->locked || !key_event_is_plain_editor_text(state)) {
+        return FALSE;
+    }
+
+    char *text = text_for_keyval(keyval);
+    if (!text) return FALSE;
+
+    SyntaxPair *open_pair = syntax_pair_for_open(tab, text);
+    if (open_pair) {
+        insert_close_pair(tab, open_pair);
+        g_free(text);
+        return TRUE;
+    }
+
+    SyntaxPair *close_pair = syntax_pair_for_close(tab, text);
+    if (close_pair && cursor_is_before_text(tab, text)) {
+        move_cursor_over_text(tab, text);
+        g_free(text);
+        return TRUE;
+    }
+
+    g_free(text);
+    return FALSE;
+}
+
+/**
  * @brief On text view key pressed.
+ * @details This is the editor's traffic cop. Completion, Alt-inspection,
+ *          close-pairs, indentation, and normal text insertion all compete for
+ *          the same key event, so the order here is part of the behavior.
+ * @param controller The controller supplied by the caller.
+ * @param keyval The keyval supplied by the caller.
+ * @param keycode The keycode supplied by the caller.
+ * @param state The state supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean on_text_view_key_pressed(GtkEventControllerKey *controller,
                                   guint keyval, guint keycode,
@@ -371,7 +691,6 @@ gboolean on_text_view_key_pressed(GtkEventControllerKey *controller,
     if (!tab) return FALSE;
 
     guint key = gdk_keyval_to_lower(keyval);
-    gboolean ctrl = (state & GDK_CONTROL_MASK) != 0;
     gboolean alt = (state & GDK_ALT_MASK) != 0;
     gboolean shift = (state & GDK_SHIFT_MASK) != 0;
 
@@ -383,22 +702,16 @@ gboolean on_text_view_key_pressed(GtkEventControllerKey *controller,
 
     if (completion_is_visible(tab)) {
         if (key == GDK_KEY_Escape) { editor_tab_hide_completion(tab); return TRUE; }
-        if (!tab->completion_manual) {
-            editor_tab_hide_completion(tab);
-        } else {
-            if (key == GDK_KEY_Down) { completion_select_delta(tab, 1); return TRUE; }
-            if (key == GDK_KEY_Up) { completion_select_delta(tab, -1); return TRUE; }
-            if (key == GDK_KEY_Return || key == GDK_KEY_KP_Enter || key == GDK_KEY_Tab) {
-                completion_accept_selected(tab);
-                return TRUE;
-            }
+        if (key == GDK_KEY_Down) { completion_select_delta(tab, 1); return TRUE; }
+        if (key == GDK_KEY_Up) { completion_select_delta(tab, -1); return TRUE; }
+        if (key == GDK_KEY_Tab && !shift) {
+            completion_accept_selected(tab);
+            return TRUE;
         }
+        editor_tab_hide_completion(tab);
     }
 
-    if (ctrl && key == GDK_KEY_space) {
-        editor_tab_show_completion(tab, TRUE);
-        return TRUE;
-    }
+    if (handle_close_pair_key(tab, keyval, state)) return TRUE;
     if (key == GDK_KEY_Return || key == GDK_KEY_KP_Enter) {
         return handle_return_key(tab);
     }
@@ -416,6 +729,12 @@ gboolean on_text_view_key_pressed(GtkEventControllerKey *controller,
 
 /**
  * @brief On text view key released.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param controller The controller supplied by the caller.
+ * @param keyval The keyval supplied by the caller.
+ * @param keycode The keycode supplied by the caller.
+ * @param state The state supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void on_text_view_key_released(GtkEventControllerKey *controller,
                                 guint keyval, guint keycode,
@@ -430,4 +749,3 @@ void on_text_view_key_released(GtkEventControllerKey *controller,
         if (!tab->hover_pointer_inside) hide_hover_preview(tab);
     }
 }
-

@@ -1,23 +1,39 @@
 /**
  * @file src/git/git_actions.inc.c
- * @brief Cleaf git actions module.
+ * @brief Graptoς git actions module.
+ * @details Git already knows the repository truth. Graptoς adds UI, status parsing,
+ *          credentials, and command wiring, but we avoid building a half-Git inside the
+ *          editor.
+ * @param win The win supplied by the caller.
+ * @param title The title supplied by the caller.
+ * @param body The body supplied by the caller.
  */
 
 static void show_git_output(EditorWindow *win,
                             const char *title,
                             const char *body) {
-    dialog_output(win ? app_window_gtk(win) : NULL,
-                  title ? title : "Git",
-                  title ? title : "Git",
-                  body);
+    dialog_output_git(win ? app_window_gtk(win) : NULL,
+                      title ? title : "Git",
+                      title ? title : "Git",
+                      body,
+                      win ? win->git_status_added_color : NULL,
+                      win ? win->git_status_modified_color : NULL,
+                      win ? win->git_status_deleted_color : NULL,
+                      win ? win->status_error_color : NULL,
+                      win ? win->dialog_muted_color : NULL,
+                      win ? win->git_output_bg_color : NULL);
 }
 
 /**
  * @brief Show git error.
+ * @details Git actions are user-facing wrappers around command output. The comment keeps the boundary clear between collecting results and presenting them in Graptoς dialogs.
+ * @param win The win supplied by the caller.
+ * @param operation The operation supplied by the caller.
+ * @param result The result supplied by the caller.
  */
 static void show_git_error(EditorWindow *win,
                            const char *operation,
-                           const CleafGitResult *result) {
+                           const GraptosGitResult *result) {
     if (!result) return;
     GString *text = g_string_new(NULL);
     g_string_append_printf(text, "%s\n\n", result->message ? result->message : git_error_title(result->kind));
@@ -32,18 +48,23 @@ static void show_git_error(EditorWindow *win,
         g_string_append(text, "stdout:\n");
         g_string_append(text, result->out);
     }
-    app_window_set_error_status(win,
-                                operation ? operation : git_error_title(result->kind),
-                                text->str);
+    const char *title = operation ? operation : git_error_title(result->kind);
+    app_window_set_error_status(win, title, text->str);
+    show_git_output(win, title, text->str);
     g_string_free(text, TRUE);
 }
 
 /**
  * @brief Show result or error.
+ * @details Git actions are user-facing wrappers around command output. The comment keeps the boundary clear between collecting results and presenting them in Graptoς dialogs.
+ * @param win The win supplied by the caller.
+ * @param title The title supplied by the caller.
+ * @param result The result supplied by the caller.
+ * @param ok The ok supplied by the caller.
  */
 static void show_result_or_error(EditorWindow *win,
                                  const char *title,
-                                 const CleafGitResult *result,
+                                 const GraptosGitResult *result,
                                  gboolean ok) {
     if (!result) return;
     if (!ok) {
@@ -63,12 +84,15 @@ static void show_result_or_error(EditorWindow *win,
 
 /**
  * @brief Repo summary.
+ * @details Git actions are user-facing wrappers around command output. The comment keeps the boundary clear between collecting results and presenting them in Graptoς dialogs.
+ * @param repo The repo supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *repo_summary(const char *repo) {
     GString *summary = g_string_new(NULL);
     g_string_append_printf(summary, "Repository: %s\n", repo ? repo : "none");
 
-    CleafGitResult branch;
+    GraptosGitResult branch;
     if (run_git_args(repo, NULL, &branch, "branch", "--show-current", NULL)) {
         char *b = chomp_dup(branch.out);
         g_string_append_printf(summary, "Branch: %s\n", b && b[0] ? b : "detached or unnamed");
@@ -78,7 +102,7 @@ static char *repo_summary(const char *repo) {
     }
     git_result_clear(&branch);
 
-    CleafGitResult remote;
+    GraptosGitResult remote;
     if (run_git_args(repo, NULL, &remote, "remote", "-v", NULL)) {
         g_string_append(summary, "\nRemotes:\n");
         g_string_append(summary, remote.out && remote.out[0] ? remote.out : "none\n");
@@ -89,6 +113,9 @@ static char *repo_summary(const char *repo) {
 
 /**
  * @brief Action git status.
+ * @details Git actions are user-facing wrappers around command output. The comment keeps the boundary clear between collecting results and presenting them in Graptoς dialogs.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_git_status(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -100,7 +127,7 @@ void action_git_status(GtkWidget *widget, gpointer user_data) {
         return;
     }
 
-    CleafGitResult result;
+    GraptosGitResult result;
     gboolean ok = run_git_args(repo, NULL, &result, "status", "--short", "--branch", NULL);
     if (!ok) {
         show_git_error(win, "Git Status", &result);
@@ -122,6 +149,9 @@ void action_git_status(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Diff syntax.
+ * @details Git actions are user-facing wrappers around command output. The comment keeps the boundary clear between collecting results and presenting them in Graptoς dialogs.
+ * @param win The win supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static SyntaxDef *diff_syntax(EditorWindow *win) {
     if (!win || !win->syntaxes) return NULL;
@@ -133,12 +163,42 @@ static SyntaxDef *diff_syntax(EditorWindow *win) {
 }
 
 /**
+ * @brief Set the title for a Git diff tab.
+ * @details Diff tabs are read-only generated views, not normal files. The
+ *          italic prefix makes that clear while the filename stays readable and
+ *          escaped as plain user data.
+ * @param tab The generated diff tab whose title is being updated.
+ * @param path The repository-relative file path, or NULL for repository diff.
+ */
+static void set_git_diff_tab_title(EditorTab *tab, const char *path) {
+    if (!tab) return;
+
+    g_autofree char *base = NULL;
+    if (path && path[0] && g_strcmp0(path, ".") != 0) {
+        base = g_path_get_basename(path);
+    }
+    const char *display = base && base[0] ? base : "working tree";
+    g_autofree char *escaped = g_markup_escape_text(display, -1);
+    g_autofree char *plain = g_strdup_printf("diff %s", display);
+    g_autofree char *markup = g_strdup_printf("<i>diff</i> %s",
+                                              escaped ? escaped : display);
+    editor_tab_set_display_title(tab, plain, markup);
+}
+
+/**
  * @brief Open text tab.
+ * @details Git actions are user-facing wrappers around command output. The comment keeps the boundary clear between collecting results and presenting them in Graptoς dialogs.
+ * @param win The win supplied by the caller.
+ * @param title The title supplied by the caller.
+ * @param text The text fragment supplied by the caller.
+ * @param diff The diff supplied by the caller.
+ * @param diff_path The repository-relative diff path supplied by the caller.
  */
 static void open_text_tab(EditorWindow *win,
                           const char *title,
                           const char *text,
-                          gboolean diff) {
+                          gboolean diff,
+                          const char *diff_path) {
     if (!win) return;
     EditorTab *tab = editor_tab_new(win);
     tab->applying_change = TRUE;
@@ -149,12 +209,20 @@ static void open_text_tab(EditorWindow *win,
     gtk_text_view_set_editable(GTK_TEXT_VIEW(tab->text_view), FALSE);
     if (diff) editor_tab_set_syntax(tab, diff_syntax(win), TRUE);
     app_window_add_tab(win, tab, TRUE);
-    if (tab->tab_title) gtk_label_set_text(GTK_LABEL(tab->tab_title), title ? title : "Git Output");
+    if (diff) {
+        set_git_diff_tab_title(tab, diff_path);
+    } else {
+        editor_tab_set_display_title(tab, title ? title : "Git Output", NULL);
+    }
+    if (tab->tab_lock_icon) gtk_widget_set_visible(tab->tab_lock_icon, TRUE);
     editor_tab_update_status(tab);
 }
 
 /**
  * @brief Action git diff.
+ * @details Git actions are user-facing wrappers around command output. The comment keeps the boundary clear between collecting results and presenting them in Graptoς dialogs.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_git_diff(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -168,7 +236,7 @@ void action_git_diff(GtkWidget *widget, gpointer user_data) {
         return;
     }
 
-    CleafGitResult result;
+    GraptosGitResult result;
     gboolean ok;
     if (rel && rel[0] && g_strcmp0(rel, ".") != 0) {
         ok = run_git_args(repo, NULL, &result, "diff", "--", rel, NULL);
@@ -177,7 +245,11 @@ void action_git_diff(GtkWidget *widget, gpointer user_data) {
     }
 
     if (!ok) show_git_error(win, "Git Diff", &result);
-    else open_text_tab(win, rel && rel[0] ? "Git Diff: current file" : "Git Diff", result.out && result.out[0] ? result.out : "No unstaged diff.\n", TRUE);
+    else open_text_tab(win,
+                       rel && rel[0] ? "Git Diff: current file" : "Git Diff",
+                       result.out && result.out[0] ? result.out : "No unstaged diff.\n",
+                       TRUE,
+                       rel);
     git_result_clear(&result);
     g_free(rel);
     g_free(repo);
@@ -185,14 +257,20 @@ void action_git_diff(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Refresh after command.
+ * @details Git actions are user-facing wrappers around command output. The comment keeps the boundary clear between collecting results and presenting them in Graptoς dialogs.
+ * @param win The win supplied by the caller.
+ * @param status The status supplied by the caller.
  */
 static void refresh_after_command(EditorWindow *win, const char *status) {
     if (status) app_window_set_status(win, status);
-    cleaf_git_refresh_and_rebuild(win);
+    graptos_git_refresh_and_rebuild(win);
 }
 
 /**
  * @brief Action git stage.
+ * @details Git actions are user-facing wrappers around command output. The comment keeps the boundary clear between collecting results and presenting them in Graptoς dialogs.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_git_stage(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -207,7 +285,7 @@ void action_git_stage(GtkWidget *widget, gpointer user_data) {
         return;
     }
 
-    CleafGitResult result;
+    GraptosGitResult result;
     gboolean ok = run_git_args(repo, NULL, &result, "add", "--", rel, NULL);
     if (!ok) show_git_error(win, "Git Stage", &result);
     else refresh_after_command(win, "Git staged current file.");
@@ -218,6 +296,9 @@ void action_git_stage(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action git unstage.
+ * @details Git actions are user-facing wrappers around command output. The comment keeps the boundary clear between collecting results and presenting them in Graptoς dialogs.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_git_unstage(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -232,7 +313,7 @@ void action_git_unstage(GtkWidget *widget, gpointer user_data) {
         return;
     }
 
-    CleafGitResult result;
+    GraptosGitResult result;
     gboolean ok = run_git_args(repo, NULL, &result, "restore", "--staged", "--", rel, NULL);
     if (!ok) {
         git_result_clear(&result);
@@ -247,6 +328,9 @@ void action_git_unstage(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action git stage all.
+ * @details Git actions are user-facing wrappers around command output. The comment keeps the boundary clear between collecting results and presenting them in Graptoς dialogs.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_git_stage_all(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -258,7 +342,7 @@ void action_git_stage_all(GtkWidget *widget, gpointer user_data) {
         return;
     }
 
-    CleafGitResult result;
+    GraptosGitResult result;
     gboolean ok = run_git_args(repo, NULL, &result, "add", "-A", NULL);
     if (!ok) show_git_error(win, "Git Stage All", &result);
     else refresh_after_command(win, "Git staged all changes.");
@@ -268,6 +352,9 @@ void action_git_stage_all(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action git commit.
+ * @details Git actions are user-facing wrappers around command output. The comment keeps the boundary clear between collecting results and presenting them in Graptoς dialogs.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_git_commit(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -293,7 +380,7 @@ void action_git_commit(GtkWidget *widget, gpointer user_data) {
         return;
     }
 
-    CleafGitResult check;
+    GraptosGitResult check;
     gboolean staged = !run_git_args(repo, NULL, &check, "diff", "--cached", "--quiet", NULL)
         && check.exit_code == 1;
     git_result_clear(&check);
@@ -305,7 +392,7 @@ void action_git_commit(GtkWidget *widget, gpointer user_data) {
         return;
     }
 
-    CleafGitResult result;
+    GraptosGitResult result;
     gboolean ok = run_git_args(repo, NULL, &result, "commit", "-m", message, NULL);
     if (!ok) show_git_error(win, "Git Commit", &result);
     else {
@@ -319,6 +406,9 @@ void action_git_commit(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action git pull.
+ * @details Git actions are user-facing wrappers around command output. The comment keeps the boundary clear between collecting results and presenting them in Graptoς dialogs.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_git_pull(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -329,7 +419,7 @@ void action_git_pull(GtkWidget *widget, gpointer user_data) {
                                     "No Git repository is active.");
         return;
     }
-    CleafGitResult result;
+    GraptosGitResult result;
     gboolean ok = run_git_args(repo, NULL, &result, "pull", "--ff-only", NULL);
     show_result_or_error(win, "Git Pull", &result, ok);
     if (ok) refresh_after_command(win, "Git pull completed.");
@@ -339,6 +429,9 @@ void action_git_pull(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action git push.
+ * @details Git actions are user-facing wrappers around command output. The comment keeps the boundary clear between collecting results and presenting them in Graptoς dialogs.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_git_push(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -349,11 +442,11 @@ void action_git_push(GtkWidget *widget, gpointer user_data) {
                                     "No Git repository is active.");
         return;
     }
-    CleafGitResult result;
+    GraptosGitResult result;
     gboolean ok = run_git_args(repo, NULL, &result, "push", NULL);
-    if (!ok && result.kind == CLEAF_GIT_ERROR_NO_REMOTE) {
+    if (!ok && result.kind == GRAPTOS_GIT_ERROR_NO_REMOTE) {
         git_result_clear(&result);
-        CleafGitResult branch;
+        GraptosGitResult branch;
         if (run_git_args(repo, NULL, &branch, "branch", "--show-current", NULL)) {
             char *b = chomp_dup(branch.out);
             git_result_clear(&branch);

@@ -1,6 +1,11 @@
 /**
  * @file src/app/app_window_state.inc.c
- * @brief Cleaf app window state module.
+ * @brief Graptoς app window state module.
+ * @details The app window is the meeting point for most features. We keep that coordination
+ *          here so editor tabs, project state, dialogs, terminals, Git, and AI do not all
+ *          learn about each other directly.
+ * @param win The win supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 
 GtkWindow *app_window_gtk(EditorWindow *win) {
@@ -11,6 +16,9 @@ GtkWindow *app_window_gtk(EditorWindow *win) {
 
 /**
  * @brief App window set status.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param win The win supplied by the caller.
+ * @param text The text fragment supplied by the caller.
  */
 void app_window_set_status(EditorWindow *win, const char *text) {
     if (!win || !win->status_label) return;
@@ -22,19 +30,25 @@ void app_window_set_status(EditorWindow *win, const char *text) {
 
 /**
  * @brief App window clear error status.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param win The win supplied by the caller.
  */
 void app_window_clear_error_status(EditorWindow *win) {
     if (!win) return;
     g_clear_pointer(&win->status_error_title, g_free);
     g_clear_pointer(&win->status_error_detail, g_free);
     if (win->status_label) {
-        gtk_widget_remove_css_class(win->status_label, "cleaf-status-error");
+        gtk_widget_remove_css_class(win->status_label, "graptos-status-error");
         gtk_widget_set_tooltip_text(win->status_label, NULL);
     }
 }
 
 /**
  * @brief App window set error status.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param win The win supplied by the caller.
+ * @param short_text The short text supplied by the caller.
+ * @param detail The detail supplied by the caller.
  */
 void app_window_set_error_status(EditorWindow *win,
                                  const char *short_text,
@@ -47,12 +61,37 @@ void app_window_set_error_status(EditorWindow *win,
     win->status_error_detail = g_strdup(detail && detail[0] ? detail : win->status_error_title);
 
     gtk_label_set_text(GTK_LABEL(win->status_label), win->status_error_title);
-    gtk_widget_add_css_class(win->status_label, "cleaf-status-error");
+    gtk_widget_add_css_class(win->status_label, "graptos-status-error");
     gtk_widget_set_tooltip_text(win->status_label, "Click to show error details");
 }
 
 /**
+ * @brief Report an application error through status and optional dialog detail.
+ * @details A file operation can fail before the user has any visible tab to
+ *          inspect. The status bar keeps the failure reachable after the dialog
+ *          closes, while the immediate dialog makes blocking failures explicit.
+ * @param win The window that owns the status bar and parent dialog.
+ * @param short_text The short error title shown in the status bar and dialog.
+ * @param detail The detailed error message shown in tooltips and dialogs.
+ * @param show_dialog TRUE to show the error dialog immediately.
+ */
+void app_window_report_error(EditorWindow *win,
+                             const char *short_text,
+                             const char *detail,
+                             gboolean show_dialog) {
+    const char *title = short_text && short_text[0] ? short_text : "Error";
+    const char *message = detail && detail[0] ? detail : title;
+
+    app_window_set_error_status(win, title, message);
+    if (show_dialog) {
+        dialog_error(app_window_gtk(win), title, message);
+    }
+}
+
+/**
  * @brief App window show status error.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param win The win supplied by the caller.
  */
 void app_window_show_status_error(EditorWindow *win) {
     if (!win || !win->status_error_detail) return;
@@ -64,6 +103,9 @@ void app_window_show_status_error(EditorWindow *win) {
 
 /**
  * @brief Canonical or dup.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param path The filesystem path supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *canonical_or_dup(const char *path) {
     if (!path || path[0] == '\0') return NULL;
@@ -79,6 +121,10 @@ static char *canonical_or_dup(const char *path) {
 
 /**
  * @brief App window is file locked.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param win The win supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean app_window_is_file_locked(EditorWindow *win, const char *path) {
     if (!win || !win->locked_paths || !path) return FALSE;
@@ -95,6 +141,10 @@ gboolean app_window_is_file_locked(EditorWindow *win, const char *path) {
 
 /**
  * @brief App window set file locked.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param win The win supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
+ * @param locked The locked supplied by the caller.
  */
 void app_window_set_file_locked(EditorWindow *win,
                                 const char *path,
@@ -124,14 +174,9 @@ void app_window_set_file_locked(EditorWindow *win,
      * Open tabs keep their own locked state so the editor can update UI and
      * editing behavior without checking the hash table every time.
      */
-    gint pages = win->notebook
-        ? gtk_notebook_get_n_pages(GTK_NOTEBOOK(win->notebook)) : 0;
-
-    for (gint i = 0; i < pages; i++) {
-        GtkWidget *child = gtk_notebook_get_nth_page(GTK_NOTEBOOK(win->notebook), i);
-        EditorTab *tab = child
-            ? g_object_get_data(G_OBJECT(child), "cleaf-tab")
-            : NULL;
+    guint count = app_window_tab_count(win);
+    for (guint i = 0u; i < count; i++) {
+        EditorTab *tab = app_window_tab_at(win, i);
 
         if (!tab || !tab->file_path) continue;
 
@@ -148,6 +193,10 @@ void app_window_set_file_locked(EditorWindow *win,
 
 /**
  * @brief App window note path renamed.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param win The win supplied by the caller.
+ * @param old_path The old path supplied by the caller.
+ * @param new_path The new path supplied by the caller.
  */
 void app_window_note_path_renamed(EditorWindow *win,
                                   const char *old_path,
@@ -181,14 +230,9 @@ void app_window_note_path_renamed(EditorWindow *win,
      * Update open tabs that point to the renamed file or to files inside a
      * renamed folder.
      */
-    gint pages = win->notebook
-        ? gtk_notebook_get_n_pages(GTK_NOTEBOOK(win->notebook)) : 0;
-
-    for (gint i = 0; i < pages; i++) {
-        GtkWidget *child = gtk_notebook_get_nth_page(GTK_NOTEBOOK(win->notebook), i);
-        EditorTab *tab = child
-            ? g_object_get_data(G_OBJECT(child), "cleaf-tab")
-            : NULL;
+    guint count = app_window_tab_count(win);
+    for (guint i = 0u; i < count; i++) {
+        EditorTab *tab = app_window_tab_at(win, i);
 
         if (!tab || !tab->file_path) continue;
 

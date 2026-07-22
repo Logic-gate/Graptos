@@ -5,6 +5,9 @@ icon: mime
 filenames: [Cargo.toml, pyproject.toml]
 index: true
 import_style: generic
+lsp_command: taplo
+lsp_language_id: toml
+lsp_args: [lsp, stdio]
 completions: [true, false, name, version, dependencies, dev-dependencies, package, workspace, scripts, tool, build-system, description, project, authors, license, repository]
 auto_indent: false
 indent_openers: []
@@ -23,8 +26,34 @@ import_extensions: [.toml]
 import_member_files: []
 import_strip_extensions: false
 import_dot_modules: false
+formatting:
+  enabled: false
+  scope: selection_or_block
+  profile: data
+  block_style: none
+  statement_style: newline
+  brace_style: attach
+  one_statement_per_line: false
+  space_before_block_opener: false
+  space_after_comma: true
+  space_after_control_keyword: false
+  space_around_binary_operators: true
+  space_around_logical_operators: false
+  logical_operators: []
+  binary_operators: ["="]
+  unary_prefix_operators: []
+  protected_scopes: [comment, string]
+  pointer_alignment: name
+  continuation_indent: 4
+  max_column: 100
+  wrap_after_comma: true
+  case_indent: 0
+  preserve_blank_lines: true
+  max_blank_lines: 0
+  collapse_empty_blocks: false
 rules:
   - name: comment
+    scope: comment
     pattern: "#.*$"
     color: "#6A9955"
   - name: section
@@ -36,6 +65,7 @@ rules:
     color: "#9CDCFE"
     bold: true
   - name: string
+    scope: string
     pattern: "\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'"
     color: "#CE9178"
   - name: boolean

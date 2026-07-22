@@ -1,12 +1,18 @@
 /**
  * @file src/editor_tab_gutter.c
- * @brief Cleaf editor tab gutter module.
+ * @brief Graptoς editor tab gutter module.
+ * @details The gutter and minimap mirror the editor; they are not a second editor. We
+ *          schedule their refreshes because typing should win over decorative updates every
+ *          time.
  */
 
 #include "editor_tab_private.h"
 
 /**
  * @brief Decimal digits.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param value The value being parsed, stored, or applied.
+ * @return The computed value requested by the caller.
  */
 int decimal_digits(int value) {
     int digits = 1;
@@ -20,6 +26,8 @@ int decimal_digits(int value) {
 
 /**
  * @brief Update gutter width.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void update_gutter_width(EditorTab *tab) {
     if (!tab || !tab->buffer || !tab->gutter) return;
@@ -38,6 +46,11 @@ void update_gutter_width(EditorTab *tab) {
 
 /**
  * @brief Gutter draw background.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param cr The cr supplied by the caller.
+ * @param width The width supplied by the caller.
+ * @param height The height supplied by the caller.
  */
 static void gutter_draw_background(GtkWidget *widget, cairo_t *cr,
                                    gint width, gint height) {
@@ -53,6 +66,14 @@ static void gutter_draw_background(GtkWidget *widget, cairo_t *cr,
 
 /**
  * @brief Gutter draw line number.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param cr The cr supplied by the caller.
+ * @param layout The layout supplied by the caller.
+ * @param gutter_width The gutter width supplied by the caller.
+ * @param draw_y The draw y supplied by the caller.
+ * @param line_height The line height supplied by the caller.
+ * @param line_no The line no supplied by the caller.
+ * @param current_line The current line supplied by the caller.
  */
 static void gutter_draw_line_number(cairo_t *cr, PangoLayout *layout,
                                     gint gutter_width, gint draw_y,
@@ -84,6 +105,12 @@ static void gutter_draw_line_number(cairo_t *cr, PangoLayout *layout,
 
 /**
  * @brief On gutter draw.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param area The area supplied by the caller.
+ * @param cr The cr supplied by the caller.
+ * @param draw_width The draw width supplied by the caller.
+ * @param draw_height The draw height supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void on_gutter_draw(GtkDrawingArea *area, cairo_t *cr, int draw_width,
                     int draw_height, gpointer user_data) {
@@ -135,6 +162,9 @@ void on_gutter_draw(GtkDrawingArea *area, cairo_t *cr, int draw_width,
 
 /**
  * @brief Sync minimap scroll.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param main_adj The main adj supplied by the caller.
  */
 static void sync_minimap_scroll(EditorTab *tab, GtkAdjustment *main_adj) {
     if (!tab || !tab->minimap_scrolled || !main_adj) return;
@@ -160,6 +190,9 @@ static void sync_minimap_scroll(EditorTab *tab, GtkAdjustment *main_adj) {
 
 /**
  * @brief On vadjustment value changed.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param adjustment The adjustment supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void on_vadjustment_value_changed(GtkAdjustment *adjustment, gpointer user_data) {
     EditorTab *tab = user_data;
@@ -167,12 +200,15 @@ void on_vadjustment_value_changed(GtkAdjustment *adjustment, gpointer user_data)
     if (tab) {
         sync_minimap_scroll(tab, adjustment);
         if (tab->minimap_view) gtk_widget_queue_draw(tab->minimap_view);
+        editor_tab_reposition_visible_cursor_popovers(tab);
     }
 }
 
 
 /**
  * @brief Ensure match tag.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void ensure_match_tag(EditorTab *tab) {
     if (!tab || !tab->buffer) return;
@@ -181,13 +217,13 @@ void ensure_match_tag(EditorTab *tab) {
     const char *fg = tab->win && tab->win->search_match_fg_color ?
         tab->win->search_match_fg_color : "#ffffff";
     GtkTextTagTable *table = gtk_text_buffer_get_tag_table(tab->buffer);
-    GtkTextTag *tag = gtk_text_tag_table_lookup(table, "cleaf-selection-match");
+    GtkTextTag *tag = gtk_text_tag_table_lookup(table, "graptos-selection-match");
     if (tag) {
         g_object_set(tag, "background", bg, "foreground", fg,
                      "underline", PANGO_UNDERLINE_SINGLE, NULL);
         return;
     }
-    gtk_text_buffer_create_tag(tab->buffer, "cleaf-selection-match",
+    gtk_text_buffer_create_tag(tab->buffer, "graptos-selection-match",
                                "background", bg,
                                "foreground", fg,
                                "underline", PANGO_UNDERLINE_SINGLE,
@@ -197,6 +233,8 @@ void ensure_match_tag(EditorTab *tab) {
 
 /**
  * @brief Ensure minimap match tag.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void ensure_minimap_match_tag(EditorTab *tab) {
     (void)tab;
@@ -205,6 +243,8 @@ void ensure_minimap_match_tag(EditorTab *tab) {
 
 /**
  * @brief Clear minimap matches.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void clear_minimap_matches(EditorTab *tab) {
     if (tab && tab->minimap_view) gtk_widget_queue_draw(tab->minimap_view);
@@ -213,16 +253,18 @@ void clear_minimap_matches(EditorTab *tab) {
 
 /**
  * @brief Clear selection matches.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void clear_selection_matches(EditorTab *tab) {
     if (!tab || !tab->buffer) return;
     if (tab->selection_matches_active) {
         GtkTextTagTable *table = gtk_text_buffer_get_tag_table(tab->buffer);
-        if (gtk_text_tag_table_lookup(table, "cleaf-selection-match")) {
+        if (gtk_text_tag_table_lookup(table, "graptos-selection-match")) {
             GtkTextIter start;
             GtkTextIter end;
             gtk_text_buffer_get_bounds(tab->buffer, &start, &end);
-            gtk_text_buffer_remove_tag_by_name(tab->buffer, "cleaf-selection-match", &start, &end);
+            gtk_text_buffer_remove_tag_by_name(tab->buffer, "graptos-selection-match", &start, &end);
         }
     }
     clear_minimap_matches(tab);
@@ -232,6 +274,10 @@ void clear_selection_matches(EditorTab *tab) {
 
 /**
  * @brief Apply minimap match.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param start The start supplied by the caller.
+ * @param end The end supplied by the caller.
  */
 void apply_minimap_match(EditorTab *tab, GtkTextIter *start, GtkTextIter *end) {
     (void)start;
@@ -242,6 +288,8 @@ void apply_minimap_match(EditorTab *tab, GtkTextIter *start, GtkTextIter *end) {
 
 /**
  * @brief Update selection matches.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void update_selection_matches(EditorTab *tab) {
     if (!tab || !tab->buffer) return;
@@ -249,10 +297,10 @@ void update_selection_matches(EditorTab *tab) {
     GtkTextIter start;
     GtkTextIter end;
     gtk_text_buffer_get_bounds(tab->buffer, &start, &end);
-    gtk_text_buffer_remove_tag_by_name(tab->buffer, "cleaf-selection-match", &start, &end);
+    gtk_text_buffer_remove_tag_by_name(tab->buffer, "graptos-selection-match", &start, &end);
     clear_minimap_matches(tab);
 
-    if ((guint)gtk_text_buffer_get_char_count(tab->buffer) > CLEAF_SELECTION_MATCH_MAX_CHARS) {
+    if ((guint)gtk_text_buffer_get_char_count(tab->buffer) > GRAPTOS_SELECTION_MATCH_MAX_CHARS) {
         return;
     }
 
@@ -271,7 +319,7 @@ void update_selection_matches(EditorTab *tab) {
     GtkTextIter match_end;
     guint count = 0u;
     while (gtk_text_iter_forward_search(&search, needle, GTK_TEXT_SEARCH_TEXT_ONLY, &match_start, &match_end, &end)) {
-        gtk_text_buffer_apply_tag_by_name(tab->buffer, "cleaf-selection-match", &match_start, &match_end);
+        gtk_text_buffer_apply_tag_by_name(tab->buffer, "graptos-selection-match", &match_start, &match_end);
         tab->selection_matches_active = TRUE;
         apply_minimap_match(tab, &match_start, &match_end);
         search = match_end;
@@ -284,6 +332,9 @@ void update_selection_matches(EditorTab *tab) {
 
 /**
  * @brief Selection match timeout cb.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param user_data The callback context passed through GTK signal data.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean selection_match_timeout_cb(gpointer user_data) {
     EditorTab *tab = user_data;
@@ -296,10 +347,12 @@ gboolean selection_match_timeout_cb(gpointer user_data) {
 
 /**
  * @brief Editor tab schedule selection matches.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void editor_tab_schedule_selection_matches(EditorTab *tab) {
     if (!tab || !tab->buffer) return;
-    cleaf_source_cancel(&tab->selection_match_timeout);
+    graptos_source_cancel(&tab->selection_match_timeout);
     if (!editor_tab_live_features_allowed(tab)) {
         tab->selection_match_timeout = 0u;
         return;
@@ -320,7 +373,7 @@ void editor_tab_schedule_selection_matches(EditorTab *tab) {
     }
 
     tab->selection_match_timeout = g_timeout_add_full(G_PRIORITY_LOW,
-                                                     CLEAF_SELECTION_MATCH_DELAY_MS,
+                                                     GRAPTOS_SELECTION_MATCH_DELAY_MS,
                                                      selection_match_timeout_cb,
                                                      tab,
                                                      NULL);
@@ -328,7 +381,287 @@ void editor_tab_schedule_selection_matches(EditorTab *tab) {
 
 
 /**
+ * @brief Clamp color channel.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param value The value being parsed, stored, or applied.
+ * @return The computed value requested by the caller.
+ */
+static int clamp_color_channel(int value) {
+    if (value < 0) return 0;
+    if (value > 255) return 255;
+    return value;
+}
+
+
+/**
+ * @brief Normalize color literal.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param literal The literal supplied by the caller.
+ * @param bg_out Output storage filled when the operation can provide a value.
+ * @param fg_out Output storage filled when the operation can provide a value.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
+ */
+static gboolean normalize_color_literal(const char *literal, char **bg_out, char **fg_out) {
+    if (!literal || !bg_out || !fg_out) return FALSE;
+
+    GdkRGBA rgba;
+    gboolean parsed = gdk_rgba_parse(&rgba, literal);
+
+    if (!parsed && literal[0] == '#') {
+        guint digits = 0u;
+        while (g_ascii_isxdigit(literal[1u + digits]) && digits < 8u) digits++;
+        if (digits >= 3u) {
+            char hex[7] = {0};
+            for (guint i = 0u; i < 6u; i++) {
+                hex[i] = i < digits ? literal[1u + i] : '0';
+            }
+            unsigned int rgb = 0u;
+            if (sscanf(hex, "%06x", &rgb) == 1) {
+                int red = (int)((rgb >> 16) & 0xffu);
+                int green = (int)((rgb >> 8) & 0xffu);
+                int blue = (int)(rgb & 0xffu);
+                rgba.red = (float)((double)red / 255.0);
+                rgba.green = (float)((double)green / 255.0);
+                rgba.blue = (float)((double)blue / 255.0);
+                rgba.alpha = 1.0;
+                parsed = TRUE;
+            }
+        }
+    }
+
+    if (!parsed) return FALSE;
+
+    int red = clamp_color_channel((int)(rgba.red * 255.0 + 0.5));
+    int green = clamp_color_channel((int)(rgba.green * 255.0 + 0.5));
+    int blue = clamp_color_channel((int)(rgba.blue * 255.0 + 0.5));
+    double luminance = 0.2126 * rgba.red + 0.7152 * rgba.green + 0.0722 * rgba.blue;
+
+    *bg_out = g_strdup_printf("#%02x%02x%02x", red, green, blue);
+    *fg_out = g_strdup(luminance > 0.55 ? "#111111" : "#ffffff");
+    return *bg_out && *fg_out;
+}
+
+
+/**
+ * @brief Apply color literal tag.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param start_offset The start offset supplied by the caller.
+ * @param end_offset The end offset supplied by the caller.
+ * @param background The background supplied by the caller.
+ * @param foreground The foreground supplied by the caller.
+ * @param index The index supplied by the caller.
+ */
+static void apply_color_literal_tag(EditorTab *tab,
+                                    gint start_offset,
+                                    gint end_offset,
+                                    const char *background,
+                                    const char *foreground,
+                                    guint index) {
+    if (!tab || !tab->buffer || start_offset >= end_offset || !background || !foreground) return;
+    if (!tab->color_literal_tag_names) {
+        tab->color_literal_tag_names = g_ptr_array_new_with_free_func(g_free);
+    }
+
+    char *name = g_strdup_printf("graptos-color-literal-%u", index);
+    if (!name) return;
+
+    gtk_text_buffer_create_tag(tab->buffer, name,
+                               "background", background,
+                               "foreground", foreground,
+                               NULL);
+
+    GtkTextIter start;
+    GtkTextIter end;
+    gtk_text_buffer_get_iter_at_offset(tab->buffer, &start, start_offset);
+    gtk_text_buffer_get_iter_at_offset(tab->buffer, &end, end_offset);
+    gtk_text_buffer_apply_tag_by_name(tab->buffer, name, &start, &end);
+    g_ptr_array_add(tab->color_literal_tag_names, name);
+    tab->color_literals_active = TRUE;
+}
+
+
+/**
+ * @brief Clear color literals.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ */
+void clear_color_literals(EditorTab *tab) {
+    if (!tab || !tab->buffer || !tab->color_literal_tag_names) {
+        if (tab) tab->color_literals_active = FALSE;
+        return;
+    }
+
+    GtkTextTagTable *table = gtk_text_buffer_get_tag_table(tab->buffer);
+    GtkTextIter start;
+    GtkTextIter end;
+    gtk_text_buffer_get_bounds(tab->buffer, &start, &end);
+    for (guint i = 0u; i < tab->color_literal_tag_names->len; i++) {
+        const char *name = g_ptr_array_index(tab->color_literal_tag_names, i);
+        GtkTextTag *tag = gtk_text_tag_table_lookup(table, name);
+        if (!tag) continue;
+        gtk_text_buffer_remove_tag(tab->buffer, tag, &start, &end);
+        gtk_text_tag_table_remove(table, tag);
+    }
+    g_ptr_array_set_size(tab->color_literal_tag_names, 0u);
+    tab->color_literals_active = FALSE;
+}
+
+
+/**
+ * @brief Check color token boundary.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param c The c supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
+ */
+static gboolean color_token_boundary(char c) {
+    return c == '\0' || !(g_ascii_isalnum(c) || c == '_' || c == '-' || c == '#');
+}
+
+
+/**
+ * @brief Maybe apply color token.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param token The token supplied by the caller.
+ * @param start_offset The start offset supplied by the caller.
+ * @param end_offset The end offset supplied by the caller.
+ * @param index The index supplied by the caller.
+ * @return The computed value requested by the caller.
+ */
+static guint maybe_apply_color_token(EditorTab *tab,
+                                     const char *token,
+                                     gint start_offset,
+                                     gint end_offset,
+                                     guint index) {
+    char *background = NULL;
+    char *foreground = NULL;
+    gboolean ok = normalize_color_literal(token, &background, &foreground);
+    if (ok) {
+        apply_color_literal_tag(tab, start_offset, end_offset, background, foreground, index);
+        index++;
+    }
+    g_free(background);
+    g_free(foreground);
+    return index;
+}
+
+
+/**
+ * @brief Update color literals.
+ * @details Color highlighting is useful only if it stays cheap. We scan bounded
+ *          buffers for common CSS-style forms and paint just the literal token
+ *          so theme/code previews do not need a separate color picker mode.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ */
+void update_color_literals(EditorTab *tab) {
+    if (!tab || !tab->buffer) return;
+    clear_color_literals(tab);
+    if ((guint)gtk_text_buffer_get_char_count(tab->buffer) > GRAPTOS_COLOR_LITERAL_MAX_CHARS) return;
+
+    GtkTextIter start;
+    GtkTextIter end;
+    gtk_text_buffer_get_bounds(tab->buffer, &start, &end);
+    char *text = gtk_text_buffer_get_text(tab->buffer, &start, &end, FALSE);
+    if (!text) return;
+
+    const char *p = text;
+    gint offset = 0;
+    guint tag_index = 0u;
+    while (*p != '\0') {
+        if (*p == '#' && color_token_boundary(p > text ? p[-1] : '\0')) {
+            const char *token_start = p;
+            const char *token_end = p + 1;
+            guint digits = 0u;
+            while (g_ascii_isxdigit(*token_end) && digits < 8u) {
+                token_end++;
+                digits++;
+            }
+            if (digits >= 3u && color_token_boundary(*token_end)) {
+                char *token = g_strndup(token_start, (gsize)(token_end - token_start));
+                tag_index = maybe_apply_color_token(tab, token, offset,
+                                                    offset + (gint)(token_end - token_start),
+                                                    tag_index);
+                g_free(token);
+                offset += (gint)(token_end - token_start);
+                p = token_end;
+                continue;
+            }
+        } else if (g_ascii_isalpha(*p) && color_token_boundary(p > text ? p[-1] : '\0')) {
+            const char *token_start = p;
+            const char *token_end = p + 1;
+            while (g_ascii_isalnum(*token_end) || *token_end == '_' || *token_end == '-') token_end++;
+            if (*token_end == '(' &&
+                (g_ascii_strncasecmp(token_start, "rgb", 3) == 0 ||
+                 g_ascii_strncasecmp(token_start, "rgba", 4) == 0 ||
+                 g_ascii_strncasecmp(token_start, "hsl", 3) == 0 ||
+                 g_ascii_strncasecmp(token_start, "hsla", 4) == 0)) {
+                const char *func_end = token_end + 1;
+                while (*func_end != '\0' && *func_end != ')' && *func_end != '\n') func_end++;
+                if (*func_end == ')') token_end = func_end + 1;
+            }
+            if (color_token_boundary(*token_end)) {
+                char *token = g_strndup(token_start, (gsize)(token_end - token_start));
+                tag_index = maybe_apply_color_token(tab, token, offset,
+                                                    offset + (gint)(token_end - token_start),
+                                                    tag_index);
+                g_free(token);
+                offset += (gint)(token_end - token_start);
+                p = token_end;
+                continue;
+            }
+        }
+
+        p = g_utf8_next_char(p);
+        offset++;
+    }
+
+    g_free(text);
+}
+
+
+/**
+ * @brief Color literal timeout cb.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param user_data The callback context passed through GTK signal data.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
+ */
+gboolean color_literal_timeout_cb(gpointer user_data) {
+    EditorTab *tab = user_data;
+    if (!tab) return G_SOURCE_REMOVE;
+    tab->color_literal_timeout = 0u;
+    update_color_literals(tab);
+    return G_SOURCE_REMOVE;
+}
+
+
+/**
+ * @brief Editor tab schedule color literals.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ */
+void editor_tab_schedule_color_literals(EditorTab *tab) {
+    if (!tab || !tab->buffer) return;
+    graptos_source_cancel(&tab->color_literal_timeout);
+    if (!editor_tab_live_features_allowed(tab)) {
+        tab->color_literal_timeout = 0u;
+        return;
+    }
+
+    tab->color_literal_timeout = g_timeout_add_full(G_PRIORITY_LOW,
+                                                   GRAPTOS_COLOR_LITERAL_DELAY_MS,
+                                                   color_literal_timeout_cb,
+                                                   tab,
+                                                   NULL);
+}
+
+
+/**
  * @brief Update minimap text.
+ * @details The minimap is painted from the real buffer state instead of holding
+ *          a second editable copy. We queue drawing and sync scrolling here so
+ *          it tracks the editor without becoming another source of truth.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void update_minimap_text(EditorTab *tab) {
     if (!tab || !tab->minimap_view || tab->minimap_updating) return;
@@ -346,6 +679,9 @@ void update_minimap_text(EditorTab *tab) {
 
 /**
  * @brief Minimap line is comment.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param text The text fragment supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean minimap_line_is_comment(const char *text) {
     if (!text) return FALSE;
@@ -356,6 +692,9 @@ static gboolean minimap_line_is_comment(const char *text) {
 
 /**
  * @brief Minimap line has string.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param text The text fragment supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean minimap_line_has_string(const char *text) {
     return text && (strchr(text, '"') || strchr(text, '\''));
@@ -363,6 +702,9 @@ static gboolean minimap_line_has_string(const char *text) {
 
 /**
  * @brief Minimap line is preprocessor.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param text The text fragment supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean minimap_line_is_preprocessor(const char *text) {
     if (!text) return FALSE;
@@ -372,6 +714,9 @@ static gboolean minimap_line_is_preprocessor(const char *text) {
 
 /**
  * @brief Minimap set line colour.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param cr The cr supplied by the caller.
+ * @param line The zero-based or display line handled by the caller, matching the surrounding API.
  */
 static void minimap_set_line_colour(cairo_t *cr, const char *line) {
     if (minimap_line_is_preprocessor(line)) {
@@ -387,6 +732,12 @@ static void minimap_set_line_colour(cairo_t *cr, const char *line) {
 
 /**
  * @brief On minimap draw.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param area The area supplied by the caller.
+ * @param cr The cr supplied by the caller.
+ * @param width The width supplied by the caller.
+ * @param height The height supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void on_minimap_draw(GtkDrawingArea *area, cairo_t *cr, int width,
                      int height, gpointer user_data) {
@@ -452,6 +803,14 @@ void on_minimap_draw(GtkDrawingArea *area, cairo_t *cr, int width,
 
 /**
  * @brief On minimap click.
+ * @details The minimap click maps a vertical ratio back to a buffer line. That
+ *          keeps the behavior independent of font size and lets the minimap act
+ *          like a compact scrollbar rather than a fragile text widget.
+ * @param gesture The gesture supplied by the caller.
+ * @param n_press The n press supplied by the caller.
+ * @param x The x supplied by the caller.
+ * @param y The y supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void on_minimap_click(GtkGestureClick *gesture, int n_press, double x,
                       double y, gpointer user_data) {

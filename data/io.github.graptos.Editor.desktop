@@ -1,11 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=Cleaf
+Name=Graptoς
 Comment=Small C/GTK text editor with YAML syntax highlighting
-Exec=cleaf %F
+Exec=graptos %F
 Icon=accessories-text-editor
 Terminal=false
 Categories=Utility;TextEditor;Development;
-Keywords=Text;Editor;Code;Programming;Development;
-MimeType=text/plain;application/x-zerosize;
-StartupNotify=true
+MimeType=text/plain;text/x-c;text/x-python;application/x-yaml;text/yaml;

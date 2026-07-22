@@ -27,6 +27,31 @@ import_strip_extensions: false
 import_dot_modules: false
 import_static_modules: []
 completions: []
+formatting:
+  enabled: false
+  scope: selection_or_block
+  profile: plain
+  block_style: none
+  statement_style: none
+  brace_style: attach
+  one_statement_per_line: false
+  space_before_block_opener: false
+  space_after_comma: false
+  space_after_control_keyword: false
+  space_around_binary_operators: false
+  space_around_logical_operators: false
+  logical_operators: []
+  binary_operators: []
+  unary_prefix_operators: []
+  protected_scopes: []
+  pointer_alignment: name
+  continuation_indent: 4
+  max_column: 0
+  wrap_after_comma: false
+  case_indent: 0
+  preserve_blank_lines: true
+  max_blank_lines: 0
+  collapse_empty_blocks: false
 rules:
 - name: diff-header
   pattern: ^(diff --git|index |--- |\+\+\+ ).*$

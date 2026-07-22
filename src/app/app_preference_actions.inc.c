@@ -1,6 +1,12 @@
 /**
  * @file src/app/app_preference_actions.inc.c
- * @brief Cleaf app preference actions module.
+ * @brief Graptoς app preference actions module.
+ * @details These actions are presentation glue. We keep them away from the editor core
+ *          because dialogs and theme controls change often, while the buffer and project
+ *          code should not care how those controls are displayed.
+ * @param win The win supplied by the caller.
+ * @param width The width supplied by the caller.
+ * @param insert_spaces The insert spaces supplied by the caller.
  */
 
 void set_tab_policy(EditorWindow *win, guint width, gboolean insert_spaces) {
@@ -10,12 +16,15 @@ void set_tab_policy(EditorWindow *win, guint width, gboolean insert_spaces) {
     win->tab_width = width;
     win->insert_spaces = insert_spaces;
     apply_tab_policy_to_all_tabs(win); //Existing tabs 
-    cleaf_config_save(win);
+    graptos_config_save(win);
 }
 
 
 /**
  * @brief Action tab spaces 2.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_tab_spaces_2(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -25,6 +34,9 @@ void action_tab_spaces_2(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action tab spaces 4.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_tab_spaces_4(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -34,6 +46,9 @@ void action_tab_spaces_4(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action tab spaces 8.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_tab_spaces_8(GtkWidget *widget, gpointer user_data) {
     //I found this in Sublime, I have no idea who uses 8...propably legacy use.
@@ -44,6 +59,9 @@ void action_tab_spaces_8(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action tab hard tabs.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_tab_hard_tabs(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -53,6 +71,9 @@ void action_tab_hard_tabs(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action toggle autocomplete.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_toggle_autocomplete(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -61,12 +82,15 @@ void action_toggle_autocomplete(GtkWidget *widget, gpointer user_data) {
     // Autocomplete is applied through the same tab-policy path because editor view settings are refreshed together
     win->autocomplete_enabled = !win->autocomplete_enabled;
     apply_tab_policy_to_all_tabs(win);
-    cleaf_config_save(win);
+    graptos_config_save(win);
 }
 
 
 /**
  * @brief Action toggle autosave.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_toggle_autosave(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -77,12 +101,15 @@ void action_toggle_autosave(GtkWidget *widget, gpointer user_data) {
     restart_auto_save_timer(win);
     // Refresh buttons so the bottom bar reflects the actual autosave state.
     update_policy_buttons(win);
-    cleaf_config_save(win);
+    graptos_config_save(win);
 }
 
 
 /**
  * @brief Action toggle backup.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_toggle_backup(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -90,12 +117,15 @@ void action_toggle_backup(GtkWidget *widget, gpointer user_data) {
     if (!win) return;
     win->backup_enabled = !win->backup_enabled;
     apply_tab_policy_to_all_tabs(win);
-    cleaf_config_save(win);
+    graptos_config_save(win);
 }
 
 
 /**
  * @brief Rgba to hex.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param rgba The rgba supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 char *rgba_to_hex(const GdkRGBA *rgba) {
     if (!rgba) return g_strdup("#000000");
@@ -118,6 +148,11 @@ char *rgba_to_hex(const GdkRGBA *rgba) {
 
 /**
  * @brief Choose color for slot.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param win The win supplied by the caller.
+ * @param parent_widget The parent widget supplied by the caller.
+ * @param title The title supplied by the caller.
+ * @param slot The slot supplied by the caller.
  */
 void choose_color_for_slot(EditorWindow *win,
                            GtkWidget *parent_widget,
@@ -144,12 +179,15 @@ void choose_color_for_slot(EditorWindow *win,
     *slot = rgba_to_hex(&parsed);
     g_free(value);
     apply_preferences_to_all_tabs(win);
-    cleaf_config_save(win);
+    graptos_config_save(win);
 }
 
 
 /**
  * @brief Action choose background.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_choose_background(GtkWidget *widget, gpointer user_data) {
     EditorWindow *win = user_data;
@@ -159,6 +197,9 @@ void action_choose_background(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action choose sidebar background.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_choose_sidebar_background(GtkWidget *widget, gpointer user_data) {
     EditorWindow *win = user_data;
@@ -168,6 +209,9 @@ void action_choose_sidebar_background(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action choose tabbar background.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_choose_tabbar_background(GtkWidget *widget, gpointer user_data) {
     EditorWindow *win = user_data;
@@ -177,6 +221,9 @@ void action_choose_tabbar_background(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action choose scroll preview background.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_choose_scroll_preview_background(GtkWidget *widget, gpointer user_data) {
     EditorWindow *win = user_data;
@@ -186,6 +233,9 @@ void action_choose_scroll_preview_background(GtkWidget *widget, gpointer user_da
 
 /**
  * @brief Action choose popover background.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_choose_popover_background(GtkWidget *widget, gpointer user_data) {
     EditorWindow *win = user_data;
@@ -195,6 +245,9 @@ void action_choose_popover_background(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Action reset background.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_reset_background(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -202,12 +255,15 @@ void action_reset_background(GtkWidget *widget, gpointer user_data) {
     if (!win) return;
     g_clear_pointer(&win->editor_bg_color, g_free);
     apply_preferences_to_all_tabs(win);
-    cleaf_config_save(win);
+    graptos_config_save(win);
 }
 
 
 /**
  * @brief Action reset all backgrounds.
+ * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_reset_all_backgrounds(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -248,6 +304,10 @@ void action_reset_all_backgrounds(GtkWidget *widget, gpointer user_data) {
     g_clear_pointer(&win->scroll_preview_bg_color, g_free);
     g_clear_pointer(&win->scroll_preview_fg_color, g_free);
     g_clear_pointer(&win->popover_bg_color, g_free);
+    g_clear_pointer(&win->popover_border_color, g_free);
+    g_clear_pointer(&win->tooltip_bg_color, g_free);
+    g_clear_pointer(&win->tooltip_fg_color, g_free);
+    g_clear_pointer(&win->tooltip_border_color, g_free);
     g_clear_pointer(&win->ref_popover_bg_color, g_free);
     g_clear_pointer(&win->ref_popover_fg_color, g_free);
     g_clear_pointer(&win->ref_popover_heading_color, g_free);
@@ -263,10 +323,17 @@ void action_reset_all_backgrounds(GtkWidget *widget, gpointer user_data) {
     g_clear_pointer(&win->dialog_fg_color, g_free);
     g_clear_pointer(&win->dialog_border_color, g_free);
     g_clear_pointer(&win->dialog_title_color, g_free);
+    g_clear_pointer(&win->dialog_body_color, g_free);
+    g_clear_pointer(&win->dialog_muted_color, g_free);
+    g_clear_pointer(&win->dialog_output_color, g_free);
+    g_clear_pointer(&win->dialog_action_color, g_free);
+    g_clear_pointer(&win->dialog_destructive_action_color, g_free);
+    g_clear_pointer(&win->dialog_input_fg_color, g_free);
+    g_clear_pointer(&win->dialog_input_bg_color, g_free);
     g_clear_pointer(&win->search_match_bg_color, g_free);
     g_clear_pointer(&win->search_match_fg_color, g_free);
     g_clear_pointer(&win->diagnostic_warning_bg_color, g_free);
     g_clear_pointer(&win->diagnostic_warning_fg_color, g_free);
     apply_preferences_to_all_tabs(win);
-    cleaf_config_save(win);
+    graptos_config_save(win);
 }

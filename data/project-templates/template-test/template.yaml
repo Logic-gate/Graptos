@@ -1,0 +1,95 @@
+# Project template manifest format.
+# Increment this only when Graptoς introduces an incompatible schema change.
+# Currently accepts version 1
+version: 1
+
+# Template IDs are used for discovery and overrides. A user template with the
+# same ID takes precedence over the built-in version.
+# If a user defines a c-cli in .config/graptos/project-templates
+# it will override the defualt Graptoς template.
+id: template-test
+
+# These values are displayed in the Init Project dialog.
+name: Template Test
+description: Commented template used to exercise the project-init manifest parser.
+language: Test
+
+# Variables become controls in the project creation dialog and may be referenced
+# from file contents, output paths, defaults, and `when` conditions.
+variables:
+  greeting:
+    label: Greeting
+    type: text
+
+    # Defaults are rendered after Graptoς has created its built-in project
+    # variables, so the project name can be used here.
+    default: Hello ${project_name}
+
+  include_notes:
+    label: Include notes
+    type: boolean
+    default: true
+
+  build_style:
+    label: Build style
+    type: choice
+
+    # The default must match one of the declared values.
+    values: [simple, advanced]
+    default: simple
+
+  initialize_git:
+    label: Initialize Git repository
+    type: boolean
+
+    # Keep this disabled by default so parser and generation tests do not create
+    # Git repositories unless that behavior is being tested explicitly.
+    default: false
+
+# Directories are resolved before files are written. Use the short form when no
+# condition is needed and the expanded form when additional fields are required.
+directories:
+  - src
+
+  - path: notes
+    when: include_notes
+
+  - path: advanced
+    when: build_style == "advanced"
+
+# File paths are relative to the generated project root. Template paths and
+# source paths are relative to this template's directory.
+files:
+  - path: README.md
+    template: files/README.md
+
+  - path: src/main.txt
+    template: files/main.txt
+
+  # Keep the directory and file under the same condition so the generator does
+  # not create an empty notes directory when notes are disabled.
+  - path: notes/notes.txt
+    template: files/notes.txt
+    when: include_notes
+
+  - path: advanced/config.txt
+    template: files/advanced-config.txt
+    when: build_style == "advanced"
+
+  # `source` with `render: false` performs a literal copy. Placeholders inside
+  # this file must remain unchanged.
+  - path: raw/literal.txt
+    source: files/literal.txt
+    render: false
+
+# Actions run only after the project files have been generated successfully.
+# Graptoς supports approved action types rather than arbitrary shell commands.
+actions:
+  - type: git-init
+    when: initialize_git
+
+# After generation, open the project root and select the README as the initial
+# file so the result can be inspected immediately.
+open:
+  project: .
+  file: README.md

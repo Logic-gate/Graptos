@@ -1,12 +1,17 @@
 /**
  * @file src/editor_tab_edit.c
- * @brief Cleaf editor tab edit module.
+ * @brief Graptoς editor tab edit module.
+ * @details Editor tabs hold the real editing surface. We split the implementation by
+ *          lifecycle, input, rendering, preview, and transient UI because each part has
+ *          different timing and cleanup pressure.
  */
 
 #include "editor_tab_private.h"
 
 /**
  * @brief Editor tab cut clipboard.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void editor_tab_cut_clipboard(EditorTab *tab) {
     if (!tab || tab->locked) return;
@@ -17,6 +22,8 @@ void editor_tab_cut_clipboard(EditorTab *tab) {
 
 /**
  * @brief Editor tab copy clipboard.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void editor_tab_copy_clipboard(EditorTab *tab) {
     if (!tab) return;
@@ -27,6 +34,8 @@ void editor_tab_copy_clipboard(EditorTab *tab) {
 
 /**
  * @brief Editor tab paste clipboard.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void editor_tab_paste_clipboard(EditorTab *tab) {
     if (!tab || tab->locked) return;
@@ -37,6 +46,8 @@ void editor_tab_paste_clipboard(EditorTab *tab) {
 
 /**
  * @brief Editor tab select all.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void editor_tab_select_all(EditorTab *tab) {
     if (!tab) return;
@@ -49,6 +60,8 @@ void editor_tab_select_all(EditorTab *tab) {
 
 /**
  * @brief Editor tab cut line.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void editor_tab_cut_line(EditorTab *tab) {
     if (!tab || tab->locked) return;
@@ -70,6 +83,8 @@ void editor_tab_cut_line(EditorTab *tab) {
 
 /**
  * @brief Editor tab paste cut line.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void editor_tab_paste_cut_line(EditorTab *tab) {
     if (!tab || tab->locked || !tab->kill_buffer) return;
@@ -82,6 +97,11 @@ void editor_tab_paste_cut_line(EditorTab *tab) {
 
 /**
  * @brief Select match.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param start The start supplied by the caller.
+ * @param end The end supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean select_match(EditorTab *tab, GtkTextIter *start, GtkTextIter *end) {
     if (!tab || !start || !end) return FALSE;
@@ -93,6 +113,10 @@ gboolean select_match(EditorTab *tab, GtkTextIter *start, GtkTextIter *end) {
 
 /**
  * @brief Editor tab find.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param query The query supplied by the caller.
+ * @param backwards The backwards supplied by the caller.
  */
 void editor_tab_find(EditorTab *tab, const char *query, gboolean backwards) {
     if (!tab || !query || query[0] == '\0') return;
@@ -134,6 +158,10 @@ void editor_tab_find(EditorTab *tab, const char *query, gboolean backwards) {
 
 /**
  * @brief Editor tab replace current.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param find The find supplied by the caller.
+ * @param replace The replace supplied by the caller.
  */
 void editor_tab_replace_current(EditorTab *tab, const char *find, const char *replace) {
     if (!tab || tab->locked || !find || find[0] == '\0' || !replace) return;
@@ -155,6 +183,10 @@ void editor_tab_replace_current(EditorTab *tab, const char *find, const char *re
 
 /**
  * @brief Editor tab replace all.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param find The find supplied by the caller.
+ * @param replace The replace supplied by the caller.
  */
 void editor_tab_replace_all(EditorTab *tab, const char *find, const char *replace) {
     if (!tab || tab->locked || !find || find[0] == '\0' || !replace) return;
@@ -183,6 +215,8 @@ void editor_tab_replace_all(EditorTab *tab, const char *find, const char *replac
 
 /**
  * @brief Editor tab toggle comment.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void editor_tab_toggle_comment(EditorTab *tab) {
     if (!tab || tab->locked) return;
@@ -241,6 +275,8 @@ void editor_tab_toggle_comment(EditorTab *tab) {
 
 /**
  * @brief Editor tab go to line.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void editor_tab_go_to_line(EditorTab *tab) {
     if (!tab) return;
@@ -260,9 +296,158 @@ void editor_tab_go_to_line(EditorTab *tab) {
     g_free(line_text);
 }
 
+/**
+ * @brief Convert a byte offset in UTF-8 text to a GtkTextBuffer character offset.
+ * @details Formatter range detection works in bytes because it scans C-like
+ *          source. GTK iter offsets are characters, so the editor bridges the
+ *          two representations at the buffer boundary.
+ * @param text UTF-8 buffer text.
+ * @param byte_offset Byte offset into text.
+ * @return Character offset suitable for GtkTextBuffer APIs.
+ */
+static gint char_offset_for_byte_offset(const char *text, gsize byte_offset) {
+    if (!text) return 0;
+    gsize len = strlen(text);
+    if (byte_offset > len) byte_offset = len;
+    return (gint)g_utf8_strlen(text, (gssize)byte_offset);
+}
+
+/**
+ * @brief Move a byte offset to the start of its physical line.
+ * @details Formatting a discovered brace block should include the declaration
+ *          or control line that owns the opening brace, otherwise `func() {`
+ *          outside the selected bytes would remain unformatted.
+ * @param text Full buffer text.
+ * @param byte_offset Offset inside text.
+ * @return Byte offset at the start of the containing line.
+ */
+static gsize byte_line_start(const char *text, gsize byte_offset) {
+    if (!text) return 0u;
+    gsize len = strlen(text);
+    if (byte_offset > len) byte_offset = len;
+    while (byte_offset > 0u && text[byte_offset - 1u] != '\n') byte_offset--;
+    return byte_offset;
+}
+
+/**
+ * @brief Resolve the target range for code formatting.
+ * @details Selection wins exactly. Without a selection, the formatter receives
+ *          only the surrounding brace block so Ctrl+J never reformats a whole
+ *          file by accident.
+ * @param tab The editor tab being formatted.
+ * @param start_out Output start iterator.
+ * @param end_out Output end iterator.
+ * @return TRUE when a range was resolved.
+ */
+static gboolean formatter_target_range(EditorTab *tab,
+                                       GtkTextIter *start_out,
+                                       GtkTextIter *end_out) {
+    if (!tab || !tab->buffer || !start_out || !end_out) return FALSE;
+    if (gtk_text_buffer_get_selection_bounds(tab->buffer, start_out, end_out)) {
+        return TRUE;
+    }
+    if (!tab->active_syntax || !tab->active_syntax->formatting ||
+        g_strcmp0(tab->active_syntax->formatting->scope, "selection_or_block") != 0) {
+        return FALSE;
+    }
+
+    GtkTextIter full_start;
+    GtkTextIter full_end;
+    GtkTextIter cursor;
+    GtkTextMark *insert = gtk_text_buffer_get_insert(tab->buffer);
+    gtk_text_buffer_get_bounds(tab->buffer, &full_start, &full_end);
+    gtk_text_buffer_get_iter_at_mark(tab->buffer, &cursor, insert);
+    char *text = gtk_text_buffer_get_text(tab->buffer, &full_start, &full_end, FALSE);
+    if (!text) return FALSE;
+
+    gint cursor_chars = gtk_text_iter_get_offset(&cursor);
+    const char *cursor_ptr = g_utf8_offset_to_pointer(text, cursor_chars);
+    gsize cursor_byte = cursor_ptr ? (gsize)(cursor_ptr - text) : 0u;
+    gsize start_byte = 0u;
+    gsize end_byte = 0u;
+    gboolean found = graptos_format_find_surrounding_block(tab->active_syntax,
+                                                           text,
+                                                           cursor_byte,
+                                                           &start_byte,
+                                                           &end_byte);
+    if (found) {
+        start_byte = byte_line_start(text, start_byte);
+        gtk_text_buffer_get_iter_at_offset(tab->buffer,
+                                           start_out,
+                                           char_offset_for_byte_offset(text, start_byte));
+        gtk_text_buffer_get_iter_at_offset(tab->buffer,
+                                           end_out,
+                                           char_offset_for_byte_offset(text, end_byte));
+    }
+    g_free(text);
+    return found;
+}
+
+/**
+ * @brief Format selected code or the surrounding syntax block.
+ * @details The editor owns range selection and undo grouping; the formatter only
+ *          receives plain text plus syntax and indentation preferences.
+ * @param tab The editor tab whose buffer should be formatted.
+ */
+void editor_tab_format_code(EditorTab *tab) {
+    if (!tab || tab->locked || !tab->buffer || !tab->active_syntax ||
+        !tab->active_syntax->formatting || !tab->active_syntax->formatting->enabled) {
+        return;
+    }
+
+    GtkTextIter start;
+    GtkTextIter end;
+    if (!formatter_target_range(tab, &start, &end)) {
+        if (tab && tab->win) app_window_set_status(tab->win, "No surrounding block to format");
+        return;
+    }
+
+    gint original_start = gtk_text_iter_get_offset(&start);
+    gint original_cursor = 0;
+    GtkTextIter cursor;
+    GtkTextMark *insert = gtk_text_buffer_get_insert(tab->buffer);
+    gtk_text_buffer_get_iter_at_mark(tab->buffer, &cursor, insert);
+    original_cursor = gtk_text_iter_get_offset(&cursor);
+
+    char *text = gtk_text_buffer_get_text(tab->buffer, &start, &end, FALSE);
+    if (!text) return;
+    GraptosFormatterPreferences preferences = {
+        .tab_width = tab->tab_width,
+        .insert_spaces = tab->insert_spaces,
+    };
+    g_autoptr(GError) error = NULL;
+    char *formatted = graptos_format_text(tab->active_syntax, &preferences, text, &error);
+    if (!formatted) {
+        if (tab->win && error) app_window_set_status(tab->win, error->message);
+        g_free(text);
+        return;
+    }
+    if (strcmp(text, formatted) != 0) {
+        gtk_text_buffer_begin_user_action(tab->buffer);
+        gtk_text_buffer_delete(tab->buffer, &start, &end);
+        gtk_text_buffer_insert(tab->buffer, &start, formatted, -1);
+        gtk_text_buffer_end_user_action(tab->buffer);
+
+        gint delta = original_cursor - original_start;
+        if (delta < 0) delta = 0;
+        gint formatted_chars = (gint)g_utf8_strlen(formatted, -1);
+        if (delta > formatted_chars) delta = formatted_chars;
+        GtkTextIter restored;
+        gtk_text_buffer_get_iter_at_offset(tab->buffer,
+                                           &restored,
+                                           original_start + delta);
+        gtk_text_buffer_place_cursor(tab->buffer, &restored);
+    }
+    if (tab->win) app_window_set_status(tab->win, "Formatted code");
+    g_free(formatted);
+    g_free(text);
+}
+
 
 /**
  * @brief Editor tab justify paragraph.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void editor_tab_justify_paragraph(EditorTab *tab) {
     if (!tab || tab->locked) return;
@@ -321,5 +506,4 @@ void editor_tab_justify_paragraph(EditorTab *tab) {
     g_strfreev(words);
     g_free(text);
 }
-
 

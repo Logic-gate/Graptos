@@ -1,6 +1,9 @@
 /**
  * @file src/project_search.c
  * @brief Project-wide search and replace dialog implementation.
+ * @details Projects change underneath the editor. We keep tree rows, filesystem context,
+ *          and search helpers away from EditorTab so directory updates do not become
+ *          buffer-management problems.
  */
 
 #include "app_private.h"
@@ -50,6 +53,8 @@ typedef struct {
 
 /**
  * @brief Project match free.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param data The callback context passed by the caller.
  */
 static void project_match_free(gpointer data) {
     ProjectMatch *match = data;
@@ -61,6 +66,9 @@ static void project_match_free(gpointer data) {
 
 /**
  * @brief Skip dir name.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param name The name supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean skip_dir_name(const char *name) {
     static const char *skip[] = {
@@ -76,6 +84,9 @@ static gboolean skip_dir_name(const char *name) {
 
 /**
  * @brief Readable small file.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param path The filesystem path supplied by the caller.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean readable_small_file(const char *path) {
     GStatBuf st;
@@ -86,6 +97,10 @@ static gboolean readable_small_file(const char *path) {
 
 /**
  * @brief Relative display path.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param win The win supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *relative_display_path(EditorWindow *win, const char *path) {
     const char *root = project_root_for_path(win, path);
@@ -99,6 +114,10 @@ static char *relative_display_path(EditorWindow *win, const char *path) {
 
 /**
  * @brief Line for offset.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param text The text fragment supplied by the caller.
+ * @param pos The pos supplied by the caller.
+ * @return The computed value requested by the caller.
  */
 static guint line_for_offset(const char *text, const char *pos) {
     guint line = 1u;
@@ -111,6 +130,10 @@ static guint line_for_offset(const char *text, const char *pos) {
 
 /**
  * @brief Snippet for match.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param line_start The line start supplied by the caller.
+ * @param match The match supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *snippet_for_match(const char *line_start, const char *match) {
     if (!line_start || !match) return g_strdup("");
@@ -125,6 +148,9 @@ static char *snippet_for_match(const char *line_start, const char *match) {
 
 /**
  * @brief Add result row.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param state The state supplied by the caller.
+ * @param match The match supplied by the caller.
  */
 static void add_result_row(ProjectSearch *state, ProjectMatch *match) {
     if (!state || !match || !state->result_list) return;
@@ -140,18 +166,18 @@ static void add_result_row(ProjectSearch *state, ProjectMatch *match) {
     char *title = g_strdup_printf("%s:%u", rel, match->line);
     GtkWidget *title_label = gtk_label_new(title);
     gtk_label_set_xalign(GTK_LABEL(title_label), 0.0f);
-    gtk_widget_add_css_class(title_label, "cleaf-ref-title");
+    gtk_widget_add_css_class(title_label, "graptos-ref-title");
 
     GtkWidget *snippet = gtk_label_new(match->snippet ? match->snippet : "");
     gtk_label_set_xalign(GTK_LABEL(snippet), 0.0f);
     gtk_label_set_ellipsize(GTK_LABEL(snippet), PANGO_ELLIPSIZE_END);
-    gtk_widget_add_css_class(snippet, "cleaf-ref-snippet");
+    gtk_widget_add_css_class(snippet, "graptos-ref-snippet");
 
     gtk_box_append(GTK_BOX(box), title_label);
     gtk_box_append(GTK_BOX(box), snippet);
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
-    g_object_set_data(G_OBJECT(row), "cleaf-project-search-path", match->path);
-    g_object_set_data(G_OBJECT(row), "cleaf-project-search-line",
+    g_object_set_data(G_OBJECT(row), "graptos-project-search-path", match->path);
+    g_object_set_data(G_OBJECT(row), "graptos-project-search-line",
                       GUINT_TO_POINTER(match->line));
     gtk_list_box_insert(GTK_LIST_BOX(state->result_list), row, -1);
     g_free(title);
@@ -160,6 +186,11 @@ static void add_result_row(ProjectSearch *state, ProjectMatch *match) {
 
 /**
  * @brief Scan text for matches.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param state The state supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
+ * @param text The text fragment supplied by the caller.
+ * @param query The query supplied by the caller.
  */
 static void scan_text_for_matches(ProjectSearch *state,
                                   const char *path,
@@ -184,6 +215,11 @@ static void scan_text_for_matches(ProjectSearch *state,
 
 /**
  * @brief Project scan dir.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param state The state supplied by the caller.
+ * @param dir The dir supplied by the caller.
+ * @param query The query supplied by the caller.
+ * @param depth The depth supplied by the caller.
  */
 static void project_scan_dir(ProjectSearch *state,
                              const char *dir,
@@ -222,15 +258,19 @@ static void project_scan_dir(ProjectSearch *state,
 
 /**
  * @brief Clear results.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param state The state supplied by the caller.
  */
 static void clear_results(ProjectSearch *state) {
     if (!state) return;
     if (state->matches) g_ptr_array_set_size(state->matches, 0u);
-    if (state->result_list) cleaf_list_box_clear(state->result_list);
+    if (state->result_list) graptos_list_box_clear(state->result_list);
 }
 
 /**
  * @brief Update count.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param state The state supplied by the caller.
  */
 static void update_count(ProjectSearch *state) {
     if (!state || !state->count_label) return;
@@ -242,6 +282,9 @@ static void update_count(ProjectSearch *state) {
 
 /**
  * @brief Project search run.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void project_search_run(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -264,6 +307,12 @@ static void project_search_run(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Replace literal.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param text The text fragment supplied by the caller.
+ * @param find The find supplied by the caller.
+ * @param replace The replace supplied by the caller.
+ * @param count_out Output storage filled when the operation can provide a value.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *replace_literal(const char *text,
                              const char *find,
@@ -290,6 +339,11 @@ static char *replace_literal(const char *text,
 
 /**
  * @brief Replace in file.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param path The filesystem path supplied by the caller.
+ * @param find The find supplied by the caller.
+ * @param replace The replace supplied by the caller.
+ * @return The computed value requested by the caller.
  */
 static guint replace_in_file(const char *path,
                              const char *find,
@@ -312,6 +366,9 @@ static guint replace_in_file(const char *path,
 
 /**
  * @brief Project replace all.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void project_replace_all(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -354,6 +411,10 @@ static void project_replace_all(GtkWidget *widget, gpointer user_data) {
 
 /**
  * @brief Result activated.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param box The box supplied by the caller.
+ * @param row The row supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
  */
 static void result_activated(GtkListBox *box,
                              GtkListBoxRow *row,
@@ -362,9 +423,9 @@ static void result_activated(GtkListBox *box,
     ProjectSearch *state = user_data;
     if (!state || !row) return;
     const char *path = g_object_get_data(G_OBJECT(row),
-                                         "cleaf-project-search-path");
+                                         "graptos-project-search-path");
     guint line = GPOINTER_TO_UINT(g_object_get_data(G_OBJECT(row),
-        "cleaf-project-search-line"));
+        "graptos-project-search-line"));
     if (path && app_window_open_file(state->win, path)) {
         editor_tab_jump_to_line(app_window_current_tab(state->win), line);
     }
@@ -372,6 +433,10 @@ static void result_activated(GtkListBox *box,
 
 /**
  * @brief Project search closed.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param window The window supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean project_search_closed(GtkWindow *window, gpointer user_data) {
     (void)window;
@@ -384,6 +449,9 @@ static gboolean project_search_closed(GtkWindow *window, gpointer user_data) {
 
 /**
  * @brief Action project search.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
  */
 void action_project_search(GtkWidget *widget, gpointer user_data) {
     (void)widget;
@@ -398,14 +466,14 @@ void action_project_search(GtkWidget *widget, gpointer user_data) {
     state->win = win;
     state->matches = g_ptr_array_new_with_free_func(project_match_free);
     state->window = gtk_window_new();
-    gtk_widget_add_css_class(state->window, "cleaf-window");
+    gtk_widget_add_css_class(state->window, "graptos-window");
     gtk_window_set_title(GTK_WINDOW(state->window), "Project Search");
     gtk_window_set_default_size(GTK_WINDOW(state->window), 820, 520);
     gtk_window_set_transient_for(GTK_WINDOW(state->window), app_window_gtk(win));
 
     GtkWidget *root = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
-    gtk_widget_add_css_class(root, "cleaf-root");
-    cleaf_set_all_margins(root, 10);
+    gtk_widget_add_css_class(root, "graptos-root");
+    graptos_set_all_margins(root, 10);
     gtk_window_set_child(GTK_WINDOW(state->window), root);
 
     GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
@@ -417,9 +485,9 @@ void action_project_search(GtkWidget *widget, gpointer user_data) {
     gtk_widget_set_hexpand(state->replace_entry, TRUE);
     gtk_box_append(GTK_BOX(row), state->find_entry);
     gtk_box_append(GTK_BOX(row), state->replace_entry);
-    gtk_box_append(GTK_BOX(row), cleaf_flat_button_new(
+    gtk_box_append(GTK_BOX(row), graptos_flat_button_new(
         "Search", NULL, G_CALLBACK(project_search_run), state));
-    gtk_box_append(GTK_BOX(row), cleaf_flat_button_new(
+    gtk_box_append(GTK_BOX(row), graptos_flat_button_new(
         "Replace All", NULL, G_CALLBACK(project_replace_all), state));
     gtk_box_append(GTK_BOX(root), row);
 

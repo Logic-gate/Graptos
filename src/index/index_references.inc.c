@@ -1,6 +1,13 @@
 /**
  * @file src/index/index_references.inc.c
- * @brief Cleaf index references module.
+ * @brief Graptoς index references module.
+ * @details The index is our local memory of the project. It trades perfect semantic
+ *          knowledge for speed and predictability, which is the right fallback when
+ *          external tooling is absent or incomplete.
+ * @param path_label The path label supplied by the caller.
+ * @param text The text fragment supplied by the caller.
+ * @param word The symbol text being matched.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 
 static char *definition_in_text(const char *path_label, const char *text, const char *word) {
@@ -11,7 +18,7 @@ static char *definition_in_text(const char *path_label, const char *text, const 
         const char *line_end = strchr(p, '\n');
         if (!line_end) line_end = p + strlen(p);
         gsize len = (gsize)(line_end - p);
-        if (len > CLEAF_INDEX_MAX_LINE) len = CLEAF_INDEX_MAX_LINE;
+        if (len > GRAPTOS_INDEX_MAX_LINE) len = GRAPTOS_INDEX_MAX_LINE;
         char *line = g_strndup(p, len);
         char *trim = g_strstrip(line);
         gboolean match = FALSE;
@@ -37,9 +44,13 @@ static char *definition_in_text(const char *path_label, const char *text, const 
 
 /**
  * @brief Index definition for word.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param word The symbol text being matched.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 char *index_definition_for_word(EditorTab *tab, const char *word) {
-    if (!tab || !word || strlen(word) < 2u) return NULL;
+    if (!index_tab_available(tab) || !word || strlen(word) < 2u) return NULL;
     char *text = tab_text(tab);
     char *def = definition_in_text("current buffer", text, word);
     if (def) {
@@ -67,6 +78,8 @@ char *index_definition_for_word(EditorTab *tab, const char *word) {
 
 /**
  * @brief Index reference free.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param data The callback context passed by the caller.
  */
 void index_reference_free(gpointer data) {
     IndexReference *ref = data;
@@ -80,6 +93,10 @@ void index_reference_free(gpointer data) {
 
 /**
  * @brief Relative display path.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param path The filesystem path supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static char *relative_display_path(EditorTab *tab, const char *path) {
     if (!path) return g_strdup("current buffer");
@@ -94,6 +111,10 @@ static char *relative_display_path(EditorTab *tab, const char *path) {
 
 /**
  * @brief Language for path.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param path The filesystem path supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static const char *language_for_path(EditorTab *tab, const char *path) {
     if (!path) return "Buffer";
@@ -102,6 +123,10 @@ static const char *language_for_path(EditorTab *tab, const char *path) {
 
 /**
  * @brief Line looks definition.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param trim The trim supplied by the caller.
+ * @param word The symbol text being matched.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean line_looks_definition(const char *trim, const char *word) {
     if (!trim || !word || word[0] == '\0') return FALSE;
@@ -123,6 +148,11 @@ static gboolean line_looks_definition(const char *trim, const char *word) {
 
 /**
  * @brief Seen reference.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param seen The seen supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
+ * @param line The zero-based or display line handled by the caller, matching the surrounding API.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean seen_reference(GHashTable *seen, const char *path, guint line) {
     char *key = g_strdup_printf("%s:%u", path ? path : "<buffer>", line);
@@ -134,6 +164,15 @@ static gboolean seen_reference(GHashTable *seen, const char *path, guint line) {
 
 /**
  * @brief Add reference.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param out Output storage filled when the lookup succeeds.
+ * @param seen The seen supplied by the caller.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param path The filesystem path supplied by the caller.
+ * @param line The zero-based or display line handled by the caller, matching the surrounding API.
+ * @param snippet The snippet supplied by the caller.
+ * @param kind The kind supplied by the caller.
+ * @param max_results The max results supplied by the caller.
  */
 static void add_reference(GPtrArray *out, GHashTable *seen, EditorTab *tab, const char *path, guint line, const char *snippet, const char *kind, guint max_results) {
     if (!out || !seen || !snippet || out->len >= max_results) return;
@@ -150,6 +189,15 @@ static void add_reference(GPtrArray *out, GHashTable *seen, EditorTab *tab, cons
 
 /**
  * @brief Collect references from text.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param out Output storage filled when the lookup succeeds.
+ * @param seen The seen supplied by the caller.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param path The filesystem path supplied by the caller.
+ * @param text The text fragment supplied by the caller.
+ * @param word The symbol text being matched.
+ * @param max_results The max results supplied by the caller.
+ * @param definitions_first The definitions first supplied by the caller.
  */
 static void collect_references_from_text(GPtrArray *out, GHashTable *seen, EditorTab *tab, const char *path, const char *text, const char *word, guint max_results, gboolean definitions_first) {
     if (!out || !text || !word) return;
@@ -159,7 +207,7 @@ static void collect_references_from_text(GPtrArray *out, GHashTable *seen, Edito
         const char *line_end = strchr(p, '\n');
         if (!line_end) line_end = p + strlen(p);
         gsize len = (gsize)(line_end - p);
-        if (len > CLEAF_INDEX_MAX_LINE) len = CLEAF_INDEX_MAX_LINE;
+        if (len > GRAPTOS_INDEX_MAX_LINE) len = GRAPTOS_INDEX_MAX_LINE;
         char *line = g_strndup(p, len);
         char *trim = g_strstrip(line);
         gboolean boundary = has_word_boundary(trim, word);
@@ -175,11 +223,16 @@ static void collect_references_from_text(GPtrArray *out, GHashTable *seen, Edito
 
 /**
  * @brief Index references for word.
+ * @details The index is a lightweight fallback when richer language services cannot answer. The comment shows where inexpensive symbol data is collected and where callers receive owned results.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @param word The symbol text being matched.
+ * @param max_results The max results supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 GPtrArray *index_references_for_word(EditorTab *tab, const char *word, guint max_results) {
     if (max_results == 0u) max_results = 20u;
     GPtrArray *out = g_ptr_array_new_with_free_func(index_reference_free);
-    if (!tab || !word || strlen(word) < 2u) return out;
+    if (!index_tab_available(tab) || !word || strlen(word) < 2u) return out;
 
     GHashTable *seen_refs = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
     char *text = tab_text(tab);

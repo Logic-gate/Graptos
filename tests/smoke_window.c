@@ -1,6 +1,6 @@
 /**
  * @file smoke_window.c
- * @brief GTK smoke test for the main Cleaf window and basic editor workflow.
+ * @brief GTK smoke test for the main Graptoς window and basic editor workflow.
  *
  * This test is intended to run under a virtual display in CI.  It constructs a
  * real GtkApplication and EditorWindow, then exercises the file-open, find,
@@ -19,7 +19,7 @@
 /**
  * @brief Temporary root directory used for smoke-test files and XDG state.
  *
- * The directory is created before gtk_init() so GTK and Cleaf configuration
+ * The directory is created before gtk_init() so GTK and Graptoς configuration
  * files stay isolated from the developer or CI runner environment.
  */
 static char *test_tmp_dir;
@@ -103,7 +103,7 @@ static void remove_tree(const char *path) {
 }
 
 /**
- * @brief Exercises the main Cleaf editor window workflow.
+ * @brief Exercises the main Graptoς editor window workflow.
  *
  * The smoke path verifies that a window is created, a file opens into the
  * active tab, find selects expected text, reopening the same file reuses the
@@ -111,15 +111,15 @@ static void remove_tree(const char *path) {
  * and the window-owned state can be closed and freed cleanly.
  */
 static void test_window_file_find_save_close(void) {
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
     g_assert_nonnull(test_tmp_dir);
 
-    char *file_path = g_build_filename(test_tmp_dir, "sample.txt", NULL);
+    g_autofree char *file_path = g_build_filename(test_tmp_dir, "sample.txt", NULL);
     const char *initial = "alpha beta gamma\nsecond line\n";
     g_assert_true(g_file_set_contents(file_path, initial, -1, &error));
     g_assert_no_error(error);
 
-    GtkApplication *app = gtk_application_new("io.github.cleaf.Editor.Smoke",
+    GtkApplication *app = gtk_application_new("io.github.graptos.Editor.Smoke",
                                               G_APPLICATION_NON_UNIQUE);
     g_assert_true(g_application_register(G_APPLICATION(app), NULL, &error));
     g_assert_no_error(error);
@@ -129,6 +129,15 @@ static void test_window_file_find_save_close(void) {
     g_assert_true(GTK_IS_WINDOW(win->window));
     g_assert_true(GTK_IS_NOTEBOOK(win->notebook));
     drain_main_context();
+
+    app_window_set_error_status(win, "Smoke error", "Full smoke error detail");
+    g_assert_cmpstr(win->status_error_title, ==, "Smoke error");
+    g_assert_cmpstr(win->status_error_detail, ==, "Full smoke error detail");
+    g_assert_cmpstr(gtk_label_get_text(GTK_LABEL(win->status_label)), ==, "Smoke error");
+    app_window_set_status(win, "Smoke normal status");
+    g_assert_null(win->status_error_title);
+    g_assert_null(win->status_error_detail);
+    g_assert_cmpstr(gtk_label_get_text(GTK_LABEL(win->status_label)), ==, "Smoke normal status");
 
     gint initial_pages = gtk_notebook_get_n_pages(GTK_NOTEBOOK(win->notebook));
     g_assert_cmpint(initial_pages, ==, 1);
@@ -143,16 +152,14 @@ static void test_window_file_find_save_close(void) {
     g_assert_nonnull(tab);
     g_assert_cmpstr(tab->file_path, ==, file_path);
 
-    char *loaded = buffer_contents(tab->buffer);
+    g_autofree char *loaded = buffer_contents(tab->buffer);
     g_assert_cmpstr(loaded, ==, initial);
-    g_free(loaded);
 
     editor_tab_find(tab, "beta", FALSE);
     drain_main_context();
 
-    char *selection = selected_text(tab->buffer);
+    g_autofree char *selection = selected_text(tab->buffer);
     g_assert_cmpstr(selection, ==, "beta");
-    g_free(selection);
 
     g_assert_true(app_window_open_file(win, file_path));
     drain_main_context();
@@ -169,12 +176,11 @@ static void test_window_file_find_save_close(void) {
     drain_main_context();
     g_assert_false(tab->modified);
 
-    char *saved = NULL;
+    g_autofree char *saved = NULL;
     gsize saved_len = 0;
     g_assert_true(g_file_get_contents(file_path, &saved, &saved_len, &error));
     g_assert_no_error(error);
     g_assert_nonnull(strstr(saved, "smoke edit\n"));
-    g_free(saved);
 
     g_assert_true(app_window_close_all_tabs(win));
     g_assert_cmpint(gtk_notebook_get_n_pages(GTK_NOTEBOOK(win->notebook)), ==, 0);
@@ -183,7 +189,6 @@ static void test_window_file_find_save_close(void) {
     drain_main_context();
 
     g_object_unref(app);
-    g_free(file_path);
 }
 
 /**
@@ -194,10 +199,10 @@ static void test_window_file_find_save_close(void) {
  * @return The GLib test runner exit status.
  */
 int main(int argc, char **argv) {
-    g_setenv("CLEAF_TEST_MODE", "1", TRUE);
+    g_setenv("GRAPTOS_TEST_MODE", "1", TRUE);
 
-    GError *error = NULL;
-    test_tmp_dir = g_dir_make_tmp("cleaf-smoke-XXXXXX", &error);
+    g_autoptr(GError) error = NULL;
+    test_tmp_dir = g_dir_make_tmp("graptos-smoke-XXXXXX", &error);
     g_assert_no_error(error);
     g_assert_nonnull(test_tmp_dir);
     set_test_xdg_dir("XDG_CONFIG_HOME", test_tmp_dir);

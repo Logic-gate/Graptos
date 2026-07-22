@@ -1,6 +1,10 @@
 /**
  * @file src/codex_review.c
  * @brief Codex diff review tab helpers.
+ * @details AI touches the parts of the app where mistakes are expensive: files,
+ *          permissions, markdown, and long-running processes. We keep protocol, client,
+ *          panel, and review logic separated so approval and cleanup paths are easy to
+ *          audit.
  */
 
 #include "codex_review.h"
@@ -13,6 +17,11 @@
 
 /**
  * @brief Review diff syntax.
+ * @details Diff tabs are read-only editor tabs, so using the normal syntax
+ *          lookup keeps colors consistent with the rest of the app when a Diff
+ *          syntax definition is available.
+ * @param win The win supplied by the caller.
+ * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 static SyntaxDef *review_diff_syntax(EditorWindow *win) {
     if (!win || !win->syntaxes) return NULL;
@@ -26,6 +35,11 @@ static SyntaxDef *review_diff_syntax(EditorWindow *win) {
 
 /**
  * @brief Codex review open diff.
+ * @details The diff is shown in a locked tab because it is evidence, not a file
+ *          the user should accidentally edit. Revert/keep actions operate on
+ *          the underlying patch, not manual edits to the preview.
+ * @param win The win supplied by the caller.
+ * @param diff The diff supplied by the caller.
  */
 void codex_review_open_diff(EditorWindow *win, const char *diff) {
     if (!win || !diff) return;
@@ -40,13 +54,20 @@ void codex_review_open_diff(EditorWindow *win, const char *diff) {
     SyntaxDef *syntax = review_diff_syntax(win);
     if (syntax) editor_tab_set_syntax(tab, syntax, TRUE);
     app_window_add_tab(win, tab, TRUE);
-    if (tab->tab_title) {
-        gtk_label_set_text(GTK_LABEL(tab->tab_title), "Codex Turn Diff");
-    }
+    editor_tab_set_display_title(tab, "Codex Turn Diff", NULL);
+    if (tab->tab_lock_icon) gtk_widget_set_visible(tab->tab_lock_icon, TRUE);
 }
 
 /**
  * @brief Run reverse apply.
+ * @details Revert is implemented with `git apply --reverse` because Git already
+ *          knows how to validate and apply patches safely. We run `--check`
+ *          first so the UI can report a clean failure before touching files.
+ * @param cwd The cwd supplied by the caller.
+ * @param diff The diff supplied by the caller.
+ * @param check The check supplied by the caller.
+ * @param error Return location for an optional error; left untouched on success unless GTK sets it.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 static gboolean run_reverse_apply(const char *cwd,
                                   const char *diff,
@@ -79,6 +100,13 @@ static gboolean run_reverse_apply(const char *cwd,
 
 /**
  * @brief Codex review revert.
+ * @details Revert validates first and refreshes Git/tree state only after the
+ *          reverse patch succeeds. That keeps the UI from claiming a rollback
+ *          happened when Git rejected the diff.
+ * @param win The win supplied by the caller.
+ * @param diff The diff supplied by the caller.
+ * @param error Return location for an optional error; left untouched on success unless GTK sets it.
+ * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean codex_review_revert(EditorWindow *win,
                              const char *diff,
@@ -88,6 +116,6 @@ gboolean codex_review_revert(EditorWindow *win,
     const char *cwd = win->project_root ? win->project_root : fallback;
     gboolean valid = run_reverse_apply(cwd, diff, TRUE, error);
     gboolean reverted = valid && run_reverse_apply(cwd, diff, FALSE, error);
-    if (reverted) cleaf_git_refresh_and_rebuild(win);
+    if (reverted) graptos_git_refresh_and_rebuild(win);
     return reverted;
 }

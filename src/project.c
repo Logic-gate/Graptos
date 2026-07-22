@@ -1,6 +1,9 @@
 /**
  * @file src/project.c
  * @brief Project tree public API and implementation composition unit.
+ * @details Projects change underneath the editor. We keep tree rows, filesystem context,
+ *          and search helpers away from EditorTab so directory updates do not become
+ *          buffer-management problems.
  */
 
 #include "project.h"
@@ -15,18 +18,18 @@
 #include <string.h>
 
 /**
- * @brief Cleaf project max nodes macro.
+ * @brief Graptoς project max nodes macro.
  */
-#define CLEAF_PROJECT_MAX_NODES 5000u
+#define GRAPTOS_PROJECT_MAX_NODES 5000u
 /**
- * @brief Cleaf project max depth macro.
+ * @brief Graptoς project max depth macro.
  */
-#define CLEAF_PROJECT_MAX_DEPTH 12u
+#define GRAPTOS_PROJECT_MAX_DEPTH 12u
 
 /**
  * @brief Project skip flag macro.
  */
-#define PROJECT_SKIP_FLAG "__cleaf_skip_row__"
+#define PROJECT_SKIP_FLAG "__graptos_skip_row__"
 
 /**
  * @brief Project type definition.
@@ -55,8 +58,17 @@ typedef struct {
 
 /**
  * @brief Project tree rebuild.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param win The win supplied by the caller.
  */
 static void project_tree_rebuild(EditorWindow *win);
+/**
+ * @brief Watch a visible project directory for live tree refreshes.
+ * @details Project tree code mirrors the filesystem while the user is interacting with expanded rows. The comment marks which part updates the model and which part preserves visible UI state.
+ * @param win The win supplied by the caller.
+ * @param path The filesystem path supplied by the caller.
+ */
+static void project_tree_watch_directory(EditorWindow *win, const char *path);
 
 #include "project/project_util.inc.c"
 #include "project/project_context.inc.c"
