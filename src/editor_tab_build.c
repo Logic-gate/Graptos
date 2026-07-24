@@ -365,6 +365,34 @@ static GtkWidget *tab_symbolic_icon(const char *primary, const char **fallbacks)
 
 
 /**
+ * @brief Return whether a tab-label click landed on the close button.
+ * @details The tab label owns a capture-phase gesture so Shift-click tiling can
+ *          see notebook label clicks early. Close buttons live inside that same
+ *          label widget, so they need this hit-test to avoid running normal
+ *          label click behavior before the close callback destroys the tab.
+ * @param tab The editor tab whose label received the click.
+ * @param x The click x-coordinate in tab label coordinates.
+ * @param y The click y-coordinate in tab label coordinates.
+ * @return TRUE when the click target is the tab close button or one of its children.
+ */
+static gboolean tab_label_click_hit_close_button(EditorTab *tab,
+                                                 double x,
+                                                 double y) {
+    if (!tab || !tab->tab_widget || !GTK_IS_WIDGET(tab->tab_widget)) return FALSE;
+    GtkWidget *close = g_object_get_data(G_OBJECT(tab->tab_widget),
+                                         "graptos-tab-close-button");
+    if (!close || !GTK_IS_WIDGET(close)) return FALSE;
+
+    GtkWidget *picked = gtk_widget_pick(tab->tab_widget, x, y, GTK_PICK_DEFAULT);
+    while (picked) {
+        if (picked == close) return TRUE;
+        if (picked == tab->tab_widget) break;
+        picked = gtk_widget_get_parent(picked);
+    }
+    return FALSE;
+}
+
+/**
  * @brief Handle a primary click on an editor tab label.
  * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
  * @param gesture The gesture supplied by the caller.
@@ -379,10 +407,9 @@ static void on_tab_label_pressed(GtkGestureClick *gesture,
                                  double y,
                                  gpointer user_data) {
     (void)n_press;
-    (void)x;
-    (void)y;
     EditorTab *tab = user_data;
     if (!tab || !tab->win) return;
+    if (tab_label_click_hit_close_button(tab, x, y)) return;
     GdkModifierType state =
         gtk_event_controller_get_current_event_state(GTK_EVENT_CONTROLLER(gesture));
     app_window_handle_tab_label_click(tab->win, tab, state);
@@ -421,6 +448,9 @@ static void tab_create_tab_label(EditorTab *tab) {
                                                    G_CALLBACK(on_close_button_clicked),
                                                    tab);
     gtk_widget_add_css_class(close_btn, "graptos-tab-close");
+    g_object_set_data(G_OBJECT(tab->tab_widget),
+                      "graptos-tab-close-button",
+                      close_btn);
     gtk_box_append(GTK_BOX(tab->tab_widget), tab->tab_lock_icon);
     gtk_box_append(GTK_BOX(tab->tab_widget), tab->tab_title);
     gtk_box_append(GTK_BOX(tab->tab_widget), close_btn);

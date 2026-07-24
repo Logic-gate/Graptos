@@ -89,7 +89,7 @@ formatting:
   max_column: 100
   wrap_after_comma: true
   case_indent: 0
-  preserve_blank_lines: true
+  preserve_blank_lines: false
   max_blank_lines: 0
   collapse_empty_blocks: true
 

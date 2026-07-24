@@ -77,6 +77,12 @@ void app_window_close_tab(EditorWindow *win, EditorTab *tab) {
         }
     }
 
+    /*
+     * Remove saved-group and active-tile references before GTK page removal
+     * starts emitting switch signals. This keeps later tile restoration from
+     * walking a tab that is already on the close path.
+     */
+    app_window_forget_tile_tab(win, tab);
     if (win->tile_mode) app_window_clear_tiles(win);
 
     if (group_to_close) {
@@ -96,7 +102,6 @@ void app_window_close_tab(EditorWindow *win, EditorTab *tab) {
     }
 
     if (tab->folded_tile_member) {
-        app_window_forget_tile_tab(win, tab);
         app_window_unregister_tab(win, tab);
         editor_tab_free(tab);
     } else {
@@ -111,7 +116,6 @@ void app_window_close_tab(EditorWindow *win, EditorTab *tab) {
              * before removing the page and freeing the tab.
              */
             editor_tab_destroy_popovers(tab);
-            app_window_forget_tile_tab(win, tab);
 
             gtk_notebook_remove_page(GTK_NOTEBOOK(win->notebook), i);
             app_window_unregister_tab(win, tab);

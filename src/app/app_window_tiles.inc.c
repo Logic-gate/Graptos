@@ -272,6 +272,23 @@ static void app_window_set_group_member_tabs_visible(EditorWindow *win,
                                                      gboolean visible);
 
 /**
+ * @brief Dissolve a saved tile group owned by a tab.
+ * @details Saved tile groups hide member notebook pages while the group is
+ *          active. Dissolving the group has to restore those pages before the
+ *          saved array is cleared, otherwise later close and title refresh code
+ *          can still see a grouped tab with missing notebook membership.
+ * @param win The application window that owns the notebook and tab registry.
+ * @param host The tab whose saved tile group should be cleared.
+ */
+static void app_window_dissolve_saved_tile_group(EditorWindow *win,
+                                                 EditorTab *host) {
+    if (!win || !host || !host->tile_group) return;
+    app_window_set_group_member_tabs_visible(win, host, TRUE);
+    g_ptr_array_set_size(host->tile_group, 0u);
+    editor_tab_update_title(host);
+}
+
+/**
  * @brief Move a widget between boxes while preserving its reference.
  * @details Tile mode reparents real editor widgets. GTK containers drop their
  *          child reference during removal, so we hold a temporary reference
@@ -419,6 +436,30 @@ static void app_window_restore_tab_minimap(EditorTab *tab) {
 }
 
 /**
+ * @brief Restore one tiled tab to its normal editor page.
+ * @details Removing one pane from the tile set can make a later tile clear skip
+ *          that tab because it no longer belongs to win->tile_tabs. Restoring
+ *          the tab before removal keeps its editor widgets owned by the tab page
+ *          instead of leaving them under the soon-to-be-removed tile container.
+ * @param win The window whose tile layout is being changed.
+ * @param tab The tab whose editor widgets should be restored.
+ */
+static void app_window_restore_tab_from_tile(EditorWindow *win, EditorTab *tab) {
+    if (!win || !tab) return;
+    app_window_restore_tab_minimap(tab);
+    if (tab->editor_area && GTK_IS_WIDGET(tab->editor_area) &&
+        tab->box && GTK_IS_WIDGET(tab->box)) {
+        GtkWidget *editor_parent = gtk_widget_get_parent(tab->editor_area);
+        if (editor_parent && editor_parent != tab->box) {
+            app_window_reparent_box_child(tab->editor_area,
+                                          editor_parent,
+                                          tab->box);
+        }
+    }
+    editor_tab_set_minimap_visible(tab, win->minimap_enabled);
+}
+
+/**
  * @brief Return the tile whose minimap should be shown.
  * @details Tile mode has one minimap, not one minimap per pane. The active
  *          tile owns that minimap so the preview follows the pane the user is
@@ -563,6 +604,25 @@ static void app_window_remove_tile_clicked(GtkButton *button, gpointer user_data
     EditorTab *tab = user_data;
     if (!tab || !tab->win) return;
     EditorWindow *win = tab->win;
+    EditorTab *host = app_window_stable_tile_host(win, win->tile_host_tab);
+
+    if (host && host->tile_group && host->tile_group->len > 1u) {
+        while (g_ptr_array_remove(host->tile_group, tab)) {
+            app_window_tile_debug(win,
+                                  "remove saved tile tab=%p host=%p count=%u",
+                                  (void *)tab,
+                                  (void *)host,
+                                  host->tile_group->len);
+        }
+        if (host->tile_group->len < 2u) {
+            app_window_dissolve_saved_tile_group(win, host);
+        } else {
+            editor_tab_update_title(host);
+        }
+    }
+
+    app_window_restore_tab_from_tile(win, tab);
+    app_window_unfold_tile_member(win, tab, FALSE);
     app_window_tile_remove(win, tab);
     if (!win->tile_tabs || win->tile_tabs->len < 2u) {
         app_window_clear_tiles(win);
@@ -644,9 +704,7 @@ static void app_window_detach_tile_group_menu_clicked(GtkButton *button,
     if (!win || !host || !tab || !host->tile_group) return;
 
     if (tab == host) {
-        app_window_set_group_member_tabs_visible(win, host, TRUE);
-        g_ptr_array_set_size(host->tile_group, 0u);
-        editor_tab_update_title(host);
+        app_window_dissolve_saved_tile_group(win, host);
         app_window_clear_tiles(win);
         app_window_set_status(win, "Tile group detached");
         return;
@@ -658,22 +716,11 @@ static void app_window_detach_tile_group_menu_clicked(GtkButton *button,
                               (void *)tab,
                               (void *)host);
     }
-    app_window_restore_tab_minimap(tab);
-    if (tab->editor_area && GTK_IS_WIDGET(tab->editor_area) &&
-        tab->box && GTK_IS_WIDGET(tab->box)) {
-        GtkWidget *editor_parent = gtk_widget_get_parent(tab->editor_area);
-        if (editor_parent && editor_parent != tab->box) {
-            app_window_reparent_box_child(tab->editor_area,
-                                          editor_parent,
-                                          tab->box);
-        }
-    }
+    app_window_restore_tab_from_tile(win, tab);
     app_window_unfold_tile_member(win, tab, FALSE);
 
     if (host->tile_group->len < 2u) {
-        app_window_set_group_member_tabs_visible(win, host, TRUE);
-        g_ptr_array_set_size(host->tile_group, 0u);
-        editor_tab_update_title(host);
+        app_window_dissolve_saved_tile_group(win, host);
         app_window_clear_tiles(win);
         app_window_set_status(win, "Tile group detached");
         return;
@@ -983,7 +1030,7 @@ gboolean app_window_restore_saved_tile_group(EditorWindow *win, EditorTab *host)
 void app_window_forget_tile_tab(EditorWindow *win, EditorTab *closing_tab) {
     if (!win || !closing_tab) return;
     if (closing_tab->tile_group && closing_tab->tile_group->len > 1u) {
-        app_window_set_group_member_tabs_visible(win, closing_tab, TRUE);
+        app_window_dissolve_saved_tile_group(win, closing_tab);
     }
     if (win->tile_tabs) {
         while (g_ptr_array_remove(win->tile_tabs, closing_tab)) {
@@ -993,20 +1040,17 @@ void app_window_forget_tile_tab(EditorWindow *win, EditorTab *closing_tab) {
                                   win->tile_tabs->len);
         }
     }
-    gint pages = win->notebook
-        ? gtk_notebook_get_n_pages(GTK_NOTEBOOK(win->notebook))
-        : 0;
-    for (gint i = 0; i < pages; i++) {
-        GtkWidget *child = gtk_notebook_get_nth_page(GTK_NOTEBOOK(win->notebook), i);
-        EditorTab *owner = child ? g_object_get_data(G_OBJECT(child), "graptos-tab") : NULL;
+    guint count = app_window_tab_count(win);
+    for (guint i = 0u; i < count; i++) {
+        EditorTab *owner = app_window_tab_at(win, i);
         if (!owner || owner == closing_tab || !owner->tile_group) continue;
         gboolean changed = FALSE;
         while (g_ptr_array_remove(owner->tile_group, closing_tab)) changed = TRUE;
         if (owner->tile_group->len < 2u) {
-            app_window_set_group_member_tabs_visible(win, owner, TRUE);
-            g_ptr_array_set_size(owner->tile_group, 0u);
+            app_window_dissolve_saved_tile_group(win, owner);
+        } else if (changed) {
+            editor_tab_update_title(owner);
         }
-        if (changed) editor_tab_update_title(owner);
     }
     if (win->active_tab == closing_tab) win->active_tab = NULL;
     if (win->tile_host_tab == closing_tab) win->tile_host_tab = NULL;
