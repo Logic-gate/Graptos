@@ -189,14 +189,14 @@ void graptos_apply_editor_css(const char *editor_bg_color,
                             const char *code_font,
                             gboolean use_system_interface_font);
 /**
- * @brief Apply user-editable CSS after generated theme CSS.
- * @details Custom CSS is loaded at the highest application priority so local
+ * @brief Apply theme CSS after generated theme CSS.
+ * @details Theme CSS is loaded at the highest application priority so local
  *          theme files can override both compiled structure and generated
  *          colour rules without rebuilding Graptoς.
  * @param path The CSS file path supplied by config.
- * @param enabled TRUE when custom CSS loading should be active.
+ * @param enabled TRUE when theme CSS loading should be active.
  */
-void graptos_apply_custom_css(const char *path, gboolean enabled);
+void graptos_apply_theme_css(const char *path, gboolean enabled);
 /**
  * @brief Write a complete editable theme CSS template.
  * @details The template documents the stable selectors and colour names that

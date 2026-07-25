@@ -29,5 +29,29 @@ void graptos_config_save(EditorWindow *win);
  * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 char *graptos_config_path(void);
+/**
+ * @brief Load theme values from a Graptoς CSS theme file.
+ * @details CSS is the primary theme source. This parser reads the managed
+ *          `@define-color graptos_*` values and font metadata comments into the
+ *          window's in-memory theme fields.
+ * @param win The window receiving theme values.
+ * @param path The CSS theme file path.
+ * @return TRUE when the CSS file was read.
+ */
+gboolean graptos_theme_css_load_into_window(EditorWindow *win,
+                                            const char *path);
+/**
+ * @brief Save the window theme into a Graptoς CSS theme file.
+ * @details The managed theme block is replaced while user CSS outside that
+ *          block is preserved. This keeps the Theme dialog structured without
+ *          taking ownership of hand-written CSS.
+ * @param win The window whose theme values are written.
+ * @param path The CSS theme file path.
+ * @param preserve_custom TRUE to keep CSS outside the managed block.
+ * @return TRUE when the CSS reached disk.
+ */
+gboolean graptos_theme_css_save_from_window(EditorWindow *win,
+                                            const char *path,
+                                            gboolean preserve_custom);
 
 #endif /* GRAPTOS_CONFIG_H */

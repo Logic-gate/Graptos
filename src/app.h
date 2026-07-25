@@ -86,13 +86,12 @@ typedef struct _EditorWindow {
     gboolean preview_enabled; /**< Preview enabled. */
     gboolean use_gtksourceview_highlighting; /**< GtkSourceView stays enabled. */
     gboolean use_yaml_style_overrides; /**< Use yaml style overrides. */
-    gboolean custom_css_enabled; /**< Load user-editable CSS after generated theme CSS. */
     char *ui_font; /**< UI font description. */
     char *editor_font; /**< Editor font description, or empty for inherited editor default. */
     char *preview_font; /**< Preview font description, or empty for inherited preview default. */
     char *terminal_font; /**< Terminal font description, or empty for VTE default. */
     char *code_font; /**< Code snippet and auxiliary code font description. */
-    char *custom_css_path; /**< User-editable CSS path loaded after generated theme CSS. */
+    char *theme_css_path; /**< Active CSS theme path. */
     char *editor_bg_color; /**< Editor bg color. */
     char *editor_fg_color; /**< Editor fg color. */
     char *editor_gutter_bg_color; /**< Editor gutter bg color. */

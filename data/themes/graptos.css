@@ -2,10 +2,11 @@
  * Graptoς editable CSS theme.
  *
  * Copy this file to ~/.config/graptos/theme.css or load it from the Theme
- * dialog. Graptoς loads user CSS after compiled CSS and generated config.ini
- * colors, so every rule here can be edited without rebuilding the application.
+ * dialog. Graptoς loads theme CSS at runtime, so every rule here can be edited
+ * without rebuilding the application.
  */
 
+/* GRAPTOS THEME BEGIN */
 @define-color graptos_editor_bg #181a1f;
 @define-color graptos_editor_fg #d4d4d4;
 @define-color graptos_sidebar_bg #111318;
@@ -119,3 +120,4 @@ window.graptos-window .graptos-dialog-output text {
 .graptos-diagnostic-warning {
   background: @graptos_warning_bg;
 }
+/* GRAPTOS THEME END */

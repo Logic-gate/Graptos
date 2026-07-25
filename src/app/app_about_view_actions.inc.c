@@ -311,14 +311,14 @@ void action_shortcuts(GtkWidget *widget, gpointer user_data) {
  */
 #define GRAPTOS_THEME_RESPONSE_KEEP_EDITING 1003
 /**
- * @brief Theme editor response code for reloading config.ini from disk.
+ * @brief Theme editor response code for reloading the saved theme from disk.
  */
 #define GRAPTOS_THEME_RESPONSE_RELOAD_CONFIG 1004
 
 /**
  * @brief Bundled theme preset shown in the Theme dialog.
- * @details Presets are stored as normal Graptoς config fragments so loading a
- *          theme uses the same keys as manual `config.ini` editing.
+ * @details Presets are CSS files. Legacy INI files are still accepted by the
+ *          loader only as import input for the active CSS theme.
  */
 typedef struct {
     const char *label; /**< Human-readable preset name. */
@@ -329,13 +329,13 @@ typedef struct {
  * @brief Bundled theme presets available without network access.
  */
 static const ThemePreset GRAPTOS_THEME_PRESETS[] = {
-    { "Dracula", "dracula.ini" },
-    { "GitHub Dark", "github.ini" },
-    { "Apprentice", "apprentice.ini" },
-    { "Gruvbox Dark", "gruvbox.ini" },
-    { "Tokyo Night", "tokyonight.ini" },
-    { "Srcery", "srcery.ini" },
-    { "Moonfly", "moonfly.ini" },
+    { "Dracula", "dracula.css" },
+    { "GitHub Dark", "github.css" },
+    { "Apprentice", "apprentice.css" },
+    { "Gruvbox Dark", "gruvbox.css" },
+    { "Tokyo Night", "tokyonight.css" },
+    { "Srcery", "srcery.css" },
+    { "Moonfly", "moonfly.css" },
 };
 
 /**
@@ -424,8 +424,7 @@ typedef struct {
     char *preview_font; /**< Preview font. */
     char *terminal_font; /**< Terminal font. */
     char *code_font; /**< Code/snippet font. */
-    char *custom_css_path; /**< User CSS path loaded after generated theme CSS. */
-    gboolean custom_css_enabled; /**< Whether user CSS is loaded after generated theme CSS. */
+    char *theme_css_path; /**< User CSS path loaded after generated theme CSS. */
 } ThemeState;
 
 /**
@@ -472,7 +471,6 @@ typedef struct {
 typedef struct {
     ThemeDialogState *dialog; /**< Theme dialog state. */
     GtkWidget *entry; /**< CSS path entry. */
-    GtkWidget *switch_widget; /**< CSS enable switch. */
     gboolean updating; /**< Whether the control is synchronizing widgets. */
 } ThemeCssControl;
 
@@ -588,9 +586,8 @@ static ThemeState *theme_state_from_window(EditorWindow *win) {
     COPY_FIELD(preview_font);
     COPY_FIELD(terminal_font);
     COPY_FIELD(code_font);
-    COPY_FIELD(custom_css_path);
+    COPY_FIELD(theme_css_path);
 #undef COPY_FIELD
-    state->custom_css_enabled = win->custom_css_enabled;
     return state;
 }
 
@@ -684,7 +681,7 @@ static void theme_state_free(ThemeState *state) {
     FREE_FIELD(preview_font);
     FREE_FIELD(terminal_font);
     FREE_FIELD(code_font);
-    FREE_FIELD(custom_css_path);
+    FREE_FIELD(theme_css_path);
 #undef FREE_FIELD
     g_free(state);
 }
@@ -782,16 +779,15 @@ static void theme_state_apply_to_window(ThemeState *state, EditorWindow *win) {
     APPLY_FIELD(preview_font);
     APPLY_FIELD(terminal_font);
     APPLY_FIELD(code_font);
-    APPLY_FIELD(custom_css_path);
+    APPLY_FIELD(theme_css_path);
 #undef APPLY_FIELD
-    win->custom_css_enabled = state->custom_css_enabled;
 }
 
 /**
- * @brief Load one color key from an INI theme into the scratch state.
- * @details Theme files intentionally use the same `[Editor]` keys as
- *          `config.ini`. Invalid or absent colors are ignored so a custom theme
- *          can override only the roles it cares about.
+ * @brief Load one legacy INI color key into the scratch state.
+ * @details Legacy theme imports intentionally use the same `[Editor]` keys as
+ *          old config-backed themes. Invalid or absent colors are ignored so
+ *          an import can override only the roles it cares about.
  * @param key_file The parsed theme file.
  * @param key The config key to read.
  * @param slot The scratch theme color slot to replace.
@@ -896,6 +892,154 @@ static void theme_state_load_key_file(ThemeState *state, GKeyFile *key_file) {
 }
 
 /**
+ * @brief Load one managed CSS color variable into ThemeState.
+ * @details The Theme dialog only parses Graptoς-managed variables. Hand-written
+ *          CSS remains in the file and is applied by GTK, but it is not guessed
+ *          back into structured controls.
+ * @param css CSS file contents.
+ * @param name Variable name without the `graptos_` prefix.
+ * @param slot ThemeState color slot.
+ */
+static void theme_state_load_css_color(const char *css,
+                                       const char *name,
+                                       char **slot) {
+    if (!css || !name || !slot) return;
+    g_autofree char *needle = g_strdup_printf("@define-color graptos_%s", name);
+    char *pos = strstr(css, needle);
+    if (!pos) return;
+    pos += strlen(needle);
+    while (*pos == ' ' || *pos == '\t') pos++;
+    char *end = pos;
+    while (*end && *end != ';' && *end != '\n' && *end != '\r' &&
+           *end != ' ' && *end != '\t') {
+        end++;
+    }
+    if (end <= pos) return;
+    g_autofree char *value = g_strndup(pos, (gsize)(end - pos));
+    GdkRGBA rgba;
+    if (!value || !gdk_rgba_parse(&rgba, value)) return;
+    theme_replace(slot, value);
+}
+
+/**
+ * @brief Load one managed CSS font metadata value into ThemeState.
+ * @details Font metadata is stored in comments because users may still write
+ *          direct CSS font rules outside the managed block.
+ * @param css CSS file contents.
+ * @param name Metadata key.
+ * @param slot ThemeState font slot.
+ */
+static void theme_state_load_css_font(const char *css,
+                                      const char *name,
+                                      char **slot) {
+    if (!css || !name || !slot) return;
+    g_autofree char *needle = g_strdup_printf("/* @graptos-%s-font:", name);
+    char *pos = strstr(css, needle);
+    if (!pos) return;
+    pos += strlen(needle);
+    char *end = strstr(pos, "*/");
+    if (!end) return;
+    g_autofree char *value = g_strndup(pos, (gsize)(end - pos));
+    if (!value) return;
+    g_strstrip(value);
+    theme_replace(slot, value);
+}
+
+/**
+ * @brief Apply managed CSS theme values to ThemeState.
+ * @details This is the CSS equivalent of legacy INI import. It intentionally
+ *          mirrors the same complete field list so the structured Theme dialog
+ *          remains the editor for CSS-backed themes.
+ * @param state The scratch theme state being edited.
+ * @param css CSS file contents.
+ */
+static void theme_state_load_css(ThemeState *state, const char *css) {
+    if (!state || !css) return;
+#define LOAD_CSS_COLOR(name, field) \
+    theme_state_load_css_color(css, name, &state->field)
+    LOAD_CSS_COLOR("editor_bg", editor_bg_color);
+    LOAD_CSS_COLOR("editor_fg", editor_fg_color);
+    LOAD_CSS_COLOR("editor_gutter_bg", editor_gutter_bg_color);
+    LOAD_CSS_COLOR("editor_gutter_fg", editor_gutter_fg_color);
+    LOAD_CSS_COLOR("editor_current_line_bg", editor_current_line_bg_color);
+    LOAD_CSS_COLOR("editor_selection_bg", editor_selection_bg_color);
+    LOAD_CSS_COLOR("editor_selection_fg", editor_selection_fg_color);
+    LOAD_CSS_COLOR("editor_cursor", editor_cursor_color);
+    LOAD_CSS_COLOR("sidebar_bg", sidebar_bg_color);
+    LOAD_CSS_COLOR("tabbar_bg", tabbar_bg_color);
+    LOAD_CSS_COLOR("tabbar_fg", tabbar_fg_color);
+    LOAD_CSS_COLOR("tab_active_bg", tab_active_bg_color);
+    LOAD_CSS_COLOR("tab_active_fg", tab_active_fg_color);
+    LOAD_CSS_COLOR("topbar_bg", topbar_bg_color);
+    LOAD_CSS_COLOR("topbar_fg", topbar_fg_color);
+    LOAD_CSS_COLOR("bottombar_bg", bottombar_bg_color);
+    LOAD_CSS_COLOR("bottombar_fg", bottombar_fg_color);
+    LOAD_CSS_COLOR("status_error", status_error_color);
+    LOAD_CSS_COLOR("button_bg", button_bg_color);
+    LOAD_CSS_COLOR("button_fg", button_fg_color);
+    LOAD_CSS_COLOR("button_hover_bg", button_hover_bg_color);
+    LOAD_CSS_COLOR("button_active_bg", button_active_bg_color);
+    LOAD_CSS_COLOR("input_bg", input_bg_color);
+    LOAD_CSS_COLOR("input_fg", input_fg_color);
+    LOAD_CSS_COLOR("input_border", input_border_color);
+    LOAD_CSS_COLOR("project_tree_fg", project_tree_fg_color);
+    LOAD_CSS_COLOR("project_tree_selected_bg", project_tree_selected_bg_color);
+    LOAD_CSS_COLOR("project_tree_selected_fg", project_tree_selected_fg_color);
+    LOAD_CSS_COLOR("git_status_modified", git_status_modified_color);
+    LOAD_CSS_COLOR("git_status_added", git_status_added_color);
+    LOAD_CSS_COLOR("git_status_deleted", git_status_deleted_color);
+    LOAD_CSS_COLOR("git_status_renamed", git_status_renamed_color);
+    LOAD_CSS_COLOR("git_status_conflict", git_status_conflict_color);
+    LOAD_CSS_COLOR("git_status_untracked", git_status_untracked_color);
+    LOAD_CSS_COLOR("git_status_staged", git_status_staged_color);
+    LOAD_CSS_COLOR("scroll_preview_bg", scroll_preview_bg_color);
+    LOAD_CSS_COLOR("scroll_preview_fg", scroll_preview_fg_color);
+    LOAD_CSS_COLOR("popover_bg", popover_bg_color);
+    LOAD_CSS_COLOR("popover_border", popover_border_color);
+    LOAD_CSS_COLOR("tooltip_bg", tooltip_bg_color);
+    LOAD_CSS_COLOR("tooltip_fg", tooltip_fg_color);
+    LOAD_CSS_COLOR("tooltip_border", tooltip_border_color);
+    LOAD_CSS_COLOR("ref_popover_bg", ref_popover_bg_color);
+    LOAD_CSS_COLOR("ref_popover_fg", ref_popover_fg_color);
+    LOAD_CSS_COLOR("ref_popover_heading", ref_popover_heading_color);
+    LOAD_CSS_COLOR("ref_popover_title", ref_popover_title_color);
+    LOAD_CSS_COLOR("ref_popover_kind", ref_popover_kind_color);
+    LOAD_CSS_COLOR("ref_popover_snippet", ref_popover_snippet_color);
+    LOAD_CSS_COLOR("ref_popover_hover_bg", ref_popover_hover_bg_color);
+    LOAD_CSS_COLOR("ref_popover_hover_fg", ref_popover_hover_fg_color);
+    LOAD_CSS_COLOR("completion_popover_bg", completion_popover_bg_color);
+    LOAD_CSS_COLOR("completion_popover_fg", completion_popover_fg_color);
+    LOAD_CSS_COLOR("completion_popover_detail", completion_popover_detail_color);
+    LOAD_CSS_COLOR("completion_selection_bg", completion_selection_bg_color);
+    LOAD_CSS_COLOR("completion_selection_fg", completion_selection_fg_color);
+    LOAD_CSS_COLOR("dialog_bg", dialog_bg_color);
+    LOAD_CSS_COLOR("dialog_fg", dialog_fg_color);
+    LOAD_CSS_COLOR("dialog_border", dialog_border_color);
+    LOAD_CSS_COLOR("dialog_title", dialog_title_color);
+    LOAD_CSS_COLOR("dialog_body", dialog_body_color);
+    LOAD_CSS_COLOR("dialog_muted", dialog_muted_color);
+    LOAD_CSS_COLOR("dialog_output", dialog_output_color);
+    LOAD_CSS_COLOR("git_output_bg", git_output_bg_color);
+    LOAD_CSS_COLOR("dialog_action", dialog_action_color);
+    LOAD_CSS_COLOR("dialog_destructive_action", dialog_destructive_action_color);
+    LOAD_CSS_COLOR("dialog_input_fg", dialog_input_fg_color);
+    LOAD_CSS_COLOR("dialog_input_bg", dialog_input_bg_color);
+    LOAD_CSS_COLOR("search_match_bg", search_match_bg_color);
+    LOAD_CSS_COLOR("search_match_fg", search_match_fg_color);
+    LOAD_CSS_COLOR("diagnostic_warning_bg", diagnostic_warning_bg_color);
+    LOAD_CSS_COLOR("diagnostic_warning_fg", diagnostic_warning_fg_color);
+    LOAD_CSS_COLOR("codex_preview_bg", codex_preview_bg_color);
+    LOAD_CSS_COLOR("codex_preview_fg", codex_preview_fg_color);
+    LOAD_CSS_COLOR("codex_prompt_bg", codex_prompt_bg_color);
+#undef LOAD_CSS_COLOR
+    theme_state_load_css_font(css, "ui", &state->ui_font);
+    theme_state_load_css_font(css, "editor", &state->editor_font);
+    theme_state_load_css_font(css, "preview", &state->preview_font);
+    theme_state_load_css_font(css, "terminal", &state->terminal_font);
+    theme_state_load_css_font(css, "code", &state->code_font);
+}
+
+/**
  * @brief Return a valid color or fallback.
  * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
  * @param value The value being parsed, stored, or applied.
@@ -958,14 +1102,26 @@ static void theme_preview_update(ThemeDialogState *dialog) {
     const char *tooltip_border = theme_color(s->tooltip_border_color, popover_border);
     g_string_append_printf(css,
         ".graptos-theme-preview-root { background: %s; color: %s; }\n"
+        ".graptos-theme-preview-section { font-weight: 700; margin-top: 8px; }\n"
+        ".graptos-theme-preview-surface { padding: 8px; }\n"
+        ".graptos-theme-preview-row { border-spacing: 6px; }\n"
         ".graptos-theme-preview-top { background: %s; color: %s; padding: 6px; }\n"
+        ".graptos-theme-preview-tabbar { background: %s; color: %s; padding: 6px; }\n"
+        ".graptos-theme-preview-tab-active { background: %s; color: %s; padding: 4px; }\n"
         ".graptos-theme-preview-bottom { background: %s; color: %s; padding: 6px; }\n"
+        ".graptos-theme-preview-status-error { color: %s; font-weight: 800; }\n"
         ".graptos-theme-preview-editor { background: %s; color: %s; padding: 8px; }\n"
         ".graptos-theme-preview-gutter { background: %s; color: %s; padding: 8px; }\n"
         ".graptos-theme-preview-current { background: %s; padding: 2px; }\n"
         ".graptos-theme-preview-selection { background: %s; color: %s; padding: 2px; }\n"
+        ".graptos-theme-preview-cursor { background: %s; color: %s; padding: 1px 3px; }\n"
         ".graptos-theme-preview-project { background: %s; color: %s; padding: 8px; }\n"
         ".graptos-theme-preview-project-selected { background: %s; color: %s; padding: 2px; }\n"
+        ".graptos-theme-preview-button { background: %s; color: %s; padding: 4px 8px; }\n"
+        ".graptos-theme-preview-button-hover { background: %s; color: %s; padding: 4px 8px; }\n"
+        ".graptos-theme-preview-button-active { background: %s; color: %s; padding: 4px 8px; }\n"
+        ".graptos-theme-preview-input { background: %s; color: %s; padding: 4px 8px; border: 1px solid %s; }\n"
+        ".graptos-theme-preview-minimap { background: %s; color: %s; padding: 8px; }\n"
         ".graptos-theme-preview-popover { background: %s; color: %s; padding: 8px; border: 1px solid %s; }\n"
         ".graptos-theme-preview-tooltip { background: %s; color: %s; padding: 6px; border: 1px solid %s; }\n"
         ".graptos-theme-preview-completion { background: %s; color: %s; padding: 8px; }\n"
@@ -991,13 +1147,24 @@ static void theme_preview_update(ThemeDialogState *dialog) {
         ".graptos-theme-preview-warning { background: %s; color: %s; padding: 2px; }\n",
         bg, fg,
         theme_color(s->topbar_bg_color, bg), theme_color(s->topbar_fg_color, fg),
+        theme_color(s->tabbar_bg_color, bg), theme_color(s->tabbar_fg_color, fg),
+        theme_color(s->tab_active_bg_color, "#2a2e3d"), theme_color(s->tab_active_fg_color, fg),
         theme_color(s->bottombar_bg_color, bg), theme_color(s->bottombar_fg_color, fg),
+        theme_color(s->status_error_color, "#ff6b6b"),
         bg, fg,
         theme_color(s->editor_gutter_bg_color, bg), theme_color(s->editor_gutter_fg_color, "#8b949e"),
         theme_color(s->editor_current_line_bg_color, "#20232b"),
         theme_color(s->editor_selection_bg_color, "#3a405c"), theme_color(s->editor_selection_fg_color, "#ffffff"),
+        theme_color(s->editor_cursor_color, "#ffffff"), bg,
         theme_color(s->sidebar_bg_color, bg), theme_color(s->project_tree_fg_color, fg),
         theme_color(s->project_tree_selected_bg_color, "#2a2e3d"), theme_color(s->project_tree_selected_fg_color, "#ffffff"),
+        theme_color(s->button_bg_color, "#2a2e3d"), theme_color(s->button_fg_color, fg),
+        theme_color(s->button_hover_bg_color, "#343a4a"), theme_color(s->button_fg_color, fg),
+        theme_color(s->button_active_bg_color, "#3f4659"), theme_color(s->button_fg_color, fg),
+        theme_color(s->input_bg_color, bg), theme_color(s->input_fg_color, fg),
+        theme_color(s->input_border_color, "#3f4659"),
+        theme_color(s->scroll_preview_bg_color, "#20232b"),
+        theme_color(s->scroll_preview_fg_color, "#8b949e"),
         popover, fg, popover_border,
         tooltip, tooltip_fg, tooltip_border,
         theme_color(s->completion_popover_bg_color, popover), theme_color(s->completion_popover_fg_color, fg),
@@ -1076,7 +1243,7 @@ static char *theme_default_css_path(void) {
 }
 
 /**
- * @brief Synchronize the custom CSS controls from ThemeState.
+ * @brief Synchronize the theme CSS controls from ThemeState.
  * @details Presets and file loads can change CSS settings without user typing,
  *          so controls need the same explicit refresh path as colors and fonts.
  * @param control The control supplied by the caller.
@@ -1087,17 +1254,13 @@ static void theme_css_control_sync(ThemeCssControl *control) {
     control->updating = TRUE;
     if (control->entry) {
         gtk_editable_set_text(GTK_EDITABLE(control->entry),
-                              state->custom_css_path ? state->custom_css_path : "");
-    }
-    if (control->switch_widget) {
-        gtk_switch_set_active(GTK_SWITCH(control->switch_widget),
-                              state->custom_css_enabled);
+                              state->theme_css_path ? state->theme_css_path : "");
     }
     control->updating = FALSE;
 }
 
 /**
- * @brief Store the custom CSS path from the entry.
+ * @brief Store the theme CSS path from the entry.
  * @details Empty text is preserved as an explicit disabled path. That gives
  *          manual config edits and the theme dialog the same opt-out behavior.
  * @param editable The editable supplied by the caller.
@@ -1110,34 +1273,11 @@ static void theme_css_path_changed(GtkEditable *editable, gpointer user_data) {
         return;
     }
     const char *text = gtk_editable_get_text(editable);
-    if (g_strcmp0(control->dialog->state->custom_css_path, text ? text : "") == 0) {
+    if (g_strcmp0(control->dialog->state->theme_css_path, text ? text : "") == 0) {
         return;
     }
-    theme_replace(&control->dialog->state->custom_css_path, text ? text : "");
+    theme_replace(&control->dialog->state->theme_css_path, text ? text : "");
     theme_dialog_changed(control->dialog);
-}
-
-/**
- * @brief Store the custom CSS enabled switch state.
- * @details CSS remains opt-in by switch and by a non-empty path. Keeping both
- *          values explicit prevents a stale theme.css from masking INI themes.
- * @param switch_widget The switch supplied by the caller.
- * @param active TRUE when the switch is active.
- * @param user_data The callback context passed through GTK signal data.
- * @return FALSE so GTK keeps its normal switch state handling.
- */
-static gboolean theme_css_enabled_changed(GtkSwitch *switch_widget,
-                                          gboolean active,
-                                          gpointer user_data) {
-    ThemeCssControl *control = user_data;
-    if (!control || control->updating || !control->dialog ||
-        !control->dialog->state || !switch_widget) {
-        return FALSE;
-    }
-    if (control->dialog->state->custom_css_enabled == active) return FALSE;
-    control->dialog->state->custom_css_enabled = active;
-    theme_dialog_changed(control->dialog);
-    return FALSE;
 }
 
 /**
@@ -1154,23 +1294,22 @@ static void theme_css_template_clicked(GtkWidget *widget, gpointer user_data) {
     if (!control || !control->dialog || !control->dialog->state) return;
 
     ThemeState *state = control->dialog->state;
-    if (!state->custom_css_path || state->custom_css_path[0] == '\0') {
+    if (!state->theme_css_path || state->theme_css_path[0] == '\0') {
         g_autofree char *path = theme_default_css_path();
-        if (path) theme_replace(&state->custom_css_path, path);
+        if (path) theme_replace(&state->theme_css_path, path);
     }
-    if (!state->custom_css_path || state->custom_css_path[0] == '\0') {
+    if (!state->theme_css_path || state->theme_css_path[0] == '\0') {
         app_window_set_error_status(control->dialog->win,
                                     "CSS template failed",
                                     "Unable to resolve config directory.");
         return;
     }
-    if (!graptos_write_theme_css_template(state->custom_css_path, FALSE)) {
+    if (!graptos_write_theme_css_template(state->theme_css_path, FALSE)) {
         app_window_set_error_status(control->dialog->win,
                                     "CSS template failed",
-                                    state->custom_css_path);
+                                    state->theme_css_path);
         return;
     }
-    state->custom_css_enabled = TRUE;
     theme_css_control_sync(control);
     theme_dialog_changed(control->dialog);
     app_window_set_status(control->dialog->win, "CSS theme file ready");
@@ -1648,8 +1787,17 @@ static gboolean theme_dialog_load_file(ThemeDialogState *dialog,
                                         path);
             return FALSE;
         }
-        theme_replace(&dialog->state->custom_css_path, path);
-        dialog->state->custom_css_enabled = TRUE;
+        g_autofree char *css = NULL;
+        gsize length = 0u;
+        g_autoptr(GError) read_error = NULL;
+        if (!g_file_get_contents(path, &css, &length, &read_error) || !css) {
+            app_window_set_error_status(dialog->win,
+                                        "Theme load failed",
+                                        read_error ? read_error->message : path);
+            return FALSE;
+        }
+        theme_replace(&dialog->state->theme_css_path, path);
+        theme_state_load_css(dialog->state, css);
         theme_controls_sync(dialog);
         dialog->dirty = TRUE;
         theme_preview_update(dialog);
@@ -1709,13 +1857,18 @@ static void theme_preset_changed(GtkDropDown *drop_down,
     }
     g_autofree char *message = g_strdup_printf("Loaded theme: %s",
                                                preset->label);
-    (void)theme_dialog_load_file(dialog, path, message);
+    g_autofree char *active_path =
+        g_strdup(dialog->state->theme_css_path ? dialog->state->theme_css_path : "");
+    if (theme_dialog_load_file(dialog, path, message)) {
+        theme_replace(&dialog->state->theme_css_path, active_path);
+        theme_controls_sync(dialog);
+    }
 }
 
 /**
- * @brief Load a custom Graptoς theme INI file.
- * @details Custom themes use the same `[Editor]` keys as `config.ini`, making
- *          them easy to create by copying a saved config or bundled preset.
+ * @brief Load a custom Graptoς theme file.
+ * @details CSS is the primary theme format. Legacy INI files are still accepted
+ *          here as imports and are written back into the active CSS theme.
  * @param widget The button that triggered the load.
  * @param user_data The ThemeDialogState.
  */
@@ -1809,12 +1962,12 @@ static GtkWidget *theme_preset_row(ThemeDialogState *dialog) {
 }
 
 /**
- * @brief Create the custom CSS controls for the theme dialog.
- * @details This row exposes the post-generated CSS layer directly. A blank
- *          path is valid and disables CSS loading even when the switch remains
- *          active, matching manual config.ini edits.
+ * @brief Create the theme CSS controls for the theme dialog.
+ * @details This row exposes the active CSS theme path directly. The file is
+ *          the persisted theme source; structured controls rewrite its managed
+ *          block when the user applies changes.
  * @param dialog The theme dialog state.
- * @return A GTK row containing CSS enable and path controls.
+ * @return A GTK row containing CSS path controls.
  */
 static GtkWidget *theme_css_row(ThemeDialogState *dialog) {
     GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
@@ -1826,11 +1979,6 @@ static GtkWidget *theme_css_row(ThemeDialogState *dialog) {
     ThemeCssControl *control = g_new0(ThemeCssControl, 1);
     control->dialog = dialog;
 
-    GtkWidget *switch_widget = gtk_switch_new();
-    gtk_widget_set_tooltip_text(switch_widget,
-                                "Load the CSS file after generated theme CSS");
-    control->switch_widget = switch_widget;
-
     GtkWidget *entry = gtk_entry_new();
     gtk_widget_set_size_request(entry, 260, -1);
     gtk_widget_set_hexpand(entry, TRUE);
@@ -1840,13 +1988,10 @@ static GtkWidget *theme_css_row(ThemeDialogState *dialog) {
 
     g_object_set_data_full(G_OBJECT(row), "graptos-theme-css-control",
                            control, g_free);
-    g_signal_connect(switch_widget, "state-set",
-                     G_CALLBACK(theme_css_enabled_changed), control);
     g_signal_connect(entry, "changed",
                      G_CALLBACK(theme_css_path_changed), control);
 
     theme_css_control_sync(control);
-    gtk_box_append(GTK_BOX(row), switch_widget);
     gtk_box_append(GTK_BOX(row), entry);
     gtk_box_append(GTK_BOX(row),
                    graptos_flat_button_new("Create",
@@ -2002,6 +2147,18 @@ static void theme_preview_label(GtkWidget *box,
 }
 
 /**
+ * @brief Append a labeled preview section.
+ * @details The preview is also a theme audit surface. Section labels make it
+ *          obvious which family owns each sample without adding separate theme
+ *          state or hidden mappings.
+ * @param box The box supplied by the caller.
+ * @param text The text fragment supplied by the caller.
+ */
+static void theme_preview_section(GtkWidget *box, const char *text) {
+    theme_preview_label(box, text, "graptos-theme-preview-section");
+}
+
+/**
  * @brief Build the rendered theme preview.
  * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
  * @return The resolved value for the caller, or NULL when no suitable value is available.
@@ -2011,9 +2168,14 @@ static GtkWidget *theme_preview_new(void) {
     gtk_widget_add_css_class(box, "graptos-theme-preview-root");
     graptos_set_all_margins(box, 10);
 
+    theme_preview_section(box, "Chrome");
     theme_preview_label(box, "Top bar  New  Open  Folder", "graptos-theme-preview-top");
-    theme_preview_label(box, "Tab: main.c   Tab: README.md", "graptos-theme-preview-bottom");
+    theme_preview_label(box, "Tab bar foreground  main.c  README.md", "graptos-theme-preview-tabbar");
+    theme_preview_label(box, "Active tab", "graptos-theme-preview-tab-active");
+    theme_preview_label(box, "Bottom/status bar  Ready", "graptos-theme-preview-bottom");
+    theme_preview_label(box, "Status error text", "graptos-theme-preview-status-error");
 
+    theme_preview_section(box, "Editor");
     GtkWidget *editor = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     GtkWidget *gutter = gtk_label_new(" 1\n 2\n 3");
     gtk_widget_add_css_class(gutter, "graptos-theme-preview-gutter");
@@ -2023,10 +2185,13 @@ static GtkWidget *theme_preview_new(void) {
     theme_preview_label(code, "int main(void) {", "graptos-theme-preview-code");
     theme_preview_label(code, "    return 0;   ← current line", "graptos-theme-preview-current");
     theme_preview_label(code, "selected text", "graptos-theme-preview-selection");
+    theme_preview_label(code, "cursor sample |", "graptos-theme-preview-cursor");
     gtk_box_append(GTK_BOX(editor), code);
     gtk_box_append(GTK_BOX(box), editor);
 
+    theme_preview_section(box, "Project Tree and Git");
     theme_preview_label(box, "Project Tree\nM  src/app.c\n?  notes.md", "graptos-theme-preview-project");
+    theme_preview_label(box, "Selected project row", "graptos-theme-preview-project-selected");
     theme_preview_label(box, "M modified", "graptos-theme-preview-git-modified");
     theme_preview_label(box, "A added", "graptos-theme-preview-git-added");
     theme_preview_label(box, "D deleted", "graptos-theme-preview-git-deleted");
@@ -2034,17 +2199,30 @@ static GtkWidget *theme_preview_new(void) {
     theme_preview_label(box, "U conflict", "graptos-theme-preview-git-conflict");
     theme_preview_label(box, "? untracked", "graptos-theme-preview-git-untracked");
     theme_preview_label(box, "S staged", "graptos-theme-preview-git-staged");
-    theme_preview_label(box, "Selected project row", "graptos-theme-preview-project-selected");
+
+    theme_preview_section(box, "Controls and Preview");
+    theme_preview_label(box, "Button", "graptos-theme-preview-button");
+    theme_preview_label(box, "Button hover", "graptos-theme-preview-button-hover");
+    theme_preview_label(box, "Button active", "graptos-theme-preview-button-active");
+    theme_preview_label(box, "Input field text", "graptos-theme-preview-input");
+    theme_preview_label(box, "Scroll preview / minimap", "graptos-theme-preview-minimap");
+
+    theme_preview_section(box, "Popovers");
     theme_preview_label(box, "Popover demo\nDummy popover text", "graptos-theme-preview-popover");
     theme_preview_label(box, "Tooltip demo", "graptos-theme-preview-tooltip");
     theme_preview_label(box, "Completion\nprintf", "graptos-theme-preview-completion");
     theme_preview_label(box, "detail: stdio function", "graptos-theme-preview-completion-detail");
     theme_preview_label(box, "Selected completion row", "graptos-theme-preview-completion-selected");
-    theme_preview_label(box, "Reference Popover", "graptos-theme-preview-ref-heading");
+
+    theme_preview_section(box, "Reference Popover");
+    theme_preview_label(box, "Reference popover surface", "graptos-theme-preview-ref");
+    theme_preview_label(box, "Reference heading", "graptos-theme-preview-ref-heading");
     theme_preview_label(box, "symbol_name", "graptos-theme-preview-ref-title");
     theme_preview_label(box, "function", "graptos-theme-preview-ref-kind");
     theme_preview_label(box, "return symbol_name();", "graptos-theme-preview-ref-snippet");
     theme_preview_label(box, "Hovered reference row", "graptos-theme-preview-ref-hover");
+
+    theme_preview_section(box, "Dialogs");
     theme_preview_label(box, "Native dialog preview\nSave changes?", "graptos-theme-preview-dialog");
     theme_preview_label(box, "Dialog title", "graptos-theme-preview-dialog-title");
     theme_preview_label(box, "Dialog body text explains the choice.", "graptos-theme-preview-dialog-body");
@@ -2053,6 +2231,8 @@ static GtkWidget *theme_preview_new(void) {
     theme_preview_label(box, "Save action", "graptos-theme-preview-dialog-action");
     theme_preview_label(box, "Discard action", "graptos-theme-preview-dialog-destructive");
     theme_preview_label(box, "Dialog input text", "graptos-theme-preview-dialog-input");
+
+    theme_preview_section(box, "Search, Diagnostics, Codex, Fonts");
     theme_preview_label(box, "Codex response preview", "graptos-theme-preview-codex");
     theme_preview_label(box, "Ask Codex…", "graptos-theme-preview-codex-prompt");
     theme_preview_label(box, "Search match", "graptos-theme-preview-search");
@@ -2197,7 +2377,7 @@ static int theme_unsaved_prompt(GtkWindow *parent) {
         parent,
         "Unsaved theme changes",
         "Save theme changes before closing?",
-        "You can save the live preview to config.ini, discard it, or keep editing.",
+        "You can save the live preview to the active CSS theme, discard it, or keep editing.",
         460,
         180,
         actions,
@@ -2265,12 +2445,12 @@ void action_show_preferences(GtkWidget *widget, gpointer user_data) {
                                          G_CALLBACK(graptos_modal_window_respond),
                                          GINT_TO_POINTER(GRAPTOS_THEME_RESPONSE_CANCEL)));
     gtk_box_append(GTK_BOX(buttons),
-                   graptos_flat_button_new("Reload config.ini",
-                                         "Apply the manually edited config.ini file",
+                   graptos_flat_button_new("Reload Theme",
+                                         "Reload the saved config and active CSS theme",
                                          G_CALLBACK(graptos_modal_window_respond),
                                          GINT_TO_POINTER(GRAPTOS_THEME_RESPONSE_RELOAD_CONFIG)));
     gtk_box_append(GTK_BOX(buttons),
-                   graptos_flat_button_new("Apply", "Apply theme and save config",
+                   graptos_flat_button_new("Apply", "Apply theme and save CSS",
                                          G_CALLBACK(graptos_modal_window_respond),
                                          GINT_TO_POINTER(GRAPTOS_THEME_RESPONSE_APPLY)));
     gtk_box_append(GTK_BOX(root), buttons);
@@ -2284,6 +2464,11 @@ void action_show_preferences(GtkWidget *widget, gpointer user_data) {
                                               GRAPTOS_THEME_RESPONSE_CANCEL);
         if (response == GRAPTOS_THEME_RESPONSE_APPLY) {
             theme_state_apply_to_window(dialog_state.state, win);
+            if (win->theme_css_path && win->theme_css_path[0] != '\0') {
+                (void)graptos_theme_css_save_from_window(win,
+                                                         win->theme_css_path,
+                                                         TRUE);
+            }
             app_window_apply_css(win);
             apply_preferences_to_all_tabs(win);
             graptos_config_save(win);
@@ -2307,6 +2492,11 @@ void action_show_preferences(GtkWidget *widget, gpointer user_data) {
             int unsaved = theme_unsaved_prompt(GTK_WINDOW(dialog));
             if (unsaved == GRAPTOS_THEME_RESPONSE_APPLY) {
                 theme_state_apply_to_window(dialog_state.state, win);
+                if (win->theme_css_path && win->theme_css_path[0] != '\0') {
+                    (void)graptos_theme_css_save_from_window(win,
+                                                             win->theme_css_path,
+                                                             TRUE);
+                }
                 app_window_apply_css(win);
                 apply_preferences_to_all_tabs(win);
                 graptos_config_save(win);

@@ -31,19 +31,14 @@ static GtkCssProvider *custom_provider;
  */
 static const char *graptos_theme_css_template(void) {
     return
-        "/* Graptoς user theme overrides.\n"
-        " * This file is loaded after compiled CSS and generated theme CSS.\n"
-        " * Uncomment examples or add your own rules. The default template is\n"
-        " * intentionally inert so enabling custom CSS does not change themes.\n"
-        " */\n\n"
-        "/*\n"
+        "/* GRAPTOS THEME BEGIN */\n"
         "@define-color graptos_editor_bg #181a1f;\n"
         "@define-color graptos_editor_fg #d4d4d4;\n"
-        "@define-color graptos_sidebar_bg #181a1f;\n"
-        "@define-color graptos_tabbar_bg #181a1f;\n"
-        "@define-color graptos_topbar_bg #181a1f;\n"
-        "@define-color graptos_bottombar_bg #181a1f;\n"
-        "@define-color graptos_popover_bg #181a1f;\n"
+        "@define-color graptos_sidebar_bg #111318;\n"
+        "@define-color graptos_tabbar_bg #111318;\n"
+        "@define-color graptos_topbar_bg #111318;\n"
+        "@define-color graptos_bottombar_bg #111318;\n"
+        "@define-color graptos_popover_bg #1b1f24;\n"
         "@define-color graptos_dialog_bg #1b1f24;\n"
         "@define-color graptos_accent #89b4fa;\n"
         "@define-color graptos_warning_bg #5f4b24;\n\n"
@@ -76,7 +71,7 @@ static const char *graptos_theme_css_template(void) {
         ".graptos-tab-tiled { box-shadow: inset 0 -2px @graptos_accent; }\n"
         ".graptos-completion-list row:selected { background: @graptos_accent; }\n"
         ".graptos-diagnostic-warning { background: @graptos_warning_bg; }\n"
-        "*/\n";
+        "/* GRAPTOS THEME END */\n";
 }
 
 /**
@@ -103,12 +98,12 @@ gboolean graptos_write_theme_css_template(const char *path,
 }
 
 /**
- * @brief Remove the active user CSS provider.
+ * @brief Remove the active theme CSS provider.
  * @details Reloading themes replaces providers instead of stacking them so
  *          deleted or changed CSS files cannot keep stale rules alive.
  * @param display The GTK display that owns CSS providers.
  */
-static void graptos_remove_custom_css_provider(GdkDisplay *display) {
+static void graptos_remove_theme_css_provider(GdkDisplay *display) {
     if (!display || !custom_provider) return;
     gtk_style_context_remove_provider_for_display(
         display, GTK_STYLE_PROVIDER(custom_provider));
@@ -116,29 +111,26 @@ static void graptos_remove_custom_css_provider(GdkDisplay *display) {
 }
 
 /**
- * @brief Apply user-editable CSS after generated theme CSS.
- * @details The user file is optional. When it is enabled and missing, Graptoς
- *          writes a complete template so theme CSS remains editable after
- *          compilation without changing existing config or theme presets.
+ * @brief Apply theme CSS after generated fallback CSS.
+ * @details CSS file creation belongs to config migration and the Theme dialog.
+ *          The provider only loads an existing active theme file so missing
+ *          paths cannot create stale or empty override files.
  * @param path The CSS file path supplied by config.
- * @param enabled TRUE when custom CSS loading should be active.
+ * @param enabled TRUE when theme CSS loading should be active.
  */
-void graptos_apply_custom_css(const char *path, gboolean enabled) {
+void graptos_apply_theme_css(const char *path, gboolean enabled) {
     GdkDisplay *display = gdk_display_get_default();
     if (!display) return;
 
-    graptos_remove_custom_css_provider(display);
+    graptos_remove_theme_css_provider(display);
     if (!enabled || !path || path[0] == '\0') return;
-
-    if (!g_file_test(path, G_FILE_TEST_IS_REGULAR)) {
-        if (!graptos_write_theme_css_template(path, FALSE)) return;
-    }
+    if (!g_file_test(path, G_FILE_TEST_IS_REGULAR)) return;
 
     g_autofree char *css = NULL;
     gsize length = 0u;
     g_autoptr(GError) error = NULL;
     if (!g_file_get_contents(path, &css, &length, &error) || !css) {
-        g_warning("Could not load Graptoς custom CSS %s: %s",
+        g_warning("Could not load Graptoς theme CSS %s: %s",
                   path,
                   error ? error->message : "unknown error");
         return;
