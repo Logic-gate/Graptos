@@ -272,9 +272,9 @@ void graptos_apply_editor_css(const char *editor_bg_color,
     const char *effective_cursor =
         (editor_cursor_color && editor_cursor_color[0] == '#') ? editor_cursor_color : effective_fg;
     const char *effective_sidebar =
-        (sidebar_bg_color && sidebar_bg_color[0] == '#') ? sidebar_bg_color : effective_bg;
+        (sidebar_bg_color && sidebar_bg_color[0] == '#') ? sidebar_bg_color : "#111318";
     const char *effective_tabbar =
-        (tabbar_bg_color && tabbar_bg_color[0] == '#') ? tabbar_bg_color : effective_bg;
+        (tabbar_bg_color && tabbar_bg_color[0] == '#') ? tabbar_bg_color : "#111318";
     const char *effective_tabbar_fg =
         (tabbar_fg_color && tabbar_fg_color[0] == '#') ? tabbar_fg_color : effective_fg;
     const char *effective_tab_active_bg =
@@ -282,11 +282,11 @@ void graptos_apply_editor_css(const char *editor_bg_color,
     const char *effective_tab_active_fg =
         (tab_active_fg_color && tab_active_fg_color[0] == '#') ? tab_active_fg_color : "#ffffff";
     const char *effective_topbar_bg =
-        (topbar_bg_color && topbar_bg_color[0] == '#') ? topbar_bg_color : effective_bg;
+        (topbar_bg_color && topbar_bg_color[0] == '#') ? topbar_bg_color : "#111318";
     const char *effective_topbar_fg =
         (topbar_fg_color && topbar_fg_color[0] == '#') ? topbar_fg_color : effective_fg;
     const char *effective_bottombar_bg =
-        (bottombar_bg_color && bottombar_bg_color[0] == '#') ? bottombar_bg_color : effective_bg;
+        (bottombar_bg_color && bottombar_bg_color[0] == '#') ? bottombar_bg_color : "#111318";
     const char *effective_bottombar_fg =
         (bottombar_fg_color && bottombar_fg_color[0] == '#') ? bottombar_fg_color : effective_fg;
     const char *effective_status_error =
@@ -327,12 +327,12 @@ void graptos_apply_editor_css(const char *editor_bg_color,
         (git_status_staged_color && git_status_staged_color[0] == '#') ? git_status_staged_color : "#cba6f7";
     const char *effective_preview =
         (scroll_preview_bg_color && scroll_preview_bg_color[0] == '#') ?
-            scroll_preview_bg_color : effective_bg;
+            scroll_preview_bg_color : "#111318";
     const char *effective_preview_fg =
         (scroll_preview_fg_color && scroll_preview_fg_color[0] == '#') ?
             scroll_preview_fg_color : "#8b949e";
     const char *effective_popover =
-        (popover_bg_color && popover_bg_color[0] == '#') ? popover_bg_color : effective_bg;
+        (popover_bg_color && popover_bg_color[0] == '#') ? popover_bg_color : "#1b1f24";
     const char *effective_popover_border =
         (popover_border_color && popover_border_color[0] == '#') ?
             popover_border_color : "#00000000";
@@ -420,13 +420,13 @@ void graptos_apply_editor_css(const char *editor_bg_color,
         (diagnostic_warning_fg_color && diagnostic_warning_fg_color[0] == '#') ? diagnostic_warning_fg_color : "#ffd166";
     const char *effective_codex_preview =
         (codex_preview_bg_color && codex_preview_bg_color[0] == '#')
-            ? codex_preview_bg_color : effective_bg;
+            ? codex_preview_bg_color : "#1b1f24";
     const char *effective_codex_preview_fg =
         (codex_preview_fg_color && codex_preview_fg_color[0] == '#')
             ? codex_preview_fg_color : effective_fg;
     const char *effective_codex_prompt =
         (codex_prompt_bg_color && codex_prompt_bg_color[0] == '#')
-            ? codex_prompt_bg_color : effective_bg;
+            ? codex_prompt_bg_color : "#111318";
     const char *effective_ui_font =
         (ui_font && ui_font[0] != '\0') ? ui_font : NULL;
     const char *effective_editor_font =
@@ -437,6 +437,28 @@ void graptos_apply_editor_css(const char *editor_bg_color,
         (terminal_font && terminal_font[0] != '\0') ? terminal_font : NULL;
     const char *effective_code_font =
         (code_font && code_font[0] != '\0') ? code_font : "monospace";
+
+    g_string_append_printf(css,
+        "@define-color graptos_editor_bg %s;\n"
+        "@define-color graptos_editor_fg %s;\n"
+        "@define-color graptos_sidebar_bg %s;\n"
+        "@define-color graptos_tabbar_bg %s;\n"
+        "@define-color graptos_topbar_bg %s;\n"
+        "@define-color graptos_bottombar_bg %s;\n"
+        "@define-color graptos_popover_bg %s;\n"
+        "@define-color graptos_dialog_bg %s;\n"
+        "@define-color graptos_accent %s;\n"
+        "@define-color graptos_warning_bg %s;\n",
+        effective_bg,
+        effective_fg,
+        effective_sidebar,
+        effective_tabbar,
+        effective_topbar_bg,
+        effective_bottombar_bg,
+        effective_popover,
+        effective_dialog_bg,
+        effective_completion_selection_bg,
+        effective_diag_warn_bg);
 
     append_font_rule(css,
         ".graptos-root, .graptos-root label, .graptos-root button, "
@@ -457,17 +479,9 @@ void graptos_apply_editor_css(const char *editor_bg_color,
 
     g_string_append_printf(css,
         "window.graptos-window, window.graptos-window > contents, "
-        "window.graptos-window > contents > *, "
-        "window.graptos-window box, window.graptos-window paned, "
-        "window.graptos-window stack, window.graptos-window revealer, "
-        "window.graptos-window scrolledwindow, window.graptos-window viewport, "
         ".graptos-root, .graptos-root > box, .graptos-tab-page, "
         ".graptos-editor-area, .graptos-editor-overlay, "
-        ".graptos-root paned, .graptos-root revealer, "
-        ".graptos-root frame, .graptos-root viewport, "
-        ".graptos-root scrolledwindow, .graptos-root stack, "
-        ".graptos-root notebook, .graptos-root notebook > stack, "
-        ".graptos-root notebook > stack > box { "
+        ".graptos-editor-content { "
         "background: %s; background-color: %s; color: %s; }\n",
         effective_bg, effective_bg, effective_fg);
 
@@ -581,12 +595,16 @@ void graptos_apply_editor_css(const char *editor_bg_color,
     g_string_append_printf(css,
         ".graptos-root notebook > header { background: %s; background-color: %s; color: %s; }\n"
         ".graptos-root notebook > header.top > tabs > tab { background: %s; background-color: %s; color: %s; }\n"
-        ".graptos-root notebook > header.top > tabs > tab:checked { background: %s; background-color: %s; color: %s; }\n"
+        ".graptos-root notebook > header.top > tabs > tab:checked { "
+        "background: %s; background-color: %s; color: %s; border-bottom-color: %s; }\n"
+        ".graptos-tab-tiled { box-shadow: inset 0 -2px %s; }\n"
         ".graptos-tab label { color: %s; opacity: 0.68; }\n"
         ".graptos-root notebook > header.top > tabs > tab:checked .graptos-tab label { color: %s; opacity: 1.0; }\n",
         effective_tabbar, effective_tabbar, effective_tabbar_fg,
         effective_tabbar, effective_tabbar, effective_tabbar_fg,
         effective_tab_active_bg, effective_tab_active_bg, effective_tab_active_fg,
+        effective_completion_selection_bg,
+        effective_completion_selection_bg,
         effective_tabbar_fg,
         effective_tab_active_fg);
     g_string_append_printf(css,

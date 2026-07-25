@@ -111,6 +111,19 @@ static void save_string(GKeyFile *key_file, const char *key, const char *value) 
 }
 
 /**
+ * @brief Return the default user-editable theme CSS path.
+ * @details CSS overrides live beside config.ini so theme files remain editable
+ *          after compilation and do not require installation directories to be
+ *          writable.
+ * @return An owned path, or NULL when the config directory cannot be resolved.
+ */
+static char *default_custom_css_path(void) {
+    const char *base = g_get_user_config_dir();
+    if (!base || base[0] == '\0') return NULL;
+    return g_build_filename(base, "graptos", "theme.css", NULL);
+}
+
+/**
  * @brief Report a configuration save failure without interrupting shutdown.
  * @details Config writes can happen from live theme changes and from window
  *          teardown. During normal use we expose the failure through the status
@@ -278,7 +291,9 @@ static void populate_config_key_file(EditorWindow *win, GKeyFile *key_file) {
     save_string(key_file, "preview_font", win->preview_font ? win->preview_font : "");
     save_string(key_file, "terminal_font", win->terminal_font ? win->terminal_font : "");
     save_string(key_file, "code_font", win->code_font ? win->code_font : "");
+    save_string(key_file, "custom_css_path", win->custom_css_path ? win->custom_css_path : "");
     g_key_file_set_boolean(key_file, "Editor", "use_system_interface_font", win->use_system_interface_font);
+    g_key_file_set_boolean(key_file, "Editor", "custom_css_enabled", win->custom_css_enabled);
     g_key_file_set_boolean(key_file, "Editor", "autocomplete_enabled", win->autocomplete_enabled);
     g_key_file_set_boolean(key_file, "Editor", "regex_tester_enabled", win->regex_tester_enabled);
     g_key_file_set_boolean(key_file, "Editor", "diagnostics_enabled", win->diagnostics_enabled);
@@ -495,6 +510,7 @@ void graptos_config_load(EditorWindow *win) {
     load_string(key_file, "preview_font", &win->preview_font);
     load_string(key_file, "terminal_font", &win->terminal_font);
     load_string(key_file, "code_font", &win->code_font);
+    load_string(key_file, "custom_css_path", &win->custom_css_path);
     migrate_removed_font(&win->ui_font);
     migrate_removed_font(&win->editor_font);
     migrate_removed_font(&win->preview_font);
@@ -502,6 +518,7 @@ void graptos_config_load(EditorWindow *win) {
     migrate_removed_font(&win->code_font);
 
     win->use_system_interface_font = parse_bool(key_file, "use_system_interface_font", win->use_system_interface_font);
+    win->custom_css_enabled = parse_bool(key_file, "custom_css_enabled", win->custom_css_enabled);
     win->autocomplete_enabled = parse_bool(key_file, "autocomplete_enabled", win->autocomplete_enabled);
     win->regex_tester_enabled = parse_bool(key_file, "regex_tester_enabled", win->regex_tester_enabled);
     win->diagnostics_enabled = parse_bool(key_file, "diagnostics_enabled", win->diagnostics_enabled);
@@ -523,13 +540,17 @@ void graptos_config_load(EditorWindow *win) {
     win->use_yaml_style_overrides = parse_bool(key_file, "use_yaml_style_overrides", win->use_yaml_style_overrides);
 
     if (!win->codex_preview_bg_color) {
-        win->codex_preview_bg_color = g_strdup(win->editor_bg_color);
+        win->codex_preview_bg_color = g_strdup("#1b1f24");
     }
     if (!win->codex_preview_fg_color) {
         win->codex_preview_fg_color = g_strdup("#d4d4d4");
     }
     if (!win->codex_prompt_bg_color) {
-        win->codex_prompt_bg_color = g_strdup(win->editor_bg_color);
+        win->codex_prompt_bg_color = g_strdup("#111318");
+    }
+    if (!win->custom_css_path || win->custom_css_path[0] == '\0') {
+        g_clear_pointer(&win->custom_css_path, g_free);
+        win->custom_css_path = default_custom_css_path();
     }
 
     backfill_missing_config_keys(win, key_file, path);

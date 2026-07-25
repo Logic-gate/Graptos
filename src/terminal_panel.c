@@ -299,8 +299,10 @@ static void terminal_panel_apply_height(TerminalPanel *panel) {
 }
 
 /**
- * @brief Apply current editor colors and font to one terminal session.
- * @details Terminal handling crosses GTK widgets, VTE child processes, and project directories. The comment keeps the lifetime rule visible so closing tabs and shell exits do not race each other.
+ * @brief Apply current theme colors and font to one terminal session.
+ * @details The terminal is painted by VTE instead of normal GTK CSS, so it
+ *          receives the bottom-panel theme role directly rather than inheriting
+ *          editor colors through the generated stylesheet.
  * @param session The session supplied by the caller.
  */
 static void terminal_session_apply_colors(TerminalSession *session) {
@@ -313,8 +315,8 @@ static void terminal_session_apply_colors(TerminalSession *session) {
     GdkRGBA fg;
     GdkRGBA bg;
     GdkRGBA cursor;
-    const char *fg_text = win->editor_fg_color ? win->editor_fg_color : "#d4d4d4";
-    const char *bg_text = win->editor_bg_color ? win->editor_bg_color : "#181a1f";
+    const char *fg_text = win->bottombar_fg_color ? win->bottombar_fg_color : "#d4d4d4";
+    const char *bg_text = win->bottombar_bg_color ? win->bottombar_bg_color : "#111318";
     const char *cursor_text = win->editor_cursor_color
         ? win->editor_cursor_color : fg_text;
 

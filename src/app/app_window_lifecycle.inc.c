@@ -98,11 +98,18 @@ EditorWindow *app_window_new(GtkApplication *application) {
     win->preview_enabled = FALSE;
     win->use_gtksourceview_highlighting = TRUE;
     win->use_yaml_style_overrides = TRUE;
+    win->custom_css_enabled = TRUE;
     win->ui_font = g_strdup("Inconsolata");
     win->editor_font = g_strdup("");
     win->preview_font = g_strdup("");
     win->terminal_font = g_strdup("");
     win->code_font = g_strdup("monospace");
+    {
+        const char *config_dir = g_get_user_config_dir();
+        win->custom_css_path = config_dir && config_dir[0] != '\0'
+            ? g_build_filename(config_dir, "graptos", "theme.css", NULL)
+            : NULL;
+    }
     // Without defaults here, GTK paints white until the first file/tab refresh reapplies config CSS
     win->editor_bg_color = g_strdup("#181a1f");
     win->editor_fg_color = g_strdup("#d4d4d4");
@@ -192,13 +199,13 @@ EditorWindow *app_window_new(GtkApplication *application) {
     graptos_config_load(win);
     win->lsp_client = lsp_client_new(win);
     if (!win->codex_preview_bg_color) {
-        win->codex_preview_bg_color = g_strdup(win->editor_bg_color);
+        win->codex_preview_bg_color = g_strdup("#1b1f24");
     }
     if (!win->codex_preview_fg_color) {
         win->codex_preview_fg_color = g_strdup("#d4d4d4");
     }
     if (!win->codex_prompt_bg_color) {
-        win->codex_prompt_bg_color = g_strdup(win->editor_bg_color);
+        win->codex_prompt_bg_color = g_strdup("#111318");
     }
 
     /*
@@ -413,6 +420,7 @@ void app_window_free(EditorWindow *win) {
     g_free(win->preview_font);
     g_free(win->terminal_font);
     g_free(win->code_font);
+    g_free(win->custom_css_path);
     g_free(win->project_root);
     g_free(win);
 }

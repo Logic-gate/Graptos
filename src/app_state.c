@@ -90,6 +90,7 @@ void app_window_apply_css(EditorWindow *win) {
                            win->terminal_font,
                            win->code_font,
                            win->use_system_interface_font);
+    graptos_apply_custom_css(win->custom_css_path, win->custom_css_enabled);
     terminal_panel_apply_colors(win->terminal_panel);
 }
 

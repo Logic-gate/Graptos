@@ -189,6 +189,26 @@ void graptos_apply_editor_css(const char *editor_bg_color,
                             const char *code_font,
                             gboolean use_system_interface_font);
 /**
+ * @brief Apply user-editable CSS after generated theme CSS.
+ * @details Custom CSS is loaded at the highest application priority so local
+ *          theme files can override both compiled structure and generated
+ *          colour rules without rebuilding Graptoς.
+ * @param path The CSS file path supplied by config.
+ * @param enabled TRUE when custom CSS loading should be active.
+ */
+void graptos_apply_custom_css(const char *path, gboolean enabled);
+/**
+ * @brief Write a complete editable theme CSS template.
+ * @details The template documents the stable selectors and colour names that
+ *          users can override after compilation. Existing files are kept unless
+ *          overwrite is TRUE.
+ * @param path The destination path.
+ * @param overwrite TRUE to replace an existing file.
+ * @return TRUE when the template exists after the call; otherwise FALSE.
+ */
+gboolean graptos_write_theme_css_template(const char *path,
+                                          gboolean overwrite);
+/**
  * @brief Graptoς button new.
  * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
  * @param label The label supplied by the caller.
