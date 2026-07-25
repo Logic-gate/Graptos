@@ -111,19 +111,6 @@ static void save_string(GKeyFile *key_file, const char *key, const char *value) 
 }
 
 /**
- * @brief Return the default user-editable theme CSS path.
- * @details CSS overrides live beside config.ini so theme files remain editable
- *          after compilation and do not require installation directories to be
- *          writable.
- * @return An owned path, or NULL when the config directory cannot be resolved.
- */
-static char *default_custom_css_path(void) {
-    const char *base = g_get_user_config_dir();
-    if (!base || base[0] == '\0') return NULL;
-    return g_build_filename(base, "graptos", "theme.css", NULL);
-}
-
-/**
  * @brief Report a configuration save failure without interrupting shutdown.
  * @details Config writes can happen from live theme changes and from window
  *          teardown. During normal use we expose the failure through the status
@@ -331,6 +318,10 @@ static gboolean copy_missing_config_key(GKeyFile *target,
                                         const char *group,
                                         const char *key) {
     if (!target || !defaults || !group || !key) return FALSE;
+    if (g_strcmp0(group, "Editor") == 0 &&
+        g_strcmp0(key, "custom_css_path") == 0) {
+        return FALSE;
+    }
     if (g_key_file_has_key(target, group, key, NULL)) return FALSE;
 
     g_autoptr(GError) error = NULL;
@@ -510,7 +501,17 @@ void graptos_config_load(EditorWindow *win) {
     load_string(key_file, "preview_font", &win->preview_font);
     load_string(key_file, "terminal_font", &win->terminal_font);
     load_string(key_file, "code_font", &win->code_font);
-    load_string(key_file, "custom_css_path", &win->custom_css_path);
+    /**
+     * @brief Treat a missing custom_css_path as an intentional CSS override opt-out.
+     * @details Users commonly comment out a single key while testing config.ini
+     *          themes. We clear the startup default here so generated INI CSS is
+     *          not hidden by a previously created theme.css file.
+     */
+    if (g_key_file_has_key(key_file, "Editor", "custom_css_path", NULL)) {
+        load_string(key_file, "custom_css_path", &win->custom_css_path);
+    } else {
+        g_clear_pointer(&win->custom_css_path, g_free);
+    }
     migrate_removed_font(&win->ui_font);
     migrate_removed_font(&win->editor_font);
     migrate_removed_font(&win->preview_font);
@@ -548,11 +549,6 @@ void graptos_config_load(EditorWindow *win) {
     if (!win->codex_prompt_bg_color) {
         win->codex_prompt_bg_color = g_strdup("#111318");
     }
-    if (!win->custom_css_path || win->custom_css_path[0] == '\0') {
-        g_clear_pointer(&win->custom_css_path, g_free);
-        win->custom_css_path = default_custom_css_path();
-    }
-
     backfill_missing_config_keys(win, key_file, path);
 }
 

@@ -424,6 +424,8 @@ typedef struct {
     char *preview_font; /**< Preview font. */
     char *terminal_font; /**< Terminal font. */
     char *code_font; /**< Code/snippet font. */
+    char *custom_css_path; /**< User CSS path loaded after generated theme CSS. */
+    gboolean custom_css_enabled; /**< Whether user CSS is loaded after generated theme CSS. */
 } ThemeState;
 
 /**
@@ -463,6 +465,16 @@ typedef struct {
     GtkWidget *size_spin; /**< Font size spin button. */
     gboolean updating; /**< Whether the control is synchronizing widgets. */
 } ThemeFontControl;
+
+/**
+ * @brief Theme CSS control binding.
+ */
+typedef struct {
+    ThemeDialogState *dialog; /**< Theme dialog state. */
+    GtkWidget *entry; /**< CSS path entry. */
+    GtkWidget *switch_widget; /**< CSS enable switch. */
+    gboolean updating; /**< Whether the control is synchronizing widgets. */
+} ThemeCssControl;
 
 /**
  * @brief Duplicate a nullable string.
@@ -576,7 +588,9 @@ static ThemeState *theme_state_from_window(EditorWindow *win) {
     COPY_FIELD(preview_font);
     COPY_FIELD(terminal_font);
     COPY_FIELD(code_font);
+    COPY_FIELD(custom_css_path);
 #undef COPY_FIELD
+    state->custom_css_enabled = win->custom_css_enabled;
     return state;
 }
 
@@ -670,6 +684,7 @@ static void theme_state_free(ThemeState *state) {
     FREE_FIELD(preview_font);
     FREE_FIELD(terminal_font);
     FREE_FIELD(code_font);
+    FREE_FIELD(custom_css_path);
 #undef FREE_FIELD
     g_free(state);
 }
@@ -767,7 +782,9 @@ static void theme_state_apply_to_window(ThemeState *state, EditorWindow *win) {
     APPLY_FIELD(preview_font);
     APPLY_FIELD(terminal_font);
     APPLY_FIELD(code_font);
+    APPLY_FIELD(custom_css_path);
 #undef APPLY_FIELD
+    win->custom_css_enabled = state->custom_css_enabled;
 }
 
 /**
@@ -1044,6 +1061,119 @@ static void theme_dialog_changed(ThemeDialogState *dialog) {
     if (!dialog || dialog->loading) return;
     dialog->dirty = TRUE;
     theme_preview_update(dialog);
+}
+
+/**
+ * @brief Return the default editable CSS path for theme controls.
+ * @details The theme editor uses the same per-user path as first-run config so
+ *          a user can re-enable CSS overrides without remembering the directory.
+ * @return An owned path, or NULL when the config directory cannot be resolved.
+ */
+static char *theme_default_css_path(void) {
+    const char *base = g_get_user_config_dir();
+    if (!base || base[0] == '\0') return NULL;
+    return g_build_filename(base, "graptos", "theme.css", NULL);
+}
+
+/**
+ * @brief Synchronize the custom CSS controls from ThemeState.
+ * @details Presets and file loads can change CSS settings without user typing,
+ *          so controls need the same explicit refresh path as colors and fonts.
+ * @param control The control supplied by the caller.
+ */
+static void theme_css_control_sync(ThemeCssControl *control) {
+    if (!control || !control->dialog || !control->dialog->state) return;
+    ThemeState *state = control->dialog->state;
+    control->updating = TRUE;
+    if (control->entry) {
+        gtk_editable_set_text(GTK_EDITABLE(control->entry),
+                              state->custom_css_path ? state->custom_css_path : "");
+    }
+    if (control->switch_widget) {
+        gtk_switch_set_active(GTK_SWITCH(control->switch_widget),
+                              state->custom_css_enabled);
+    }
+    control->updating = FALSE;
+}
+
+/**
+ * @brief Store the custom CSS path from the entry.
+ * @details Empty text is preserved as an explicit disabled path. That gives
+ *          manual config edits and the theme dialog the same opt-out behavior.
+ * @param editable The editable supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
+ */
+static void theme_css_path_changed(GtkEditable *editable, gpointer user_data) {
+    ThemeCssControl *control = user_data;
+    if (!control || control->updating || !control->dialog ||
+        !control->dialog->state || !editable) {
+        return;
+    }
+    const char *text = gtk_editable_get_text(editable);
+    if (g_strcmp0(control->dialog->state->custom_css_path, text ? text : "") == 0) {
+        return;
+    }
+    theme_replace(&control->dialog->state->custom_css_path, text ? text : "");
+    theme_dialog_changed(control->dialog);
+}
+
+/**
+ * @brief Store the custom CSS enabled switch state.
+ * @details CSS remains opt-in by switch and by a non-empty path. Keeping both
+ *          values explicit prevents a stale theme.css from masking INI themes.
+ * @param switch_widget The switch supplied by the caller.
+ * @param active TRUE when the switch is active.
+ * @param user_data The callback context passed through GTK signal data.
+ * @return FALSE so GTK keeps its normal switch state handling.
+ */
+static gboolean theme_css_enabled_changed(GtkSwitch *switch_widget,
+                                          gboolean active,
+                                          gpointer user_data) {
+    ThemeCssControl *control = user_data;
+    if (!control || control->updating || !control->dialog ||
+        !control->dialog->state || !switch_widget) {
+        return FALSE;
+    }
+    if (control->dialog->state->custom_css_enabled == active) return FALSE;
+    control->dialog->state->custom_css_enabled = active;
+    theme_dialog_changed(control->dialog);
+    return FALSE;
+}
+
+/**
+ * @brief Create or refresh the editable CSS template file.
+ * @details The button writes only the selected CSS path. It also fills the
+ *          default per-user path when the entry is blank so the next Apply can
+ *          persist a usable CSS theme file.
+ * @param widget The widget that emitted the callback.
+ * @param user_data The callback context passed through GTK signal data.
+ */
+static void theme_css_template_clicked(GtkWidget *widget, gpointer user_data) {
+    (void)widget;
+    ThemeCssControl *control = user_data;
+    if (!control || !control->dialog || !control->dialog->state) return;
+
+    ThemeState *state = control->dialog->state;
+    if (!state->custom_css_path || state->custom_css_path[0] == '\0') {
+        g_autofree char *path = theme_default_css_path();
+        if (path) theme_replace(&state->custom_css_path, path);
+    }
+    if (!state->custom_css_path || state->custom_css_path[0] == '\0') {
+        app_window_set_error_status(control->dialog->win,
+                                    "CSS template failed",
+                                    "Unable to resolve config directory.");
+        return;
+    }
+    if (!graptos_write_theme_css_template(state->custom_css_path, FALSE)) {
+        app_window_set_error_status(control->dialog->win,
+                                    "CSS template failed",
+                                    state->custom_css_path);
+        return;
+    }
+    state->custom_css_enabled = TRUE;
+    theme_css_control_sync(control);
+    theme_dialog_changed(control->dialog);
+    app_window_set_status(control->dialog->win, "CSS theme file ready");
 }
 
 /**
@@ -1434,6 +1564,9 @@ static void theme_controls_sync_recursive(GtkWidget *widget) {
     ThemeFontControl *font_control =
         g_object_get_data(G_OBJECT(widget), "graptos-theme-font-control");
     if (font_control) theme_font_control_sync(font_control);
+    ThemeCssControl *css_control =
+        g_object_get_data(G_OBJECT(widget), "graptos-theme-css-control");
+    if (css_control) theme_css_control_sync(css_control);
 
     for (GtkWidget *child = gtk_widget_get_first_child(widget);
          child;
@@ -1494,11 +1627,12 @@ static char *theme_preset_path(const ThemePreset *preset) {
 }
 
 /**
- * @brief Load a theme INI file into the dialog scratch state.
- * @details Loading changes only the dialog preview state. The real application
- *          config is updated later when the user presses Apply.
+ * @brief Load a theme file into the dialog scratch state.
+ * @details INI files update structured color/font controls. CSS files update
+ *          the post-generated override path so themes can be edited after
+ *          compilation without replacing the existing INI workflow.
  * @param dialog The theme dialog state.
- * @param path The theme INI path.
+ * @param path The theme path.
  * @param label Name used in status/error messages.
  * @return TRUE when the theme loaded.
  */
@@ -1506,6 +1640,23 @@ static gboolean theme_dialog_load_file(ThemeDialogState *dialog,
                                        const char *path,
                                        const char *label) {
     if (!dialog || !dialog->state || !path) return FALSE;
+    g_autofree char *lower_path = g_ascii_strdown(path, -1);
+    if (lower_path && g_str_has_suffix(lower_path, ".css")) {
+        if (!g_file_test(path, G_FILE_TEST_IS_REGULAR)) {
+            app_window_set_error_status(dialog->win,
+                                        "Theme load failed",
+                                        path);
+            return FALSE;
+        }
+        theme_replace(&dialog->state->custom_css_path, path);
+        dialog->state->custom_css_enabled = TRUE;
+        theme_controls_sync(dialog);
+        dialog->dirty = TRUE;
+        theme_preview_update(dialog);
+        app_window_set_status(dialog->win, label ? label : "CSS theme loaded");
+        return TRUE;
+    }
+
     g_autoptr(GKeyFile) key_file = g_key_file_new();
     g_autoptr(GError) error = NULL;
     if (!g_key_file_load_from_file(key_file, path, G_KEY_FILE_NONE, &error)) {
@@ -1650,10 +1801,58 @@ static GtkWidget *theme_preset_row(ThemeDialogState *dialog) {
     gtk_box_append(GTK_BOX(row), drop_down);
 
     gtk_box_append(GTK_BOX(row),
-                   graptos_flat_button_new("Load .ini",
-                                         "Load a custom Graptoς theme file",
+                   graptos_flat_button_new("Load Theme",
+                                         "Load a custom Graptoς .ini or .css theme file",
                                          G_CALLBACK(theme_load_file_clicked),
                                          dialog));
+    return row;
+}
+
+/**
+ * @brief Create the custom CSS controls for the theme dialog.
+ * @details This row exposes the post-generated CSS layer directly. A blank
+ *          path is valid and disables CSS loading even when the switch remains
+ *          active, matching manual config.ini edits.
+ * @param dialog The theme dialog state.
+ * @return A GTK row containing CSS enable and path controls.
+ */
+static GtkWidget *theme_css_row(ThemeDialogState *dialog) {
+    GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    GtkWidget *label = gtk_label_new("CSS file");
+    gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
+    gtk_widget_set_hexpand(label, TRUE);
+    gtk_box_append(GTK_BOX(row), label);
+
+    ThemeCssControl *control = g_new0(ThemeCssControl, 1);
+    control->dialog = dialog;
+
+    GtkWidget *switch_widget = gtk_switch_new();
+    gtk_widget_set_tooltip_text(switch_widget,
+                                "Load the CSS file after generated theme CSS");
+    control->switch_widget = switch_widget;
+
+    GtkWidget *entry = gtk_entry_new();
+    gtk_widget_set_size_request(entry, 260, -1);
+    gtk_widget_set_hexpand(entry, TRUE);
+    gtk_widget_set_tooltip_text(entry,
+                                "Path to an editable Graptoς CSS theme file");
+    control->entry = entry;
+
+    g_object_set_data_full(G_OBJECT(row), "graptos-theme-css-control",
+                           control, g_free);
+    g_signal_connect(switch_widget, "state-set",
+                     G_CALLBACK(theme_css_enabled_changed), control);
+    g_signal_connect(entry, "changed",
+                     G_CALLBACK(theme_css_path_changed), control);
+
+    theme_css_control_sync(control);
+    gtk_box_append(GTK_BOX(row), switch_widget);
+    gtk_box_append(GTK_BOX(row), entry);
+    gtk_box_append(GTK_BOX(row),
+                   graptos_flat_button_new("Create",
+                                         "Create the editable CSS theme file",
+                                         G_CALLBACK(theme_css_template_clicked),
+                                         control));
     return row;
 }
 
@@ -1877,6 +2076,7 @@ static GtkWidget *theme_controls_new(ThemeDialogState *dialog) {
 
     gtk_box_append(GTK_BOX(box), theme_section_label("Themes"));
     gtk_box_append(GTK_BOX(box), theme_preset_row(dialog));
+    gtk_box_append(GTK_BOX(box), theme_css_row(dialog));
 
     gtk_box_append(GTK_BOX(box), theme_section_label("Fonts"));
     gtk_box_append(GTK_BOX(box), theme_font_row(dialog, "UI", &s->ui_font));
