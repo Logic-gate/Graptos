@@ -103,6 +103,7 @@ typedef struct _EditorWindow {
     char *sidebar_bg_color; /**< Sidebar bg color. */
     char *tabbar_bg_color; /**< Tabbar bg color. */
     char *tabbar_fg_color; /**< Tabbar fg color. */
+    char *tabbar_border_color; /**< Tabbar border color. */
     char *tab_active_bg_color; /**< Tab active bg color. */
     char *tab_active_fg_color; /**< Tab active fg color. */
     char *tab_active_border_color; /**< Tab active underline color. */

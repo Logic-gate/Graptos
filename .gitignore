@@ -63,6 +63,7 @@ dkms.conf
 .graptos-latex-build/
 build/
 .zig-cache/
+git_check.sh
 
 # Github actions
 .github/

@@ -11,6 +11,7 @@
 @define-color graptos_editor_fg #d4d4d4;
 @define-color graptos_sidebar_bg #111318;
 @define-color graptos_tabbar_bg #111318;
+@define-color graptos_tabbar_border #00000000;
 @define-color graptos_tab_active_bg #20232b;
 @define-color graptos_tab_active_fg #ffffff;
 @define-color graptos_tab_active_border #89b4fa;
@@ -69,13 +70,14 @@ sourceview.graptos-editor text {
 .graptos-root notebook > header.top > tabs > tab {
   background: @graptos_tabbar_bg;
   background-color: @graptos_tabbar_bg;
-  border-left-color: transparent;
-  border-right-color: transparent;
-  border-top-color: transparent;
-  border-bottom-color: transparent;
+  border-left-color: @graptos_tabbar_border;
+  border-right-color: @graptos_tabbar_border;
+  border-top-color: @graptos_tabbar_border;
+  border-bottom-color: @graptos_tabbar_border;
 }
 
 .graptos-root notebook > header.top {
+  border-color: @graptos_tabbar_border;
   border-bottom-color: @graptos_tab_active_border;
 }
 
@@ -83,9 +85,9 @@ sourceview.graptos-editor text {
   background: @graptos_tab_active_bg;
   background-color: @graptos_tab_active_bg;
   color: @graptos_tab_active_fg;
-  border-left-color: transparent;
-  border-right-color: transparent;
-  border-top-color: transparent;
+  border-left-color: @graptos_tabbar_border;
+  border-right-color: @graptos_tabbar_border;
+  border-top-color: @graptos_tabbar_border;
   border-bottom-color: @graptos_tab_active_border;
 }
 

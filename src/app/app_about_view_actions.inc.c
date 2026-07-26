@@ -356,6 +356,7 @@ typedef struct {
     char *sidebar_bg_color; /**< Sidebar background. */
     char *tabbar_bg_color; /**< Tabbar background. */
     char *tabbar_fg_color; /**< Tabbar foreground. */
+    char *tabbar_border_color; /**< Tabbar border. */
     char *tab_active_bg_color; /**< Active tab background. */
     char *tab_active_fg_color; /**< Active tab foreground. */
     char *tab_active_border_color; /**< Active tab underline. */
@@ -520,6 +521,7 @@ static ThemeState *theme_state_from_window(EditorWindow *win) {
     COPY_FIELD(sidebar_bg_color);
     COPY_FIELD(tabbar_bg_color);
     COPY_FIELD(tabbar_fg_color);
+    COPY_FIELD(tabbar_border_color);
     COPY_FIELD(tab_active_bg_color);
     COPY_FIELD(tab_active_fg_color);
     COPY_FIELD(tab_active_border_color);
@@ -617,6 +619,7 @@ static void theme_state_free(ThemeState *state) {
     FREE_FIELD(sidebar_bg_color);
     FREE_FIELD(tabbar_bg_color);
     FREE_FIELD(tabbar_fg_color);
+    FREE_FIELD(tabbar_border_color);
     FREE_FIELD(tab_active_bg_color);
     FREE_FIELD(tab_active_fg_color);
     FREE_FIELD(tab_active_border_color);
@@ -717,6 +720,7 @@ static void theme_state_apply_to_window(ThemeState *state, EditorWindow *win) {
     APPLY_FIELD(sidebar_bg_color);
     APPLY_FIELD(tabbar_bg_color);
     APPLY_FIELD(tabbar_fg_color);
+    APPLY_FIELD(tabbar_border_color);
     APPLY_FIELD(tab_active_bg_color);
     APPLY_FIELD(tab_active_fg_color);
     APPLY_FIELD(tab_active_border_color);
@@ -833,6 +837,7 @@ static void theme_state_load_key_file(ThemeState *state, GKeyFile *key_file) {
     LOAD_THEME_COLOR("sidebar_background_color", sidebar_bg_color);
     LOAD_THEME_COLOR("tabbar_background_color", tabbar_bg_color);
     LOAD_THEME_COLOR("tabbar_foreground_color", tabbar_fg_color);
+    LOAD_THEME_COLOR("tabbar_border_color", tabbar_border_color);
     LOAD_THEME_COLOR("tab_active_background_color", tab_active_bg_color);
     LOAD_THEME_COLOR("tab_active_foreground_color", tab_active_fg_color);
     LOAD_THEME_COLOR("tab_active_border_color", tab_active_border_color);
@@ -978,6 +983,7 @@ static void theme_state_load_css(ThemeState *state, const char *css) {
     LOAD_CSS_COLOR("sidebar_bg", sidebar_bg_color);
     LOAD_CSS_COLOR("tabbar_bg", tabbar_bg_color);
     LOAD_CSS_COLOR("tabbar_fg", tabbar_fg_color);
+    LOAD_CSS_COLOR("tabbar_border", tabbar_border_color);
     LOAD_CSS_COLOR("tab_active_bg", tab_active_bg_color);
     LOAD_CSS_COLOR("tab_active_fg", tab_active_fg_color);
     LOAD_CSS_COLOR("tab_active_border", tab_active_border_color);
@@ -1126,9 +1132,9 @@ static void theme_preview_update(ThemeDialogState *dialog) {
         ".graptos-theme-preview-surface { padding: 8px; }\n"
         ".graptos-theme-preview-row { border-spacing: 6px; }\n"
         ".graptos-theme-preview-top { background: %s; color: %s; padding: 6px; }\n"
-        ".graptos-theme-preview-tabbar { background: %s; color: %s; padding: 6px; }\n"
-        ".graptos-theme-preview-tab-active { background: %s; color: %s; padding: 4px; border-bottom: 2px solid %s; }\n"
-        ".graptos-theme-preview-tab-tiled { background: %s; color: %s; padding: 4px; box-shadow: inset 0 -2px %s; }\n"
+        ".graptos-theme-preview-tabbar { background: %s; color: %s; padding: 6px; border: 1px solid %s; }\n"
+        ".graptos-theme-preview-tab-active { background: %s; color: %s; padding: 4px; border: 1px solid %s; border-bottom-color: %s; }\n"
+        ".graptos-theme-preview-tab-tiled { background: %s; color: %s; padding: 4px; border: 1px solid %s; box-shadow: inset 0 -2px %s; }\n"
         ".graptos-theme-preview-bottom { background: %s; color: %s; padding: 6px; }\n"
         ".graptos-theme-preview-status-error { color: %s; font-weight: 800; }\n"
         ".graptos-theme-preview-editor { background: %s; color: %s; padding: 8px; }\n"
@@ -1171,9 +1177,12 @@ static void theme_preview_update(ThemeDialogState *dialog) {
         bg, fg,
         theme_color(s->topbar_bg_color, bg), theme_color(s->topbar_fg_color, fg),
         theme_color(s->tabbar_bg_color, bg), theme_color(s->tabbar_fg_color, fg),
+        theme_color(s->tabbar_border_color, "#00000000"),
         theme_color(s->tab_active_bg_color, "#2a2e3d"), theme_color(s->tab_active_fg_color, fg),
+        theme_color(s->tabbar_border_color, "#00000000"),
         theme_color(s->tab_active_border_color, "#89b4fa"),
         theme_color(s->tab_active_bg_color, "#2a2e3d"), theme_color(s->tab_active_fg_color, fg),
+        theme_color(s->tabbar_border_color, "#00000000"),
         theme_color(s->tab_tiled_indicator_color,
                     theme_color(s->tab_active_border_color, "#89b4fa")),
         theme_color(s->bottombar_bg_color, bg), theme_color(s->bottombar_fg_color, fg),
@@ -2325,6 +2334,7 @@ static GtkWidget *theme_controls_new(ThemeDialogState *dialog) {
     gtk_box_append(GTK_BOX(box), theme_section_label("Tabs and Project Tree"));
     theme_append_color(box, dialog, "Tabbar background", &s->tabbar_bg_color);
     theme_append_color(box, dialog, "Tabbar foreground", &s->tabbar_fg_color);
+    theme_append_color(box, dialog, "Tabbar border", &s->tabbar_border_color);
     theme_append_color(box, dialog, "Active tab background", &s->tab_active_bg_color);
     theme_append_color(box, dialog, "Active tab foreground", &s->tab_active_fg_color);
     theme_append_color(box, dialog, "Active tab underline", &s->tab_active_border_color);

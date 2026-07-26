@@ -93,6 +93,7 @@ static void append_font_rule(GString *css,
  * @param sidebar_bg_color The sidebar bg color supplied by the caller.
  * @param tabbar_bg_color The tabbar bg color supplied by the caller.
  * @param tabbar_fg_color The tabbar fg color supplied by the caller.
+ * @param tabbar_border_color The tabbar border color supplied by the caller.
  * @param tab_active_bg_color The tab active bg color supplied by the caller.
  * @param tab_active_fg_color The tab active fg color supplied by the caller.
  * @param tab_active_border_color The tab active underline color supplied by the caller.
@@ -176,6 +177,7 @@ void graptos_apply_editor_css(const char *editor_bg_color,
                             const char *sidebar_bg_color,
                             const char *tabbar_bg_color,
                             const char *tabbar_fg_color,
+                            const char *tabbar_border_color,
                             const char *tab_active_bg_color,
                             const char *tab_active_fg_color,
                             const char *tab_active_border_color,
@@ -281,6 +283,9 @@ void graptos_apply_editor_css(const char *editor_bg_color,
         (tabbar_bg_color && tabbar_bg_color[0] == '#') ? tabbar_bg_color : "#111318";
     const char *effective_tabbar_fg =
         (tabbar_fg_color && tabbar_fg_color[0] == '#') ? tabbar_fg_color : effective_fg;
+    const char *effective_tabbar_border =
+        (tabbar_border_color && tabbar_border_color[0] == '#') ?
+            tabbar_border_color : "#00000000";
     const char *effective_tab_active_bg =
         (tab_active_bg_color && tab_active_bg_color[0] == '#') ? tab_active_bg_color : "#20232b";
     const char *effective_tab_active_fg =
@@ -453,6 +458,7 @@ void graptos_apply_editor_css(const char *editor_bg_color,
         "@define-color graptos_editor_fg %s;\n"
         "@define-color graptos_sidebar_bg %s;\n"
         "@define-color graptos_tabbar_bg %s;\n"
+        "@define-color graptos_tabbar_border %s;\n"
         "@define-color graptos_tab_active_border %s;\n"
         "@define-color graptos_tab_tiled_indicator %s;\n"
         "@define-color graptos_topbar_bg %s;\n"
@@ -465,6 +471,7 @@ void graptos_apply_editor_css(const char *editor_bg_color,
         effective_fg,
         effective_sidebar,
         effective_tabbar,
+        effective_tabbar_border,
         effective_tab_active_border,
         effective_tab_tiled_indicator,
         effective_topbar_bg,
@@ -608,22 +615,27 @@ void graptos_apply_editor_css(const char *editor_bg_color,
         effective_git_untracked, effective_git_staged);
     g_string_append_printf(css,
         ".graptos-root notebook > header { background: %s; background-color: %s; color: %s; }\n"
-        ".graptos-root notebook > header.top { border-bottom-color: %s; }\n"
+        ".graptos-root notebook > header.top { border-color: %s; border-bottom-color: %s; }\n"
         ".graptos-root notebook > header.top > tabs > tab { "
         "background: %s; background-color: %s; color: %s; "
-        "border-left-color: transparent; border-right-color: transparent; "
-        "border-top-color: transparent; border-bottom-color: transparent; }\n"
+        "border-left-color: %s; border-right-color: %s; "
+        "border-top-color: %s; border-bottom-color: %s; }\n"
         ".graptos-root notebook > header.top > tabs > tab:checked { "
         "background: %s; background-color: %s; color: %s; "
-        "border-left-color: transparent; border-right-color: transparent; "
-        "border-top-color: transparent; border-bottom-color: %s; }\n"
+        "border-left-color: %s; border-right-color: %s; "
+        "border-top-color: %s; border-bottom-color: %s; }\n"
         ".graptos-tab-tiled { box-shadow: inset 0 -2px %s; }\n"
         ".graptos-tab label { color: %s; opacity: 0.68; }\n"
         ".graptos-root notebook > header.top > tabs > tab:checked .graptos-tab label { color: %s; opacity: 1.0; }\n",
         effective_tabbar, effective_tabbar, effective_tabbar_fg,
+        effective_tabbar_border,
         effective_tab_active_border,
         effective_tabbar, effective_tabbar, effective_tabbar_fg,
+        effective_tabbar_border, effective_tabbar_border,
+        effective_tabbar_border, effective_tabbar_border,
         effective_tab_active_bg, effective_tab_active_bg, effective_tab_active_fg,
+        effective_tabbar_border, effective_tabbar_border,
+        effective_tabbar_border,
         effective_tab_active_border,
         effective_tab_tiled_indicator,
         effective_tabbar_fg,

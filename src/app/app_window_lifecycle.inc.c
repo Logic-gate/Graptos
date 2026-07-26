@@ -121,6 +121,7 @@ EditorWindow *app_window_new(GtkApplication *application) {
     win->sidebar_bg_color = g_strdup("#181a1f");
     win->tabbar_bg_color = g_strdup("#181a1f");
     win->tabbar_fg_color = g_strdup("#d4d4d4");
+    win->tabbar_border_color = g_strdup("#00000000");
     win->tab_active_bg_color = g_strdup("#20232b");
     win->tab_active_fg_color = g_strdup("#ffffff");
     win->tab_active_border_color = g_strdup("#89b4fa");
@@ -353,6 +354,7 @@ void app_window_free(EditorWindow *win) {
     g_free(win->sidebar_bg_color);
     g_free(win->tabbar_bg_color);
     g_free(win->tabbar_fg_color);
+    g_free(win->tabbar_border_color);
     g_free(win->tab_active_bg_color);
     g_free(win->tab_active_fg_color);
     g_free(win->tab_active_border_color);

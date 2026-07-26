@@ -261,6 +261,7 @@ static char *build_managed_theme_css(EditorWindow *win) {
     append_theme_define(css, "sidebar_bg", win->sidebar_bg_color, "#111318");
     append_theme_define(css, "tabbar_bg", win->tabbar_bg_color, "#111318");
     append_theme_define(css, "tabbar_fg", win->tabbar_fg_color, "#d4d4d4");
+    append_theme_define(css, "tabbar_border", win->tabbar_border_color, "#00000000");
     append_theme_define(css, "tab_active_bg", win->tab_active_bg_color, "#20232b");
     append_theme_define(css, "tab_active_fg", win->tab_active_fg_color, "#ffffff");
     append_theme_define(css, "tab_active_border", win->tab_active_border_color, "#89b4fa");
@@ -402,18 +403,21 @@ static char *build_managed_theme_css(EditorWindow *win) {
         ".graptos-root notebook > header.top > tabs > tab {\n"
         "  background: @graptos_tabbar_bg;\n"
         "  color: @graptos_tabbar_fg;\n"
-        "  border-left-color: transparent;\n"
-        "  border-right-color: transparent;\n"
-        "  border-top-color: transparent;\n"
-        "  border-bottom-color: transparent;\n"
+        "  border-left-color: @graptos_tabbar_border;\n"
+        "  border-right-color: @graptos_tabbar_border;\n"
+        "  border-top-color: @graptos_tabbar_border;\n"
+        "  border-bottom-color: @graptos_tabbar_border;\n"
         "}\n"
-        ".graptos-root notebook > header.top { border-bottom-color: @graptos_tab_active_border; }\n"
+        ".graptos-root notebook > header.top {\n"
+        "  border-color: @graptos_tabbar_border;\n"
+        "  border-bottom-color: @graptos_tab_active_border;\n"
+        "}\n"
         ".graptos-root notebook > header.top > tabs > tab:checked {\n"
         "  background: @graptos_tab_active_bg;\n"
         "  color: @graptos_tab_active_fg;\n"
-        "  border-left-color: transparent;\n"
-        "  border-right-color: transparent;\n"
-        "  border-top-color: transparent;\n"
+        "  border-left-color: @graptos_tabbar_border;\n"
+        "  border-right-color: @graptos_tabbar_border;\n"
+        "  border-top-color: @graptos_tabbar_border;\n"
         "  border-bottom-color: @graptos_tab_active_border;\n"
         "}\n"
         ".graptos-tab-tiled { box-shadow: inset 0 -2px @graptos_tab_tiled_indicator; }\n\n");
@@ -577,6 +581,7 @@ gboolean graptos_theme_css_load_into_window(EditorWindow *win,
     LOAD_THEME_VAR("sidebar_bg", sidebar_bg_color);
     LOAD_THEME_VAR("tabbar_bg", tabbar_bg_color);
     LOAD_THEME_VAR("tabbar_fg", tabbar_fg_color);
+    LOAD_THEME_VAR("tabbar_border", tabbar_border_color);
     LOAD_THEME_VAR("tab_active_bg", tab_active_bg_color);
     LOAD_THEME_VAR("tab_active_fg", tab_active_fg_color);
     LOAD_THEME_VAR("tab_active_border", tab_active_border_color);
@@ -805,6 +810,7 @@ void graptos_config_load(EditorWindow *win) {
     load_color(key_file, "sidebar_background_color", &win->sidebar_bg_color);
     load_color(key_file, "tabbar_background_color", &win->tabbar_bg_color);
     load_color(key_file, "tabbar_foreground_color", &win->tabbar_fg_color);
+    load_color(key_file, "tabbar_border_color", &win->tabbar_border_color);
     load_color(key_file, "tab_active_background_color", &win->tab_active_bg_color);
     load_color(key_file, "tab_active_foreground_color", &win->tab_active_fg_color);
     load_color(key_file, "tab_active_border_color", &win->tab_active_border_color);

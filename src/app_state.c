@@ -27,6 +27,7 @@ void app_window_apply_css(EditorWindow *win) {
                            win->editor_cursor_color,
                            win->sidebar_bg_color, win->tabbar_bg_color,
                            win->tabbar_fg_color,
+                           win->tabbar_border_color,
                            win->tab_active_bg_color,
                            win->tab_active_fg_color,
                            win->tab_active_border_color,
