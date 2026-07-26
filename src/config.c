@@ -263,6 +263,8 @@ static char *build_managed_theme_css(EditorWindow *win) {
     append_theme_define(css, "tabbar_fg", win->tabbar_fg_color, "#d4d4d4");
     append_theme_define(css, "tab_active_bg", win->tab_active_bg_color, "#20232b");
     append_theme_define(css, "tab_active_fg", win->tab_active_fg_color, "#ffffff");
+    append_theme_define(css, "tab_active_border", win->tab_active_border_color, "#89b4fa");
+    append_theme_define(css, "tab_tiled_indicator", win->tab_tiled_indicator_color, "#89b4fa");
     append_theme_define(css, "topbar_bg", win->topbar_bg_color, "#111318");
     append_theme_define(css, "topbar_fg", win->topbar_fg_color, "#d4d4d4");
     append_theme_define(css, "bottombar_bg", win->bottombar_bg_color, "#111318");
@@ -400,13 +402,21 @@ static char *build_managed_theme_css(EditorWindow *win) {
         ".graptos-root notebook > header.top > tabs > tab {\n"
         "  background: @graptos_tabbar_bg;\n"
         "  color: @graptos_tabbar_fg;\n"
+        "  border-left-color: transparent;\n"
+        "  border-right-color: transparent;\n"
+        "  border-top-color: transparent;\n"
+        "  border-bottom-color: transparent;\n"
         "}\n"
+        ".graptos-root notebook > header.top { border-bottom-color: @graptos_tab_active_border; }\n"
         ".graptos-root notebook > header.top > tabs > tab:checked {\n"
         "  background: @graptos_tab_active_bg;\n"
         "  color: @graptos_tab_active_fg;\n"
-        "  border-bottom-color: @graptos_completion_selection_bg;\n"
+        "  border-left-color: transparent;\n"
+        "  border-right-color: transparent;\n"
+        "  border-top-color: transparent;\n"
+        "  border-bottom-color: @graptos_tab_active_border;\n"
         "}\n"
-        ".graptos-tab-tiled { box-shadow: inset 0 -2px @graptos_completion_selection_bg; }\n\n");
+        ".graptos-tab-tiled { box-shadow: inset 0 -2px @graptos_tab_tiled_indicator; }\n\n");
     g_string_append(css,
         ".graptos-minimap, .graptos-minimap text,\n"
         ".graptos-preview, .graptos-preview text {\n"
@@ -418,6 +428,14 @@ static char *build_managed_theme_css(EditorWindow *win) {
         "  color: @graptos_codex_preview_fg;\n"
         "}\n"
         ".graptos-codex-prompt, .graptos-codex-prompt text { background: @graptos_codex_prompt_bg; }\n\n"
+        ".graptos-codex-approval {\n"
+        "  background: @graptos_diagnostic_warning_bg;\n"
+        "  border-color: @graptos_diagnostic_warning_fg;\n"
+        "}\n"
+        ".graptos-codex-review {\n"
+        "  background: @graptos_search_match_bg;\n"
+        "  border-color: @graptos_search_match_fg;\n"
+        "}\n\n"
         "popover.graptos-context-popover, popover.graptos-tools-popover,\n"
         "popover.graptos-completion-popover, popover.graptos-hover-popover,\n"
         "popover.graptos-context-popover contents, popover.graptos-tools-popover contents,\n"
@@ -561,6 +579,8 @@ gboolean graptos_theme_css_load_into_window(EditorWindow *win,
     LOAD_THEME_VAR("tabbar_fg", tabbar_fg_color);
     LOAD_THEME_VAR("tab_active_bg", tab_active_bg_color);
     LOAD_THEME_VAR("tab_active_fg", tab_active_fg_color);
+    LOAD_THEME_VAR("tab_active_border", tab_active_border_color);
+    LOAD_THEME_VAR("tab_tiled_indicator", tab_tiled_indicator_color);
     LOAD_THEME_VAR("topbar_bg", topbar_bg_color);
     LOAD_THEME_VAR("topbar_fg", topbar_fg_color);
     LOAD_THEME_VAR("bottombar_bg", bottombar_bg_color);
@@ -603,6 +623,14 @@ gboolean graptos_theme_css_load_into_window(EditorWindow *win,
     LOAD_THEME_VAR("completion_popover_detail", completion_popover_detail_color);
     LOAD_THEME_VAR("completion_selection_bg", completion_selection_bg_color);
     LOAD_THEME_VAR("completion_selection_fg", completion_selection_fg_color);
+    if (!strstr(css, "graptos_tab_active_border")) {
+        replace_config_string(&win->tab_active_border_color,
+                              win->completion_selection_bg_color);
+    }
+    if (!strstr(css, "graptos_tab_tiled_indicator")) {
+        replace_config_string(&win->tab_tiled_indicator_color,
+                              win->completion_selection_bg_color);
+    }
     LOAD_THEME_VAR("dialog_bg", dialog_bg_color);
     LOAD_THEME_VAR("dialog_fg", dialog_fg_color);
     LOAD_THEME_VAR("dialog_border", dialog_border_color);
@@ -779,6 +807,8 @@ void graptos_config_load(EditorWindow *win) {
     load_color(key_file, "tabbar_foreground_color", &win->tabbar_fg_color);
     load_color(key_file, "tab_active_background_color", &win->tab_active_bg_color);
     load_color(key_file, "tab_active_foreground_color", &win->tab_active_fg_color);
+    load_color(key_file, "tab_active_border_color", &win->tab_active_border_color);
+    load_color(key_file, "tab_tiled_indicator_color", &win->tab_tiled_indicator_color);
     load_color(key_file, "topbar_background_color", &win->topbar_bg_color);
     load_color(key_file, "topbar_foreground_color", &win->topbar_fg_color);
     load_color(key_file, "bottombar_background_color", &win->bottombar_bg_color);

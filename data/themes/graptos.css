@@ -11,6 +11,10 @@
 @define-color graptos_editor_fg #d4d4d4;
 @define-color graptos_sidebar_bg #111318;
 @define-color graptos_tabbar_bg #111318;
+@define-color graptos_tab_active_bg #20232b;
+@define-color graptos_tab_active_fg #ffffff;
+@define-color graptos_tab_active_border #89b4fa;
+@define-color graptos_tab_tiled_indicator #89b4fa;
 @define-color graptos_topbar_bg #111318;
 @define-color graptos_bottombar_bg #111318;
 @define-color graptos_popover_bg #1b1f24;
@@ -65,16 +69,28 @@ sourceview.graptos-editor text {
 .graptos-root notebook > header.top > tabs > tab {
   background: @graptos_tabbar_bg;
   background-color: @graptos_tabbar_bg;
+  border-left-color: transparent;
+  border-right-color: transparent;
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+}
+
+.graptos-root notebook > header.top {
+  border-bottom-color: @graptos_tab_active_border;
 }
 
 .graptos-root notebook > header.top > tabs > tab:checked {
-  background: @graptos_editor_bg;
-  background-color: @graptos_editor_bg;
-  border-bottom-color: @graptos_accent;
+  background: @graptos_tab_active_bg;
+  background-color: @graptos_tab_active_bg;
+  color: @graptos_tab_active_fg;
+  border-left-color: transparent;
+  border-right-color: transparent;
+  border-top-color: transparent;
+  border-bottom-color: @graptos_tab_active_border;
 }
 
 .graptos-tab-tiled {
-  box-shadow: inset 0 -2px @graptos_accent;
+  box-shadow: inset 0 -2px @graptos_tab_tiled_indicator;
 }
 
 .graptos-preview,
@@ -119,5 +135,15 @@ window.graptos-window .graptos-dialog-output text {
 
 .graptos-diagnostic-warning {
   background: @graptos_warning_bg;
+}
+
+.graptos-codex-approval {
+  background: @graptos_warning_bg;
+  border-color: @graptos_editor_fg;
+}
+
+.graptos-codex-review {
+  background: @graptos_accent;
+  border-color: @graptos_editor_fg;
 }
 /* GRAPTOS THEME END */

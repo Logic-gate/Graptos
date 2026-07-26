@@ -358,6 +358,8 @@ typedef struct {
     char *tabbar_fg_color; /**< Tabbar foreground. */
     char *tab_active_bg_color; /**< Active tab background. */
     char *tab_active_fg_color; /**< Active tab foreground. */
+    char *tab_active_border_color; /**< Active tab underline. */
+    char *tab_tiled_indicator_color; /**< Tiled tab indicator. */
     char *topbar_bg_color; /**< Topbar background. */
     char *topbar_fg_color; /**< Topbar foreground. */
     char *bottombar_bg_color; /**< Bottombar background. */
@@ -520,6 +522,8 @@ static ThemeState *theme_state_from_window(EditorWindow *win) {
     COPY_FIELD(tabbar_fg_color);
     COPY_FIELD(tab_active_bg_color);
     COPY_FIELD(tab_active_fg_color);
+    COPY_FIELD(tab_active_border_color);
+    COPY_FIELD(tab_tiled_indicator_color);
     COPY_FIELD(topbar_bg_color);
     COPY_FIELD(topbar_fg_color);
     COPY_FIELD(bottombar_bg_color);
@@ -615,6 +619,8 @@ static void theme_state_free(ThemeState *state) {
     FREE_FIELD(tabbar_fg_color);
     FREE_FIELD(tab_active_bg_color);
     FREE_FIELD(tab_active_fg_color);
+    FREE_FIELD(tab_active_border_color);
+    FREE_FIELD(tab_tiled_indicator_color);
     FREE_FIELD(topbar_bg_color);
     FREE_FIELD(topbar_fg_color);
     FREE_FIELD(bottombar_bg_color);
@@ -713,6 +719,8 @@ static void theme_state_apply_to_window(ThemeState *state, EditorWindow *win) {
     APPLY_FIELD(tabbar_fg_color);
     APPLY_FIELD(tab_active_bg_color);
     APPLY_FIELD(tab_active_fg_color);
+    APPLY_FIELD(tab_active_border_color);
+    APPLY_FIELD(tab_tiled_indicator_color);
     APPLY_FIELD(topbar_bg_color);
     APPLY_FIELD(topbar_fg_color);
     APPLY_FIELD(bottombar_bg_color);
@@ -827,6 +835,8 @@ static void theme_state_load_key_file(ThemeState *state, GKeyFile *key_file) {
     LOAD_THEME_COLOR("tabbar_foreground_color", tabbar_fg_color);
     LOAD_THEME_COLOR("tab_active_background_color", tab_active_bg_color);
     LOAD_THEME_COLOR("tab_active_foreground_color", tab_active_fg_color);
+    LOAD_THEME_COLOR("tab_active_border_color", tab_active_border_color);
+    LOAD_THEME_COLOR("tab_tiled_indicator_color", tab_tiled_indicator_color);
     LOAD_THEME_COLOR("topbar_background_color", topbar_bg_color);
     LOAD_THEME_COLOR("topbar_foreground_color", topbar_fg_color);
     LOAD_THEME_COLOR("bottombar_background_color", bottombar_bg_color);
@@ -970,6 +980,8 @@ static void theme_state_load_css(ThemeState *state, const char *css) {
     LOAD_CSS_COLOR("tabbar_fg", tabbar_fg_color);
     LOAD_CSS_COLOR("tab_active_bg", tab_active_bg_color);
     LOAD_CSS_COLOR("tab_active_fg", tab_active_fg_color);
+    LOAD_CSS_COLOR("tab_active_border", tab_active_border_color);
+    LOAD_CSS_COLOR("tab_tiled_indicator", tab_tiled_indicator_color);
     LOAD_CSS_COLOR("topbar_bg", topbar_bg_color);
     LOAD_CSS_COLOR("topbar_fg", topbar_fg_color);
     LOAD_CSS_COLOR("bottombar_bg", bottombar_bg_color);
@@ -1012,6 +1024,14 @@ static void theme_state_load_css(ThemeState *state, const char *css) {
     LOAD_CSS_COLOR("completion_popover_detail", completion_popover_detail_color);
     LOAD_CSS_COLOR("completion_selection_bg", completion_selection_bg_color);
     LOAD_CSS_COLOR("completion_selection_fg", completion_selection_fg_color);
+    if (!strstr(css, "graptos_tab_active_border")) {
+        theme_replace(&state->tab_active_border_color,
+                      state->completion_selection_bg_color);
+    }
+    if (!strstr(css, "graptos_tab_tiled_indicator")) {
+        theme_replace(&state->tab_tiled_indicator_color,
+                      state->completion_selection_bg_color);
+    }
     LOAD_CSS_COLOR("dialog_bg", dialog_bg_color);
     LOAD_CSS_COLOR("dialog_fg", dialog_fg_color);
     LOAD_CSS_COLOR("dialog_border", dialog_border_color);
@@ -1107,7 +1127,8 @@ static void theme_preview_update(ThemeDialogState *dialog) {
         ".graptos-theme-preview-row { border-spacing: 6px; }\n"
         ".graptos-theme-preview-top { background: %s; color: %s; padding: 6px; }\n"
         ".graptos-theme-preview-tabbar { background: %s; color: %s; padding: 6px; }\n"
-        ".graptos-theme-preview-tab-active { background: %s; color: %s; padding: 4px; }\n"
+        ".graptos-theme-preview-tab-active { background: %s; color: %s; padding: 4px; border-bottom: 2px solid %s; }\n"
+        ".graptos-theme-preview-tab-tiled { background: %s; color: %s; padding: 4px; box-shadow: inset 0 -2px %s; }\n"
         ".graptos-theme-preview-bottom { background: %s; color: %s; padding: 6px; }\n"
         ".graptos-theme-preview-status-error { color: %s; font-weight: 800; }\n"
         ".graptos-theme-preview-editor { background: %s; color: %s; padding: 8px; }\n"
@@ -1143,12 +1164,18 @@ static void theme_preview_update(ThemeDialogState *dialog) {
         ".graptos-theme-preview-dialog-input { background: %s; color: %s; padding: 3px; }\n"
         ".graptos-theme-preview-codex { background: %s; color: %s; padding: 8px; }\n"
         ".graptos-theme-preview-codex-prompt { background: %s; padding: 4px; }\n"
+        ".graptos-theme-preview-codex-approval { background: %s; color: %s; border: 1px solid %s; padding: 4px; }\n"
+        ".graptos-theme-preview-codex-review { background: %s; color: %s; border: 1px solid %s; padding: 4px; }\n"
         ".graptos-theme-preview-search { background: %s; color: %s; padding: 2px; }\n"
         ".graptos-theme-preview-warning { background: %s; color: %s; padding: 2px; }\n",
         bg, fg,
         theme_color(s->topbar_bg_color, bg), theme_color(s->topbar_fg_color, fg),
         theme_color(s->tabbar_bg_color, bg), theme_color(s->tabbar_fg_color, fg),
         theme_color(s->tab_active_bg_color, "#2a2e3d"), theme_color(s->tab_active_fg_color, fg),
+        theme_color(s->tab_active_border_color, "#89b4fa"),
+        theme_color(s->tab_active_bg_color, "#2a2e3d"), theme_color(s->tab_active_fg_color, fg),
+        theme_color(s->tab_tiled_indicator_color,
+                    theme_color(s->tab_active_border_color, "#89b4fa")),
         theme_color(s->bottombar_bg_color, bg), theme_color(s->bottombar_fg_color, fg),
         theme_color(s->status_error_color, "#ff6b6b"),
         bg, fg,
@@ -1188,6 +1215,12 @@ static void theme_preview_update(ThemeDialogState *dialog) {
         theme_color(s->dialog_input_fg_color, fg),
         theme_color(s->codex_preview_bg_color, bg), theme_color(s->codex_preview_fg_color, fg),
         theme_color(s->codex_prompt_bg_color, bg),
+        theme_color(s->diagnostic_warning_bg_color, "#5f4b24"),
+        theme_color(s->diagnostic_warning_fg_color, "#ffd166"),
+        theme_color(s->diagnostic_warning_fg_color, "#ffd166"),
+        theme_color(s->search_match_bg_color, "#515c7a"),
+        theme_color(s->search_match_fg_color, "#ffffff"),
+        theme_color(s->search_match_fg_color, "#ffffff"),
         theme_color(s->search_match_bg_color, "#515c7a"), theme_color(s->search_match_fg_color, "#ffffff"),
         theme_color(s->diagnostic_warning_bg_color, "#5f4b24"), theme_color(s->diagnostic_warning_fg_color, "#ffd166"));
     g_string_append_printf(css,
@@ -2172,6 +2205,7 @@ static GtkWidget *theme_preview_new(void) {
     theme_preview_label(box, "Top bar  New  Open  Folder", "graptos-theme-preview-top");
     theme_preview_label(box, "Tab bar foreground  main.c  README.md", "graptos-theme-preview-tabbar");
     theme_preview_label(box, "Active tab", "graptos-theme-preview-tab-active");
+    theme_preview_label(box, "Tiled tab indicator", "graptos-theme-preview-tab-tiled");
     theme_preview_label(box, "Bottom/status bar  Ready", "graptos-theme-preview-bottom");
     theme_preview_label(box, "Status error text", "graptos-theme-preview-status-error");
 
@@ -2235,6 +2269,8 @@ static GtkWidget *theme_preview_new(void) {
     theme_preview_section(box, "Search, Diagnostics, Codex, Fonts");
     theme_preview_label(box, "Codex response preview", "graptos-theme-preview-codex");
     theme_preview_label(box, "Ask Codex…", "graptos-theme-preview-codex-prompt");
+    theme_preview_label(box, "Codex approval panel", "graptos-theme-preview-codex-approval");
+    theme_preview_label(box, "Codex review panel", "graptos-theme-preview-codex-review");
     theme_preview_label(box, "Search match", "graptos-theme-preview-search");
     theme_preview_label(box, "Diagnostic warning", "graptos-theme-preview-warning");
     theme_preview_label(box, "$ make check", "graptos-theme-preview-terminal");
@@ -2291,6 +2327,8 @@ static GtkWidget *theme_controls_new(ThemeDialogState *dialog) {
     theme_append_color(box, dialog, "Tabbar foreground", &s->tabbar_fg_color);
     theme_append_color(box, dialog, "Active tab background", &s->tab_active_bg_color);
     theme_append_color(box, dialog, "Active tab foreground", &s->tab_active_fg_color);
+    theme_append_color(box, dialog, "Active tab underline", &s->tab_active_border_color);
+    theme_append_color(box, dialog, "Tiled tab indicator", &s->tab_tiled_indicator_color);
     theme_append_color(box, dialog, "Project background", &s->sidebar_bg_color);
     theme_append_color(box, dialog, "Project foreground", &s->project_tree_fg_color);
     theme_append_color(box, dialog, "Project selected background", &s->project_tree_selected_bg_color);

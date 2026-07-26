@@ -40,6 +40,8 @@ void graptos_apply_css(void);
  * @param tabbar_fg_color The tabbar fg color supplied by the caller.
  * @param tab_active_bg_color The tab active bg color supplied by the caller.
  * @param tab_active_fg_color The tab active fg color supplied by the caller.
+ * @param tab_active_border_color The tab active underline color supplied by the caller.
+ * @param tab_tiled_indicator_color The tiled tab indicator color supplied by the caller.
  * @param topbar_bg_color The topbar bg color supplied by the caller.
  * @param topbar_fg_color The topbar fg color supplied by the caller.
  * @param bottombar_bg_color The bottombar bg color supplied by the caller.
@@ -121,6 +123,8 @@ void graptos_apply_editor_css(const char *editor_bg_color,
                             const char *tabbar_fg_color,
                             const char *tab_active_bg_color,
                             const char *tab_active_fg_color,
+                            const char *tab_active_border_color,
+                            const char *tab_tiled_indicator_color,
                             const char *topbar_bg_color,
                             const char *topbar_fg_color,
                             const char *bottombar_bg_color,

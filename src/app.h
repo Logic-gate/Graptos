@@ -105,6 +105,8 @@ typedef struct _EditorWindow {
     char *tabbar_fg_color; /**< Tabbar fg color. */
     char *tab_active_bg_color; /**< Tab active bg color. */
     char *tab_active_fg_color; /**< Tab active fg color. */
+    char *tab_active_border_color; /**< Tab active underline color. */
+    char *tab_tiled_indicator_color; /**< Tiled tab indicator color. */
     char *topbar_bg_color; /**< Topbar bg color. */
     char *topbar_fg_color; /**< Topbar fg color. */
     char *bottombar_bg_color; /**< Bottombar bg color. */

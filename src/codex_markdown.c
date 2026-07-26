@@ -31,14 +31,20 @@ typedef struct { GtkTextBuffer *buffer; GtkTextIter iter; } Writer;
 static void tag_ensure(GtkTextBuffer *buffer, const char *name,
                        const char *first, ...) {
     GtkTextTagTable *table = gtk_text_buffer_get_tag_table(buffer);
-    if (gtk_text_tag_table_lookup(table, name)) return;
-    GtkTextTag *tag = gtk_text_tag_new(name);
+    GtkTextTag *tag = gtk_text_tag_table_lookup(table, name);
+    gboolean created = FALSE;
+    if (!tag) {
+        tag = gtk_text_tag_new(name);
+        created = TRUE;
+    }
     va_list args;
     va_start(args, first);
     g_object_set_valist(G_OBJECT(tag), first, args);
     va_end(args);
-    gtk_text_tag_table_add(table, tag);
-    g_object_unref(tag);
+    if (created) {
+        gtk_text_tag_table_add(table, tag);
+        g_object_unref(tag);
+    }
 }
 
 /**
@@ -48,20 +54,38 @@ static void tag_ensure(GtkTextBuffer *buffer, const char *name,
  *          response pane into a browser widget.
  * @param buffer The text buffer used for the operation.
  */
-static void tags_ensure(GtkTextBuffer *buffer) {
+static void tags_ensure(GtkTextBuffer *buffer,
+                        const char *heading_color,
+                        const char *success_color,
+                        const char *warning_color,
+                        const char *code_fg_color,
+                        const char *code_bg_color,
+                        const char *quote_color) {
+    const char *heading = heading_color && heading_color[0] == '#'
+        ? heading_color : NULL;
+    const char *success = success_color && success_color[0] == '#'
+        ? success_color : heading;
+    const char *warning = warning_color && warning_color[0] == '#'
+        ? warning_color : heading;
+    const char *code_fg = code_fg_color && code_fg_color[0] == '#'
+        ? code_fg_color : NULL;
+    const char *code_bg = code_bg_color && code_bg_color[0] == '#'
+        ? code_bg_color : NULL;
+    const char *quote = quote_color && quote_color[0] == '#'
+        ? quote_color : code_fg;
     tag_ensure(buffer, "ai-h1", "weight", PANGO_WEIGHT_BOLD, "scale", 1.55,
-               "foreground", "#89b4fa", "pixels-above-lines", 10, NULL);
+               "foreground", heading, "pixels-above-lines", 10, NULL);
     tag_ensure(buffer, "ai-h2", "weight", PANGO_WEIGHT_BOLD, "scale", 1.30,
-               "foreground", "#a6e3a1", "pixels-above-lines", 8, NULL);
+               "foreground", success, "pixels-above-lines", 8, NULL);
     tag_ensure(buffer, "ai-h3", "weight", PANGO_WEIGHT_BOLD, "scale", 1.12,
-               "foreground", "#f9e2af", NULL);
+               "foreground", warning, NULL);
     tag_ensure(buffer, "ai-bold", "weight", PANGO_WEIGHT_BOLD, NULL);
     tag_ensure(buffer, "ai-italic", "style", PANGO_STYLE_ITALIC, NULL);
-    tag_ensure(buffer, "ai-code", "family", "monospace", "foreground", "#f1f1f1",
-               "background", "#282c34", NULL);
+    tag_ensure(buffer, "ai-code", "family", "monospace", "foreground", code_fg,
+               "background", code_bg, NULL);
     tag_ensure(buffer, "ai-quote", "style", PANGO_STYLE_ITALIC,
-               "foreground", "#b7c5d3", "left-margin", 12, NULL);
-    tag_ensure(buffer, "ai-link", "foreground", "#7dcfff",
+               "foreground", quote, "left-margin", 12, NULL);
+    tag_ensure(buffer, "ai-link", "foreground", heading,
                "underline", PANGO_UNDERLINE_SINGLE, NULL);
 }
 
@@ -159,11 +183,30 @@ static void line_render(Writer *writer, const char *line, gboolean *code) {
  *          current markdown string into styled text.
  * @param buffer The text buffer used for the operation.
  * @param markdown The markdown supplied by the caller.
+ * @param heading_color The primary heading/link color.
+ * @param success_color The secondary heading color.
+ * @param warning_color The tertiary heading color.
+ * @param code_fg_color The code foreground color.
+ * @param code_bg_color The code background color.
+ * @param quote_color The quoted text color.
  */
-void codex_markdown_render(GtkTextBuffer *buffer, const char *markdown) {
+void codex_markdown_render(GtkTextBuffer *buffer,
+                           const char *markdown,
+                           const char *heading_color,
+                           const char *success_color,
+                           const char *warning_color,
+                           const char *code_fg_color,
+                           const char *code_bg_color,
+                           const char *quote_color) {
     if (!buffer) return;
     gtk_text_buffer_set_text(buffer, "", 0);
-    tags_ensure(buffer);
+    tags_ensure(buffer,
+                heading_color,
+                success_color,
+                warning_color,
+                code_fg_color,
+                code_bg_color,
+                quote_color);
     Writer writer = { .buffer = buffer };
     gtk_text_buffer_get_end_iter(buffer, &writer.iter);
     gboolean code = FALSE;

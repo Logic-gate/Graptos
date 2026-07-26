@@ -13,6 +13,8 @@
 @define-color graptos_tabbar_fg #bd93f9;
 @define-color graptos_tab_active_bg #282a36;
 @define-color graptos_tab_active_fg #f8f8f2;
+@define-color graptos_tab_active_border #bd93f9;
+@define-color graptos_tab_tiled_indicator #bd93f9;
 @define-color graptos_topbar_bg #21222c;
 @define-color graptos_topbar_fg #f8f8f2;
 @define-color graptos_bottombar_bg #21222c;
@@ -87,9 +89,10 @@ sourceview.graptos-editor text selection { background: @graptos_editor_selection
 .graptos-top { background: @graptos_topbar_bg; color: @graptos_topbar_fg; }
 .graptos-bottom, .graptos-search-panel, .graptos-tool-panel { background: @graptos_bottombar_bg; color: @graptos_bottombar_fg; }
 .graptos-project-pane, .graptos-project-tree, .graptos-project-tree row { background: @graptos_sidebar_bg; color: @graptos_project_tree_fg; }
-.graptos-root notebook > header, .graptos-root notebook > header.top > tabs > tab { background: @graptos_tabbar_bg; color: @graptos_tabbar_fg; }
-.graptos-root notebook > header.top > tabs > tab:checked { background: @graptos_tab_active_bg; color: @graptos_tab_active_fg; border-bottom-color: @graptos_completion_selection_bg; }
-.graptos-tab-tiled { box-shadow: inset 0 -2px @graptos_completion_selection_bg; }
+.graptos-root notebook > header, .graptos-root notebook > header.top > tabs > tab { background: @graptos_tabbar_bg; color: @graptos_tabbar_fg; border-left-color: transparent; border-right-color: transparent; border-top-color: transparent; border-bottom-color: transparent; }
+.graptos-root notebook > header.top { border-bottom-color: @graptos_tab_active_border; }
+.graptos-root notebook > header.top > tabs > tab:checked { background: @graptos_tab_active_bg; color: @graptos_tab_active_fg; border-left-color: transparent; border-right-color: transparent; border-top-color: transparent; border-bottom-color: @graptos_tab_active_border; }
+.graptos-tab-tiled { box-shadow: inset 0 -2px @graptos_tab_tiled_indicator; }
 .graptos-root button { background: @graptos_button_bg; color: @graptos_button_fg; }
 .graptos-root button:hover { background: @graptos_button_hover_bg; }
 .graptos-root button:checked, .graptos-root button:active { background: @graptos_button_active_bg; }
@@ -98,4 +101,6 @@ popover.graptos-context-popover, popover.graptos-tools-popover, popover.graptos-
 .graptos-completion-list row:selected, .graptos-completion-list row:hover { background: @graptos_completion_selection_bg; color: @graptos_completion_selection_fg; }
 .graptos-search-match { background: @graptos_search_match_bg; color: @graptos_search_match_fg; }
 .graptos-diagnostic-warning { background: @graptos_diagnostic_warning_bg; color: @graptos_diagnostic_warning_fg; }
+.graptos-codex-approval { background: @graptos_diagnostic_warning_bg; border-color: @graptos_diagnostic_warning_fg; }
+.graptos-codex-review { background: @graptos_search_match_bg; border-color: @graptos_search_match_fg; }
 /* GRAPTOS THEME END */
