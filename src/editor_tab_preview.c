@@ -333,15 +333,20 @@ static void ensure_tag(GtkTextBuffer *buffer,
                        const char *first_property,
                        ...) {
     GtkTextTagTable *table = gtk_text_buffer_get_tag_table(buffer);
-    if (gtk_text_tag_table_lookup(table, name)) return;
-
-    GtkTextTag *tag = gtk_text_tag_new(name);
+    GtkTextTag *tag = gtk_text_tag_table_lookup(table, name);
+    gboolean created = FALSE;
+    if (!tag) {
+        tag = gtk_text_tag_new(name);
+        created = TRUE;
+    }
     va_list args;
     va_start(args, first_property);
     g_object_set_valist(G_OBJECT(tag), first_property, args);
     va_end(args);
-    gtk_text_tag_table_add(table, tag);
-    g_object_unref(tag);
+    if (created) {
+        gtk_text_tag_table_add(table, tag);
+        g_object_unref(tag);
+    }
 }
 
 /**
@@ -352,6 +357,16 @@ static void ensure_tag(GtkTextBuffer *buffer,
 void preview_ensure_tags(EditorTab *tab) {
     if (!tab || !tab->preview_buffer) return;
     GtkTextBuffer *buffer = tab->preview_buffer;
+    const char *code_bg = tab->win && tab->win->codex_prompt_bg_color
+        ? tab->win->codex_prompt_bg_color : NULL;
+    const char *muted = tab->win && tab->win->scroll_preview_fg_color
+        ? tab->win->scroll_preview_fg_color : NULL;
+    const char *link = tab->win && tab->win->ref_popover_title_color
+        ? tab->win->ref_popover_title_color : NULL;
+    const char *math = tab->win && tab->win->ref_popover_heading_color
+        ? tab->win->ref_popover_heading_color : NULL;
+    const char *command = tab->win && tab->win->git_status_added_color
+        ? tab->win->git_status_added_color : NULL;
     ensure_tag(buffer, "preview-h1", "weight", PANGO_WEIGHT_BOLD,
                "scale", 1.65, "pixels-above-lines", 12, NULL);
     ensure_tag(buffer, "preview-h2", "weight", PANGO_WEIGHT_BOLD,
@@ -368,19 +383,19 @@ void preview_ensure_tags(EditorTab *tab) {
     ensure_tag(buffer, "preview-italic", "style", PANGO_STYLE_ITALIC, NULL);
     ensure_tag(buffer, "preview-strike", "strikethrough", TRUE, NULL);
     ensure_tag(buffer, "preview-code", "family", "monospace",
-               "background", "#2A2E3D", NULL);
+               "background", code_bg, NULL);
     ensure_tag(buffer, "preview-quote", "style", PANGO_STYLE_ITALIC,
-               "foreground", "#8FA1B3", NULL);
+               "foreground", muted, NULL);
     ensure_tag(buffer, "preview-link", "underline", PANGO_UNDERLINE_SINGLE,
-               "foreground", "#61AFEF", NULL);
+               "foreground", link, NULL);
     ensure_tag(buffer, "preview-table", "family", "monospace", NULL);
     ensure_tag(buffer, "preview-task", "family", "monospace",
                "weight", PANGO_WEIGHT_BOLD, NULL);
-    ensure_tag(buffer, "preview-rule", "foreground", "#8FA1B3", NULL);
+    ensure_tag(buffer, "preview-rule", "foreground", muted, NULL);
     ensure_tag(buffer, "preview-math", "family", "monospace",
-               "foreground", "#C586C0", NULL);
+               "foreground", math, NULL);
     ensure_tag(buffer, "preview-command", "weight", PANGO_WEIGHT_BOLD,
-               "foreground", "#4EC9B0", NULL);
+               "foreground", command, NULL);
 }
 
 /**

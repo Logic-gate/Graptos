@@ -284,8 +284,11 @@ void action_reset_all_backgrounds(GtkWidget *widget, gpointer user_data) {
     g_clear_pointer(&win->sidebar_bg_color, g_free);
     g_clear_pointer(&win->tabbar_bg_color, g_free);
     g_clear_pointer(&win->tabbar_fg_color, g_free);
+    g_clear_pointer(&win->tabbar_border_color, g_free);
     g_clear_pointer(&win->tab_active_bg_color, g_free);
     g_clear_pointer(&win->tab_active_fg_color, g_free);
+    g_clear_pointer(&win->tab_active_border_color, g_free);
+    g_clear_pointer(&win->tab_tiled_indicator_color, g_free);
     g_clear_pointer(&win->topbar_bg_color, g_free);
     g_clear_pointer(&win->topbar_fg_color, g_free);
     g_clear_pointer(&win->bottombar_bg_color, g_free);

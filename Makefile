@@ -1,6 +1,6 @@
 APP_NAME := graptos
 APP_ID := io.github.graptos.Editor
-VERSION := 0.23.61
+VERSION := 0.23.66
 PREFIX ?= /usr/local
 CC ?= cc
 BUILD_DIR := build
@@ -151,6 +151,9 @@ install: $(BUILD_DIR)/$(APP_NAME)
 	install -m644 data/logos/*.png $(DESTDIR)$(DATADIR)/logos/
 	install -d $(DESTDIR)$(DATADIR)/themes
 	install -m644 data/themes/*.ini $(DESTDIR)$(DATADIR)/themes/
+	@if ls data/themes/*.css >/dev/null 2>&1; then \
+		install -m644 data/themes/*.css $(DESTDIR)$(DATADIR)/themes/; \
+	fi
 	install -d $(DESTDIR)$(DATADIR)/fonts/Inconsolata
 	cp -R data/fonts/Inconsolata/. $(DESTDIR)$(DATADIR)/fonts/Inconsolata/
 	install -d $(DESTDIR)$(DATADIR)/project-templates

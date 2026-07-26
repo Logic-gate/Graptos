@@ -1,0 +1,151 @@
+/*
+ * Graptoς editable CSS theme.
+ *
+ * Copy this file to ~/.config/graptos/theme.css or load it from the Theme
+ * dialog. Graptoς loads theme CSS at runtime, so every rule here can be edited
+ * without rebuilding the application.
+ */
+
+/* GRAPTOS THEME BEGIN */
+@define-color graptos_editor_bg #181a1f;
+@define-color graptos_editor_fg #d4d4d4;
+@define-color graptos_sidebar_bg #111318;
+@define-color graptos_tabbar_bg #111318;
+@define-color graptos_tabbar_border #00000000;
+@define-color graptos_tab_active_bg #20232b;
+@define-color graptos_tab_active_fg #ffffff;
+@define-color graptos_tab_active_border #89b4fa;
+@define-color graptos_tab_tiled_indicator #89b4fa;
+@define-color graptos_topbar_bg #111318;
+@define-color graptos_bottombar_bg #111318;
+@define-color graptos_popover_bg #1b1f24;
+@define-color graptos_dialog_bg #1b1f24;
+@define-color graptos_accent #89b4fa;
+@define-color graptos_warning_bg #5f4b24;
+
+window.graptos-window,
+window.graptos-window > contents,
+.graptos-root,
+.graptos-root > box,
+.graptos-tab-page,
+.graptos-editor-area,
+.graptos-editor-overlay,
+.graptos-editor-content {
+  background: @graptos_editor_bg;
+  background-color: @graptos_editor_bg;
+  color: @graptos_editor_fg;
+}
+
+.graptos-editor,
+.graptos-editor text,
+textview.graptos-editor,
+textview.graptos-editor text,
+sourceview.graptos-editor,
+sourceview.graptos-editor text {
+  background: @graptos_editor_bg;
+  background-color: @graptos_editor_bg;
+  color: @graptos_editor_fg;
+}
+
+.graptos-project-pane,
+.graptos-project-tree,
+.graptos-project-tree row {
+  background: @graptos_sidebar_bg;
+  background-color: @graptos_sidebar_bg;
+}
+
+.graptos-top {
+  background: @graptos_topbar_bg;
+  background-color: @graptos_topbar_bg;
+}
+
+.graptos-bottom,
+.graptos-search-panel,
+.graptos-tool-panel {
+  background: @graptos_bottombar_bg;
+  background-color: @graptos_bottombar_bg;
+}
+
+.graptos-root notebook > header,
+.graptos-root notebook > header.top > tabs > tab {
+  background: @graptos_tabbar_bg;
+  background-color: @graptos_tabbar_bg;
+  border-left-color: @graptos_tabbar_border;
+  border-right-color: @graptos_tabbar_border;
+  border-top-color: @graptos_tabbar_border;
+  border-bottom-color: @graptos_tabbar_border;
+}
+
+.graptos-root notebook > header.top {
+  border-color: @graptos_tabbar_border;
+  border-bottom-color: @graptos_tab_active_border;
+}
+
+.graptos-root notebook > header.top > tabs > tab:checked {
+  background: @graptos_tab_active_bg;
+  background-color: @graptos_tab_active_bg;
+  color: @graptos_tab_active_fg;
+  border-left-color: @graptos_tabbar_border;
+  border-right-color: @graptos_tabbar_border;
+  border-top-color: @graptos_tabbar_border;
+  border-bottom-color: @graptos_tab_active_border;
+}
+
+.graptos-tab-tiled {
+  box-shadow: inset 0 -2px @graptos_tab_tiled_indicator;
+}
+
+.graptos-preview,
+.graptos-minimap,
+.graptos-codex-preview {
+  background: @graptos_editor_bg;
+  background-color: @graptos_editor_bg;
+  color: @graptos_editor_fg;
+}
+
+popover.graptos-context-popover,
+popover.graptos-tools-popover,
+popover.graptos-completion-popover,
+popover.graptos-hover-popover,
+popover.graptos-context-popover contents,
+popover.graptos-tools-popover contents,
+popover.graptos-completion-popover contents,
+popover.graptos-hover-popover contents {
+  background: @graptos_popover_bg;
+  background-color: @graptos_popover_bg;
+}
+
+.graptos-completion-list row:selected,
+.graptos-completion-list row:selected label,
+.graptos-completion-list row:selected .graptos-completion-title,
+.graptos-completion-list row:selected .graptos-completion-detail {
+  background: @graptos_accent;
+  background-color: @graptos_accent;
+}
+
+window.graptos-window .graptos-root.graptos-dialog-root,
+window.graptos-window .graptos-dialog-output,
+window.graptos-window .graptos-dialog-output text {
+  background: @graptos_dialog_bg;
+  background-color: @graptos_dialog_bg;
+  color: @graptos_editor_fg;
+}
+
+.graptos-search-match {
+  background: @graptos_accent;
+}
+
+.graptos-diagnostic-warning {
+  background: @graptos_warning_bg;
+}
+
+.graptos-codex-approval {
+  background: @graptos_warning_bg;
+  border-color: @graptos_editor_fg;
+}
+
+.graptos-codex-review {
+  background: @graptos_accent;
+  border-color: @graptos_editor_fg;
+}
+/* GRAPTOS THEME END */

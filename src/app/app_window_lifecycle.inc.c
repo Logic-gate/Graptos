@@ -103,6 +103,12 @@ EditorWindow *app_window_new(GtkApplication *application) {
     win->preview_font = g_strdup("");
     win->terminal_font = g_strdup("");
     win->code_font = g_strdup("monospace");
+    {
+        const char *config_dir = g_get_user_config_dir();
+        win->theme_css_path = config_dir && config_dir[0] != '\0'
+            ? g_build_filename(config_dir, "graptos", "theme.css", NULL)
+            : NULL;
+    }
     // Without defaults here, GTK paints white until the first file/tab refresh reapplies config CSS
     win->editor_bg_color = g_strdup("#181a1f");
     win->editor_fg_color = g_strdup("#d4d4d4");
@@ -115,8 +121,11 @@ EditorWindow *app_window_new(GtkApplication *application) {
     win->sidebar_bg_color = g_strdup("#181a1f");
     win->tabbar_bg_color = g_strdup("#181a1f");
     win->tabbar_fg_color = g_strdup("#d4d4d4");
+    win->tabbar_border_color = g_strdup("#00000000");
     win->tab_active_bg_color = g_strdup("#20232b");
     win->tab_active_fg_color = g_strdup("#ffffff");
+    win->tab_active_border_color = g_strdup("#89b4fa");
+    win->tab_tiled_indicator_color = g_strdup("#89b4fa");
     win->topbar_bg_color = g_strdup("#181a1f");
     win->topbar_fg_color = g_strdup("#d4d4d4");
     win->bottombar_bg_color = g_strdup("#181a1f");
@@ -192,13 +201,13 @@ EditorWindow *app_window_new(GtkApplication *application) {
     graptos_config_load(win);
     win->lsp_client = lsp_client_new(win);
     if (!win->codex_preview_bg_color) {
-        win->codex_preview_bg_color = g_strdup(win->editor_bg_color);
+        win->codex_preview_bg_color = g_strdup("#1b1f24");
     }
     if (!win->codex_preview_fg_color) {
         win->codex_preview_fg_color = g_strdup("#d4d4d4");
     }
     if (!win->codex_prompt_bg_color) {
-        win->codex_prompt_bg_color = g_strdup(win->editor_bg_color);
+        win->codex_prompt_bg_color = g_strdup("#111318");
     }
 
     /*
@@ -345,8 +354,11 @@ void app_window_free(EditorWindow *win) {
     g_free(win->sidebar_bg_color);
     g_free(win->tabbar_bg_color);
     g_free(win->tabbar_fg_color);
+    g_free(win->tabbar_border_color);
     g_free(win->tab_active_bg_color);
     g_free(win->tab_active_fg_color);
+    g_free(win->tab_active_border_color);
+    g_free(win->tab_tiled_indicator_color);
     g_free(win->topbar_bg_color);
     g_free(win->topbar_fg_color);
     g_free(win->bottombar_bg_color);
@@ -413,6 +425,7 @@ void app_window_free(EditorWindow *win) {
     g_free(win->preview_font);
     g_free(win->terminal_font);
     g_free(win->code_font);
+    g_free(win->theme_css_path);
     g_free(win->project_root);
     g_free(win);
 }

@@ -27,8 +27,11 @@ void app_window_apply_css(EditorWindow *win) {
                            win->editor_cursor_color,
                            win->sidebar_bg_color, win->tabbar_bg_color,
                            win->tabbar_fg_color,
+                           win->tabbar_border_color,
                            win->tab_active_bg_color,
                            win->tab_active_fg_color,
+                           win->tab_active_border_color,
+                           win->tab_tiled_indicator_color,
                            win->topbar_bg_color, win->topbar_fg_color,
                            win->bottombar_bg_color, win->bottombar_fg_color,
                            win->status_error_color,
@@ -90,6 +93,7 @@ void app_window_apply_css(EditorWindow *win) {
                            win->terminal_font,
                            win->code_font,
                            win->use_system_interface_font);
+    graptos_apply_theme_css(win->theme_css_path, TRUE);
     terminal_panel_apply_colors(win->terminal_panel);
 }
 

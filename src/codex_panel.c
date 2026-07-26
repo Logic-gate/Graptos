@@ -82,7 +82,14 @@ static void panel_render_now(CodexPanel *panel) {
     if (!panel || !panel->current_chat ||
         !panel->current_chat->render_dirty) return;
     CodexChat *chat = panel->current_chat;
-    codex_markdown_render(chat->buffer, chat->markdown->str);
+    codex_markdown_render(chat->buffer,
+                          chat->markdown->str,
+                          panel->win ? panel->win->completion_selection_bg_color : NULL,
+                          panel->win ? panel->win->git_status_added_color : NULL,
+                          panel->win ? panel->win->git_status_modified_color : NULL,
+                          panel->win ? panel->win->codex_preview_fg_color : NULL,
+                          panel->win ? panel->win->codex_prompt_bg_color : NULL,
+                          panel->win ? panel->win->dialog_muted_color : NULL);
     chat->render_dirty = FALSE;
     if (gtk_widget_get_mapped(chat->view) &&
         gtk_widget_get_width(chat->view) > 0 &&

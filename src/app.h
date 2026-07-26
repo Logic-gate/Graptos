@@ -91,6 +91,7 @@ typedef struct _EditorWindow {
     char *preview_font; /**< Preview font description, or empty for inherited preview default. */
     char *terminal_font; /**< Terminal font description, or empty for VTE default. */
     char *code_font; /**< Code snippet and auxiliary code font description. */
+    char *theme_css_path; /**< Active CSS theme path. */
     char *editor_bg_color; /**< Editor bg color. */
     char *editor_fg_color; /**< Editor fg color. */
     char *editor_gutter_bg_color; /**< Editor gutter bg color. */
@@ -102,8 +103,11 @@ typedef struct _EditorWindow {
     char *sidebar_bg_color; /**< Sidebar bg color. */
     char *tabbar_bg_color; /**< Tabbar bg color. */
     char *tabbar_fg_color; /**< Tabbar fg color. */
+    char *tabbar_border_color; /**< Tabbar border color. */
     char *tab_active_bg_color; /**< Tab active bg color. */
     char *tab_active_fg_color; /**< Tab active fg color. */
+    char *tab_active_border_color; /**< Tab active underline color. */
+    char *tab_tiled_indicator_color; /**< Tiled tab indicator color. */
     char *topbar_bg_color; /**< Topbar bg color. */
     char *topbar_fg_color; /**< Topbar fg color. */
     char *bottombar_bg_color; /**< Bottombar bg color. */

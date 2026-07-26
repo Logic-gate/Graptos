@@ -15,6 +15,19 @@
  * @details Replaces the target buffer with styled text for the supported subset.
  * @param buffer The text buffer used for the operation.
  * @param markdown The markdown supplied by the caller.
+ * @param heading_color The primary heading/link color.
+ * @param success_color The secondary heading color.
+ * @param warning_color The tertiary heading color.
+ * @param code_fg_color The code foreground color.
+ * @param code_bg_color The code background color.
+ * @param quote_color The quoted text color.
  */
-void codex_markdown_render(GtkTextBuffer *buffer, const char *markdown);
+void codex_markdown_render(GtkTextBuffer *buffer,
+                           const char *markdown,
+                           const char *heading_color,
+                           const char *success_color,
+                           const char *warning_color,
+                           const char *code_fg_color,
+                           const char *code_bg_color,
+                           const char *quote_color);
 #endif

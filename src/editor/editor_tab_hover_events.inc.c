@@ -976,11 +976,22 @@ static gboolean selected_text_is_regex(EditorTab *tab, const char *selected) {
  */
 static void ensure_regex_tester_tag(GtkTextBuffer *buffer) {
     if (!buffer) return;
+    const char *bg = g_object_get_data(G_OBJECT(buffer),
+                                       "graptos-regex-match-bg");
+    const char *fg = g_object_get_data(G_OBJECT(buffer),
+                                       "graptos-regex-match-fg");
+    if (!bg || bg[0] != '#') bg = NULL;
+    if (!fg || fg[0] != '#') fg = NULL;
     GtkTextTagTable *table = gtk_text_buffer_get_tag_table(buffer);
-    if (gtk_text_tag_table_lookup(table, "graptos-regex-match")) return;
+    GtkTextTag *tag = gtk_text_tag_table_lookup(table, "graptos-regex-match");
+    if (tag) {
+        g_object_set(tag, "background", bg, "foreground", fg,
+                     "underline", PANGO_UNDERLINE_SINGLE, NULL);
+        return;
+    }
     gtk_text_buffer_create_tag(buffer, "graptos-regex-match",
-                               "background", "#515c7a",
-                               "foreground", "#ffffff",
+                               "background", bg,
+                               "foreground", fg,
                                "underline", PANGO_UNDERLINE_SINGLE,
                                NULL);
 }
@@ -1074,11 +1085,13 @@ static void regex_tester_text_changed(GtkTextBuffer *buffer, gpointer user_data)
 /**
  * @brief Create regex tester row.
  * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose theme state provides match colors.
  * @param pattern The pattern supplied by the caller.
  * @param test_view_out Output storage filled when the operation can provide a value.
  * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
-static GtkWidget *regex_tester_row_new(const char *pattern,
+static GtkWidget *regex_tester_row_new(EditorTab *tab,
+                                       const char *pattern,
                                        GtkWidget **test_view_out) {
     GtkWidget *row = gtk_list_box_row_new();
     gtk_list_box_row_set_activatable(GTK_LIST_BOX_ROW(row), FALSE);
@@ -1117,6 +1130,16 @@ static GtkWidget *regex_tester_row_new(const char *pattern,
     g_object_set_data_full(G_OBJECT(buffer),
                            "graptos-regex-pattern",
                            g_strdup(pattern ? pattern : ""),
+                           g_free);
+    g_object_set_data_full(G_OBJECT(buffer),
+                           "graptos-regex-match-bg",
+                           g_strdup(tab && tab->win && tab->win->search_match_bg_color
+                                    ? tab->win->search_match_bg_color : ""),
+                           g_free);
+    g_object_set_data_full(G_OBJECT(buffer),
+                           "graptos-regex-match-fg",
+                           g_strdup(tab && tab->win && tab->win->search_match_fg_color
+                                    ? tab->win->search_match_fg_color : ""),
                            g_free);
     g_object_set_data(G_OBJECT(buffer), "graptos-regex-status", status);
     g_signal_connect(buffer, "changed",
@@ -1171,7 +1194,7 @@ static void show_regex_tester_in_hover(EditorTab *tab,
     gtk_list_box_insert(GTK_LIST_BOX(tab->hover_list), header, -1);
     GtkWidget *test_view = NULL;
     gtk_list_box_insert(GTK_LIST_BOX(tab->hover_list),
-                        regex_tester_row_new(pattern, &test_view),
+                        regex_tester_row_new(tab, pattern, &test_view),
                         -1);
 
     (void)where;

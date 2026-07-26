@@ -38,8 +38,11 @@ void graptos_apply_css(void);
  * @param sidebar_bg_color The sidebar bg color supplied by the caller.
  * @param tabbar_bg_color The tabbar bg color supplied by the caller.
  * @param tabbar_fg_color The tabbar fg color supplied by the caller.
+ * @param tabbar_border_color The tabbar border color supplied by the caller.
  * @param tab_active_bg_color The tab active bg color supplied by the caller.
  * @param tab_active_fg_color The tab active fg color supplied by the caller.
+ * @param tab_active_border_color The tab active underline color supplied by the caller.
+ * @param tab_tiled_indicator_color The tiled tab indicator color supplied by the caller.
  * @param topbar_bg_color The topbar bg color supplied by the caller.
  * @param topbar_fg_color The topbar fg color supplied by the caller.
  * @param bottombar_bg_color The bottombar bg color supplied by the caller.
@@ -119,8 +122,11 @@ void graptos_apply_editor_css(const char *editor_bg_color,
                             const char *sidebar_bg_color,
                             const char *tabbar_bg_color,
                             const char *tabbar_fg_color,
+                            const char *tabbar_border_color,
                             const char *tab_active_bg_color,
                             const char *tab_active_fg_color,
+                            const char *tab_active_border_color,
+                            const char *tab_tiled_indicator_color,
                             const char *topbar_bg_color,
                             const char *topbar_fg_color,
                             const char *bottombar_bg_color,
@@ -188,6 +194,26 @@ void graptos_apply_editor_css(const char *editor_bg_color,
                             const char *terminal_font,
                             const char *code_font,
                             gboolean use_system_interface_font);
+/**
+ * @brief Apply theme CSS after generated theme CSS.
+ * @details Theme CSS is loaded at the highest application priority so local
+ *          theme files can override both compiled structure and generated
+ *          colour rules without rebuilding Graptoς.
+ * @param path The CSS file path supplied by config.
+ * @param enabled TRUE when theme CSS loading should be active.
+ */
+void graptos_apply_theme_css(const char *path, gboolean enabled);
+/**
+ * @brief Write a complete editable theme CSS template.
+ * @details The template documents the stable selectors and colour names that
+ *          users can override after compilation. Existing files are kept unless
+ *          overwrite is TRUE.
+ * @param path The destination path.
+ * @param overwrite TRUE to replace an existing file.
+ * @return TRUE when the template exists after the call; otherwise FALSE.
+ */
+gboolean graptos_write_theme_css_template(const char *path,
+                                          gboolean overwrite);
 /**
  * @brief Graptoς button new.
  * @details Shared UI helpers keep Graptoς styling and GTK ownership rules in one place. The comment notes the small contract each wrapper protects for callers.
