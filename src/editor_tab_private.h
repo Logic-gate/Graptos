@@ -15,6 +15,7 @@
 #include "formatter.h"
 #include "index.h"
 #include "import_complete.h"
+#include "editor_notes.h"
 #include "lsp_client.h"
 #include "ui.h"
 
@@ -301,6 +302,13 @@ void menu_comment(GtkWidget *w, gpointer data);
  */
 void menu_complete(GtkWidget *w, gpointer data);
 /**
+ * @brief Menu add note.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param w The w supplied by the caller.
+ * @param data The callback context passed by the caller.
+ */
+void menu_add_note(GtkWidget *w, gpointer data);
+/**
  * @brief Hex to rgba.
  * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
  * @param text The text fragment supplied by the caller.
@@ -512,6 +520,25 @@ void on_minimap_draw(GtkDrawingArea *area, cairo_t *cr, int width, int height, g
  * @param user_data The callback context passed through GTK signal data.
  */
 void on_gutter_draw(GtkDrawingArea *area, cairo_t *cr, int width, int height, gpointer user_data);
+/**
+ * @brief On gutter right click.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param gesture The gesture supplied by the caller.
+ * @param n_press The n press supplied by the caller.
+ * @param x The x supplied by the caller.
+ * @param y The y supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
+ */
+void on_gutter_right_click(GtkGestureClick *gesture, int n_press, double x, double y, gpointer user_data);
+/**
+ * @brief On gutter motion.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param controller The controller supplied by the caller.
+ * @param x The x supplied by the caller.
+ * @param y The y supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
+ */
+void on_gutter_motion(GtkEventControllerMotion *controller, double x, double y, gpointer user_data);
 /**
  * @brief On vadjustment value changed.
  * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
@@ -898,6 +925,24 @@ gboolean on_text_view_key_pressed(GtkEventControllerKey *controller, guint keyva
  * @param user_data The callback context passed through GTK signal data.
  */
 void on_text_view_key_released(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, gpointer user_data);
+/**
+ * @brief Load notes for tab.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ */
+void editor_tab_load_notes(EditorTab *tab);
+/**
+ * @brief Save notes for tab.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ */
+void editor_tab_save_notes(EditorTab *tab);
+/**
+ * @brief Show add note popover.
+ * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ */
+void editor_tab_show_add_note(EditorTab *tab);
 /**
  * @brief On close button clicked.
  * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.

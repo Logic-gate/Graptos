@@ -24,6 +24,7 @@ static void tab_init_state(EditorTab *tab, EditorWindow *win) {
     tab->undo_stack = g_ptr_array_new_with_free_func(g_free);
     tab->redo_stack = g_ptr_array_new_with_free_func(g_free);
     tab->diagnostics = g_ptr_array_new_with_free_func(editor_diagnostic_free);
+    tab->notes = g_ptr_array_new_with_free_func(editor_note_free);
 }
 
 /**
@@ -72,7 +73,7 @@ static void tab_create_text_area(EditorTab *tab, EditorWindow *win) {
     gtk_text_view_set_bottom_margin(GTK_TEXT_VIEW(tab->text_view), 8);
     gtk_text_view_set_pixels_above_lines(GTK_TEXT_VIEW(tab->text_view), 3);
     gtk_text_view_set_pixels_below_lines(GTK_TEXT_VIEW(tab->text_view), 2);
-    gtk_source_view_set_show_line_numbers(GTK_SOURCE_VIEW(tab->text_view), TRUE);
+    gtk_source_view_set_show_line_numbers(GTK_SOURCE_VIEW(tab->text_view), FALSE);
     gtk_source_view_set_highlight_current_line(GTK_SOURCE_VIEW(tab->text_view), TRUE);
     gtk_source_view_set_auto_indent(GTK_SOURCE_VIEW(tab->text_view), FALSE);
     gtk_source_view_set_indent_on_tab(GTK_SOURCE_VIEW(tab->text_view), FALSE);
@@ -308,7 +309,7 @@ static void tab_pack_widgets(EditorTab *tab) {
                                   tab->text_view);
     gtk_overlay_set_child(GTK_OVERLAY(tab->popover_parent), tab->scrolled);
 
-    gtk_widget_set_visible(tab->gutter, FALSE);
+    gtk_widget_set_visible(tab->gutter, TRUE);
     gtk_box_append(GTK_BOX(tab->editor_area), tab->gutter);
     gtk_widget_set_hexpand(tab->popover_parent, TRUE);
     gtk_widget_set_vexpand(tab->popover_parent, TRUE);
@@ -478,6 +479,19 @@ static void tab_connect_signals(EditorTab *tab) {
     g_signal_connect(tab->buffer, "mark-set", G_CALLBACK(on_mark_set), tab);
     gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(tab->gutter),
                                    on_gutter_draw, tab, NULL);
+    GtkGesture *gutter_right_click = gtk_gesture_click_new();
+    gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gutter_right_click),
+                                  GDK_BUTTON_SECONDARY);
+    gtk_event_controller_set_propagation_phase(
+        GTK_EVENT_CONTROLLER(gutter_right_click), GTK_PHASE_CAPTURE);
+    g_signal_connect(gutter_right_click, "pressed",
+                     G_CALLBACK(on_gutter_right_click), tab);
+    gtk_widget_add_controller(tab->gutter,
+                              GTK_EVENT_CONTROLLER(gutter_right_click));
+    GtkEventController *gutter_motion = gtk_event_controller_motion_new();
+    g_signal_connect(gutter_motion, "motion",
+                     G_CALLBACK(on_gutter_motion), tab);
+    gtk_widget_add_controller(tab->gutter, gutter_motion);
 
     GtkAdjustment *vadj =
         gtk_scrolled_window_get_vadjustment(

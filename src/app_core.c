@@ -7,6 +7,7 @@
  */
 
 #include "app_private.h"
+#include "editor_notes.h"
 
 #include <stdarg.h>
 

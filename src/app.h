@@ -96,6 +96,11 @@ typedef struct _EditorWindow {
     char *editor_fg_color; /**< Editor fg color. */
     char *editor_gutter_bg_color; /**< Editor gutter bg color. */
     char *editor_gutter_fg_color; /**< Editor gutter fg color. */
+    char *note_indicator_color; /**< Note indicator color. */
+    char *note_indicator_active_color; /**< Active note indicator color. */
+    char *note_popover_bg_color; /**< Note popover background color. */
+    char *note_popover_fg_color; /**< Note popover foreground color. */
+    char *note_popover_border_color; /**< Note popover border color. */
     char *editor_current_line_bg_color; /**< Editor current line bg color. */
     char *editor_selection_bg_color; /**< Editor selection bg color. */
     char *editor_selection_fg_color; /**< Editor selection fg color. */

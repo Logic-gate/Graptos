@@ -9,6 +9,13 @@
 /* GRAPTOS THEME BEGIN */
 @define-color graptos_editor_bg #181a1f;
 @define-color graptos_editor_fg #d4d4d4;
+@define-color graptos_editor_gutter_bg #181a1f;
+@define-color graptos_editor_gutter_fg #8b949e;
+@define-color graptos_note_indicator #f9c74f;
+@define-color graptos_note_indicator_active #ffd166;
+@define-color graptos_note_popover_bg #181a1f;
+@define-color graptos_note_popover_fg #d4d4d4;
+@define-color graptos_note_popover_border #3a4050;
 @define-color graptos_sidebar_bg #111318;
 @define-color graptos_tabbar_bg #111318;
 @define-color graptos_tabbar_border #00000000;
@@ -113,6 +120,17 @@ popover.graptos-completion-popover contents,
 popover.graptos-hover-popover contents {
   background: @graptos_popover_bg;
   background-color: @graptos_popover_bg;
+}
+
+popover.graptos-note-popover,
+popover.graptos-note-popover contents,
+popover.graptos-note-popover textview,
+popover.graptos-note-popover textview text,
+popover.graptos-note-popover .graptos-note-status {
+  background: @graptos_note_popover_bg;
+  background-color: @graptos_note_popover_bg;
+  color: @graptos_note_popover_fg;
+  border-color: @graptos_note_popover_border;
 }
 
 .graptos-completion-list row:selected,

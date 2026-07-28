@@ -13,6 +13,7 @@
 #include <gtksourceview/gtksource.h>
 #include "syntax.h"
 #include "completion.h"
+#include "editor_notes.h"
 
 /**
  * @brief Editor tab type definition.
@@ -85,6 +86,7 @@ struct _EditorTab {
     GPtrArray *tile_group; /**< EditorTab*: saved tile group owned by this tab. */
     GPtrArray *color_literal_tag_names; /**< Color literal tag names. */
     GPtrArray *diagnostics; /**< EditorDiagnostic*. */
+    GPtrArray *notes; /**< EditorNote*. */
     guint highlight_timeout; /**< Highlight timeout. */
     guint completion_timeout; /**< Completion timeout. */
     guint minimap_timeout; /**< Minimap timeout. */
@@ -101,9 +103,11 @@ struct _EditorTab {
     guint hover_hide_timeout; /**< Hover hide timeout. */
     guint hover_lsp_fallback_timeout; /**< Hover LSP fallback timeout. */
     guint ui_refresh_timeout; /**< Ui refresh timeout. */
+    guint note_autocomplete_timeout; /**< Deferred note autocomplete timeout. */
     guint tab_width; /**< Tab width. */
     guint diagnostic_warnings; /**< Diagnostic warnings. */
     guint cached_gutter_width; /**< Cached gutter width. */
+    guint last_line_count; /**< Last line count observed for note shifts. */
     guint lsp_version; /**< LSP document version. */
     guint hover_lsp_line; /**< Hover LSP line for reference lookup. */
     guint hover_lsp_character; /**< Hover LSP character for reference lookup. */
@@ -190,6 +194,20 @@ gboolean editor_tab_confirm_close(EditorTab *tab);
  * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void editor_tab_update_title(EditorTab *tab);
+/**
+ * @brief Load project notes for a tab.
+ * @details Notes are persisted beside the project rather than inside the
+ *          source buffer, so path changes need a public refresh hook.
+ * @param tab The editor tab whose note database should be loaded.
+ */
+void editor_tab_load_notes(EditorTab *tab);
+/**
+ * @brief Save project notes for a tab.
+ * @details Notes save independently from source text and should not mark the
+ *          source buffer modified.
+ * @param tab The editor tab whose notes should be saved.
+ */
+void editor_tab_save_notes(EditorTab *tab);
 /**
  * @brief Set a generated display title for a tab.
  * @details Generated tabs, such as Git diff and Codex review tabs, do not have

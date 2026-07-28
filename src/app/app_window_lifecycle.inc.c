@@ -114,6 +114,11 @@ EditorWindow *app_window_new(GtkApplication *application) {
     win->editor_fg_color = g_strdup("#d4d4d4");
     win->editor_gutter_bg_color = g_strdup("#181a1f");
     win->editor_gutter_fg_color = g_strdup("#8b949e");
+    win->note_indicator_color = g_strdup("#f9c74f");
+    win->note_indicator_active_color = g_strdup("#ffd166");
+    win->note_popover_bg_color = g_strdup("#181a1f");
+    win->note_popover_fg_color = g_strdup("#d4d4d4");
+    win->note_popover_border_color = g_strdup("#3a4050");
     win->editor_current_line_bg_color = g_strdup("#20232b");
     win->editor_selection_bg_color = g_strdup("#3a405c");
     win->editor_selection_fg_color = g_strdup("#ffffff");
@@ -347,6 +352,11 @@ void app_window_free(EditorWindow *win) {
     g_free(win->editor_fg_color);
     g_free(win->editor_gutter_bg_color);
     g_free(win->editor_gutter_fg_color);
+    g_free(win->note_indicator_color);
+    g_free(win->note_indicator_active_color);
+    g_free(win->note_popover_bg_color);
+    g_free(win->note_popover_fg_color);
+    g_free(win->note_popover_border_color);
     g_free(win->editor_current_line_bg_color);
     g_free(win->editor_selection_bg_color);
     g_free(win->editor_selection_fg_color);

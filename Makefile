@@ -1,6 +1,6 @@
 APP_NAME := graptos
 APP_ID := io.github.graptos.Editor
-VERSION := 0.23.66
+VERSION := 0.23.67
 PREFIX ?= /usr/local
 CC ?= cc
 BUILD_DIR := build
@@ -26,6 +26,8 @@ SOURCES := \
 	$(SRC_DIR)/editor_tab_latex.c \
 	$(SRC_DIR)/editor_tab_hover.c \
 	$(SRC_DIR)/editor_tab_completion.c \
+	$(SRC_DIR)/editor_notes.c \
+	$(SRC_DIR)/editor_tab_notes.c \
 	$(SRC_DIR)/editor_tab_keys.c \
 	$(SRC_DIR)/editor_tab_diagnostics.c \
 	$(SRC_DIR)/editor_tab_edit.c \
@@ -127,7 +129,7 @@ check: $(VERSION_HEADER)
 test: $(BUILD_DIR)/unit_tests
 	$<
 
-$(BUILD_DIR)/unit_tests: $(TEST_DIR)/unit_tests.c $(SRC_DIR)/codex_protocol.c $(SRC_DIR)/syntax_diagnostics.c $(SRC_DIR)/project_init.c $(SRC_DIR)/formatter.c $(SRC_DIR)/formatter_lexer.c $(SRC_DIR)/formatter_layout.c $(SRC_DIR)/formatter_spacing.c $(SRC_DIR)/formatter_scope.c $(SRC_DIR)/syntax.c | $(BUILD_DIR)
+$(BUILD_DIR)/unit_tests: $(TEST_DIR)/unit_tests.c $(SRC_DIR)/codex_protocol.c $(SRC_DIR)/syntax_diagnostics.c $(SRC_DIR)/project_init.c $(SRC_DIR)/formatter.c $(SRC_DIR)/formatter_lexer.c $(SRC_DIR)/formatter_layout.c $(SRC_DIR)/formatter_spacing.c $(SRC_DIR)/formatter_scope.c $(SRC_DIR)/syntax.c $(SRC_DIR)/editor_notes.c | $(BUILD_DIR)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARNINGS) $(GTK_SYSTEM_CFLAGS) -std=c11 $^ $(GTK_LIBS) -o $@
 
 smoke-test: $(BUILD_DIR)/smoke_window

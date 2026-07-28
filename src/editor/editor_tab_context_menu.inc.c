@@ -211,6 +211,10 @@ on_text_view_right_click(GtkGestureClick *gesture,
                    context_button(tab,
                                   "Auto Complete",
                                   G_CALLBACK(menu_complete)));
+    gtk_box_append(GTK_BOX(box),
+                   context_button(tab,
+                                  "Add Note",
+                                  G_CALLBACK(menu_add_note)));
 
     /*
      * Use the click position as a tiny target rectangle so the popover opens

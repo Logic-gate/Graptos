@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "../src/codex_protocol.h"
+#include "../src/editor_notes.h"
 #include "../src/formatter.h"
 #include "../src/project_init.h"
 #include "../src/syntax.h"
@@ -765,6 +766,53 @@ static void test_project_init_language_templates(void) {
 }
 
 /**
+ * @brief Verifies note text databases round-trip escaped text.
+ * @details Notes are meant to be reviewed and shared as text files. This test
+ *          covers the escaping that keeps tabs, newlines, and backslashes in a
+ *          single database record.
+ */
+static void test_editor_notes_round_trip(void) {
+    g_autoptr(GError) error = NULL;
+    g_autofree char *dir = g_dir_make_tmp("graptos-notes-XXXXXX", &error);
+    g_assert_no_error(error);
+    g_autofree char *path = g_build_filename(dir, "main.c.12345678.notes.txt", NULL);
+    GPtrArray *notes = g_ptr_array_new_with_free_func(editor_note_free);
+    g_ptr_array_add(notes, editor_note_new(7u, 2, 4, 5, 8, "one\ttwo\nthree\\four"));
+
+    g_assert_true(editor_notes_save(path, notes, &error));
+    g_assert_no_error(error);
+    GPtrArray *loaded = editor_notes_load(path);
+    g_assert_cmpuint(loaded->len, ==, 1u);
+    EditorNote *note = g_ptr_array_index(loaded, 0u);
+    g_assert_cmpuint(note->id, ==, 7u);
+    g_assert_cmpint(note->start_line, ==, 2);
+    g_assert_cmpint(note->end_line, ==, 5);
+    g_assert_cmpstr(note->note, ==, "one\ttwo\nthree\\four");
+
+    g_ptr_array_free(loaded, TRUE);
+    g_ptr_array_free(notes, TRUE);
+    test_remove_tree(dir);
+}
+
+/**
+ * @brief Verifies note path names avoid same-basename collisions.
+ * @details The database filename keeps the source basename for readability and
+ *          appends a relative-path hash so two folders can both contain main.c.
+ */
+static void test_editor_notes_path_collision(void) {
+    const char *root = "/tmp/graptos-project";
+    g_autofree char *first = editor_notes_db_path(root, "/tmp/graptos-project/src/main.c");
+    g_autofree char *second = editor_notes_db_path(root, "/tmp/graptos-project/tests/main.c");
+    g_assert_nonnull(first);
+    g_assert_nonnull(second);
+    g_assert_true(g_str_has_suffix(first, ".notes.txt"));
+    g_assert_true(g_str_has_suffix(second, ".notes.txt"));
+    g_assert_nonnull(strstr(first, "main.c."));
+    g_assert_nonnull(strstr(second, "main.c."));
+    g_assert_cmpstr(first, !=, second);
+}
+
+/**
  * @brief Registers and runs the unit test suite.
  *
  * @param argc Command-line argument count supplied by the test runner.
@@ -798,5 +846,7 @@ int main(int argc, char **argv) {
     g_test_add_func("/project-init/apply/success", test_project_init_apply_success);
     g_test_add_func("/project-init/templates/template-test", test_project_init_builtin_template_test);
     g_test_add_func("/project-init/templates/languages", test_project_init_language_templates);
+    g_test_add_func("/editor-notes/round-trip", test_editor_notes_round_trip);
+    g_test_add_func("/editor-notes/path-collision", test_editor_notes_path_collision);
     return g_test_run();
 }

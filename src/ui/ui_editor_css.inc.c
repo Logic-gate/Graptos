@@ -86,6 +86,11 @@ static void append_font_rule(GString *css,
  * @param editor_fg_color The editor fg color supplied by the caller.
  * @param editor_gutter_bg_color The editor gutter bg color supplied by the caller.
  * @param editor_gutter_fg_color The editor gutter fg color supplied by the caller.
+ * @param note_indicator_color The note indicator color supplied by the caller.
+ * @param note_indicator_active_color The active note indicator color supplied by the caller.
+ * @param note_popover_bg_color The note popover background color supplied by the caller.
+ * @param note_popover_fg_color The note popover foreground color supplied by the caller.
+ * @param note_popover_border_color The note popover border color supplied by the caller.
  * @param editor_current_line_bg_color The editor current line bg color supplied by the caller.
  * @param editor_selection_bg_color The editor selection bg color supplied by the caller.
  * @param editor_selection_fg_color The editor selection fg color supplied by the caller.
@@ -170,6 +175,11 @@ void graptos_apply_editor_css(const char *editor_bg_color,
                             const char *editor_fg_color,
                             const char *editor_gutter_bg_color,
                             const char *editor_gutter_fg_color,
+                            const char *note_indicator_color,
+                            const char *note_indicator_active_color,
+                            const char *note_popover_bg_color,
+                            const char *note_popover_fg_color,
+                            const char *note_popover_border_color,
                             const char *editor_current_line_bg_color,
                             const char *editor_selection_bg_color,
                             const char *editor_selection_fg_color,
@@ -269,6 +279,16 @@ void graptos_apply_editor_css(const char *editor_bg_color,
         (editor_gutter_bg_color && editor_gutter_bg_color[0] == '#') ? editor_gutter_bg_color : effective_bg;
     const char *effective_gutter_fg =
         (editor_gutter_fg_color && editor_gutter_fg_color[0] == '#') ? editor_gutter_fg_color : "#8b949e";
+    const char *effective_note_indicator =
+        (note_indicator_color && note_indicator_color[0] == '#') ? note_indicator_color : "#f9c74f";
+    const char *effective_note_indicator_active =
+        (note_indicator_active_color && note_indicator_active_color[0] == '#') ? note_indicator_active_color : "#ffd166";
+    const char *effective_note_popover_bg =
+        (note_popover_bg_color && note_popover_bg_color[0] == '#') ? note_popover_bg_color : effective_bg;
+    const char *effective_note_popover_fg =
+        (note_popover_fg_color && note_popover_fg_color[0] == '#') ? note_popover_fg_color : effective_fg;
+    const char *effective_note_popover_border =
+        (note_popover_border_color && note_popover_border_color[0] == '#') ? note_popover_border_color : "#3a4050";
     const char *effective_current_line =
         (editor_current_line_bg_color && editor_current_line_bg_color[0] == '#') ? editor_current_line_bg_color : "#20232b";
     const char *effective_selection_bg =
@@ -550,6 +570,8 @@ void graptos_apply_editor_css(const char *editor_bg_color,
         "background: %s; background-color: %s; color: %s; caret-color: %s; }\n"
         "sourceview.graptos-editor gutter, sourceview.graptos-editor gutter * { "
         "background: %s; background-color: %s; color: %s; }\n"
+        ".graptos-gutter { "
+        "background: %s; background-color: %s; color: %s; }\n"
         "sourceview.graptos-editor gutter renderer, "
         "sourceview.graptos-editor gutter lines, "
         "sourceview.graptos-editor gutter marks { "
@@ -559,7 +581,20 @@ void graptos_apply_editor_css(const char *editor_bg_color,
         effective_bg, effective_bg, effective_fg, effective_cursor,
         effective_gutter_bg, effective_gutter_bg, effective_gutter_fg,
         effective_gutter_bg, effective_gutter_bg, effective_gutter_fg,
+        effective_gutter_bg, effective_gutter_bg, effective_gutter_fg,
         effective_selection_bg, effective_selection_bg, effective_selection_fg);
+    g_string_append_printf(css,
+        ".graptos-note-popover, .graptos-note-popover contents, "
+        ".graptos-note-popover textview, .graptos-note-popover textview text, "
+        ".graptos-note-popover .graptos-note-input, "
+        ".graptos-note-popover .graptos-note-status { "
+        "background: %s; background-color: %s; color: %s; "
+        "border-color: %s; }\n"
+        ".graptos-note-indicator { color: %s; }\n"
+        ".graptos-note-indicator-active { color: %s; }\n",
+        effective_note_popover_bg, effective_note_popover_bg,
+        effective_note_popover_fg, effective_note_popover_border,
+        effective_note_indicator, effective_note_indicator_active);
     if (effective_editor_font) {
         append_font_rule(css,
             ".graptos-editor, .graptos-editor text, "

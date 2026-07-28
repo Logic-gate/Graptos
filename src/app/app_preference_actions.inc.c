@@ -277,6 +277,11 @@ void action_reset_all_backgrounds(GtkWidget *widget, gpointer user_data) {
     g_clear_pointer(&win->editor_fg_color, g_free);
     g_clear_pointer(&win->editor_gutter_bg_color, g_free);
     g_clear_pointer(&win->editor_gutter_fg_color, g_free);
+    g_clear_pointer(&win->note_indicator_color, g_free);
+    g_clear_pointer(&win->note_indicator_active_color, g_free);
+    g_clear_pointer(&win->note_popover_bg_color, g_free);
+    g_clear_pointer(&win->note_popover_fg_color, g_free);
+    g_clear_pointer(&win->note_popover_border_color, g_free);
     g_clear_pointer(&win->editor_current_line_bg_color, g_free);
     g_clear_pointer(&win->editor_selection_bg_color, g_free);
     g_clear_pointer(&win->editor_selection_fg_color, g_free);

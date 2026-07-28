@@ -225,6 +225,7 @@ void app_window_note_path_renamed(EditorWindow *win,
         app_window_set_file_locked(win, old_canonical, FALSE);
         app_window_set_file_locked(win, new_canonical, TRUE);
     }
+    editor_notes_rename_db(win->project_root, old_canonical, new_canonical);
 
     /*
      * Update open tabs that point to the renamed file or to files inside a
@@ -256,8 +257,10 @@ void app_window_note_path_renamed(EditorWindow *win,
         }
 
         if (replacement) {
+            editor_notes_rename_db(win->project_root, tab_canonical, replacement);
             g_free(tab->file_path);
             tab->file_path = replacement;
+            editor_tab_load_notes(tab);
 
             /*
              * A renamed path can change the detected language, so drop manual

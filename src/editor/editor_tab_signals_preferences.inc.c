@@ -118,6 +118,27 @@ void on_buffer_changed(GtkTextBuffer *buffer, gpointer user_data) {
     if (!tab || tab->applying_change) return;
 
     gint char_count = gtk_text_buffer_get_char_count(tab->buffer);
+    guint line_count = (guint)gtk_text_buffer_get_line_count(tab->buffer);
+    if (tab->last_line_count != 0u && line_count != tab->last_line_count) {
+        GtkTextIter cursor;
+        GtkTextMark *mark = gtk_text_buffer_get_insert(tab->buffer);
+        gtk_text_buffer_get_iter_at_mark(tab->buffer, &cursor, mark);
+        gint edit_line = gtk_text_iter_get_line(&cursor);
+        gint delta = (gint)line_count - (gint)tab->last_line_count;
+        for (guint i = 0u; tab->notes && i < tab->notes->len; i++) {
+            EditorNote *note = g_ptr_array_index(tab->notes, i);
+            if (!note) continue;
+            if (note->start_line > edit_line) {
+                note->start_line = MAX(0, note->start_line + delta);
+                note->end_line = MAX(note->start_line, note->end_line + delta);
+            } else if (note->end_line >= edit_line) {
+                note->end_line = MAX(note->start_line, note->end_line + delta);
+            }
+        }
+        editor_tab_save_notes(tab);
+        if (tab->gutter) gtk_widget_queue_draw(tab->gutter);
+    }
+    tab->last_line_count = line_count;
     gboolean large_file = (guint)char_count > GRAPTOS_LIVE_FEATURE_MAX_CHARS;
 
     /*

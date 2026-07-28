@@ -201,6 +201,7 @@ gboolean editor_tab_load_file(EditorTab *tab, const char *path) {
     g_clear_pointer(&tab->display_title, g_free);
     g_clear_pointer(&tab->display_title_markup, g_free);
     tab->file_path = g_canonicalize_filename(path, NULL);
+    editor_tab_load_notes(tab);
     cleanup_legacy_tilde_backup(tab->file_path);
     tab->modified = FALSE;
     tab->manual_syntax_override = FALSE;
@@ -301,6 +302,7 @@ gboolean save_to_path(EditorTab *tab, const char *path) {
     g_clear_pointer(&tab->display_title, g_free);
     g_clear_pointer(&tab->display_title_markup, g_free);
     tab->file_path = g_canonicalize_filename(stable_path, NULL);
+    editor_tab_load_notes(tab);
     cleanup_legacy_tilde_backup(tab->file_path);
     tab->modified = FALSE;
     tab->manual_syntax_override = FALSE;

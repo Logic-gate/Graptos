@@ -229,6 +229,7 @@ void action_shortcuts(GtkWidget *widget, gpointer user_data) {
         {"Ctrl+K", "Cut line"},
         {"Ctrl+U", "Paste cut line"},
         {"Ctrl+/", "Comment or uncomment line"},
+        {"Ctrl+Shift+M", "Add note at cursor or selection"},
         {"Tab", "Indent selection, accept completion, or insert indentation"},
         {"Shift+Tab", "Unindent selection or line"},
         {"Enter", "Insert newline with editor indentation handling"},
@@ -349,6 +350,11 @@ typedef struct {
     char *editor_fg_color; /**< Editor foreground color. */
     char *editor_gutter_bg_color; /**< Editor gutter background color. */
     char *editor_gutter_fg_color; /**< Editor gutter foreground color. */
+    char *note_indicator_color; /**< Note indicator color. */
+    char *note_indicator_active_color; /**< Active note indicator color. */
+    char *note_popover_bg_color; /**< Note popover background. */
+    char *note_popover_fg_color; /**< Note popover foreground. */
+    char *note_popover_border_color; /**< Note popover border. */
     char *editor_current_line_bg_color; /**< Editor current line background. */
     char *editor_selection_bg_color; /**< Editor selection background. */
     char *editor_selection_fg_color; /**< Editor selection foreground. */
@@ -514,6 +520,11 @@ static ThemeState *theme_state_from_window(EditorWindow *win) {
     COPY_FIELD(editor_fg_color);
     COPY_FIELD(editor_gutter_bg_color);
     COPY_FIELD(editor_gutter_fg_color);
+    COPY_FIELD(note_indicator_color);
+    COPY_FIELD(note_indicator_active_color);
+    COPY_FIELD(note_popover_bg_color);
+    COPY_FIELD(note_popover_fg_color);
+    COPY_FIELD(note_popover_border_color);
     COPY_FIELD(editor_current_line_bg_color);
     COPY_FIELD(editor_selection_bg_color);
     COPY_FIELD(editor_selection_fg_color);
@@ -612,6 +623,11 @@ static void theme_state_free(ThemeState *state) {
     FREE_FIELD(editor_fg_color);
     FREE_FIELD(editor_gutter_bg_color);
     FREE_FIELD(editor_gutter_fg_color);
+    FREE_FIELD(note_indicator_color);
+    FREE_FIELD(note_indicator_active_color);
+    FREE_FIELD(note_popover_bg_color);
+    FREE_FIELD(note_popover_fg_color);
+    FREE_FIELD(note_popover_border_color);
     FREE_FIELD(editor_current_line_bg_color);
     FREE_FIELD(editor_selection_bg_color);
     FREE_FIELD(editor_selection_fg_color);
@@ -713,6 +729,11 @@ static void theme_state_apply_to_window(ThemeState *state, EditorWindow *win) {
     APPLY_FIELD(editor_fg_color);
     APPLY_FIELD(editor_gutter_bg_color);
     APPLY_FIELD(editor_gutter_fg_color);
+    APPLY_FIELD(note_indicator_color);
+    APPLY_FIELD(note_indicator_active_color);
+    APPLY_FIELD(note_popover_bg_color);
+    APPLY_FIELD(note_popover_fg_color);
+    APPLY_FIELD(note_popover_border_color);
     APPLY_FIELD(editor_current_line_bg_color);
     APPLY_FIELD(editor_selection_bg_color);
     APPLY_FIELD(editor_selection_fg_color);
@@ -830,6 +851,11 @@ static void theme_state_load_key_file(ThemeState *state, GKeyFile *key_file) {
     LOAD_THEME_COLOR("foreground_color", editor_fg_color);
     LOAD_THEME_COLOR("editor_gutter_background_color", editor_gutter_bg_color);
     LOAD_THEME_COLOR("editor_gutter_foreground_color", editor_gutter_fg_color);
+    LOAD_THEME_COLOR("note_indicator_color", note_indicator_color);
+    LOAD_THEME_COLOR("note_indicator_active_color", note_indicator_active_color);
+    LOAD_THEME_COLOR("note_popover_background_color", note_popover_bg_color);
+    LOAD_THEME_COLOR("note_popover_foreground_color", note_popover_fg_color);
+    LOAD_THEME_COLOR("note_popover_border_color", note_popover_border_color);
     LOAD_THEME_COLOR("editor_current_line_background_color", editor_current_line_bg_color);
     LOAD_THEME_COLOR("editor_selection_background_color", editor_selection_bg_color);
     LOAD_THEME_COLOR("editor_selection_foreground_color", editor_selection_fg_color);
@@ -976,6 +1002,11 @@ static void theme_state_load_css(ThemeState *state, const char *css) {
     LOAD_CSS_COLOR("editor_fg", editor_fg_color);
     LOAD_CSS_COLOR("editor_gutter_bg", editor_gutter_bg_color);
     LOAD_CSS_COLOR("editor_gutter_fg", editor_gutter_fg_color);
+    LOAD_CSS_COLOR("note_indicator", note_indicator_color);
+    LOAD_CSS_COLOR("note_indicator_active", note_indicator_active_color);
+    LOAD_CSS_COLOR("note_popover_bg", note_popover_bg_color);
+    LOAD_CSS_COLOR("note_popover_fg", note_popover_fg_color);
+    LOAD_CSS_COLOR("note_popover_border", note_popover_border_color);
     LOAD_CSS_COLOR("editor_current_line_bg", editor_current_line_bg_color);
     LOAD_CSS_COLOR("editor_selection_bg", editor_selection_bg_color);
     LOAD_CSS_COLOR("editor_selection_fg", editor_selection_fg_color);
@@ -1139,6 +1170,9 @@ static void theme_preview_update(ThemeDialogState *dialog) {
         ".graptos-theme-preview-status-error { color: %s; font-weight: 800; }\n"
         ".graptos-theme-preview-editor { background: %s; color: %s; padding: 8px; }\n"
         ".graptos-theme-preview-gutter { background: %s; color: %s; padding: 8px; }\n"
+        ".graptos-theme-preview-note-dot { color: %s; font-weight: 800; }\n"
+        ".graptos-theme-preview-note-dot-active { color: %s; font-weight: 800; }\n"
+        ".graptos-theme-preview-note-popover { background: %s; color: %s; border: 1px solid %s; padding: 8px; }\n"
         ".graptos-theme-preview-current { background: %s; padding: 2px; }\n"
         ".graptos-theme-preview-selection { background: %s; color: %s; padding: 2px; }\n"
         ".graptos-theme-preview-cursor { background: %s; color: %s; padding: 1px 3px; }\n"
@@ -1189,6 +1223,11 @@ static void theme_preview_update(ThemeDialogState *dialog) {
         theme_color(s->status_error_color, "#ff6b6b"),
         bg, fg,
         theme_color(s->editor_gutter_bg_color, bg), theme_color(s->editor_gutter_fg_color, "#8b949e"),
+        theme_color(s->note_indicator_color, "#f9c74f"),
+        theme_color(s->note_indicator_active_color, "#ffd166"),
+        theme_color(s->note_popover_bg_color, "#181a1f"),
+        theme_color(s->note_popover_fg_color, fg),
+        theme_color(s->note_popover_border_color, "#3a4050"),
         theme_color(s->editor_current_line_bg_color, "#20232b"),
         theme_color(s->editor_selection_bg_color, "#3a405c"), theme_color(s->editor_selection_fg_color, "#ffffff"),
         theme_color(s->editor_cursor_color, "#ffffff"), bg,
@@ -2220,7 +2259,7 @@ static GtkWidget *theme_preview_new(void) {
 
     theme_preview_section(box, "Editor");
     GtkWidget *editor = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-    GtkWidget *gutter = gtk_label_new(" 1\n 2\n 3");
+    GtkWidget *gutter = gtk_label_new(" 1  •\n 2\n 3  •");
     gtk_widget_add_css_class(gutter, "graptos-theme-preview-gutter");
     gtk_box_append(GTK_BOX(editor), gutter);
     GtkWidget *code = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
@@ -2229,8 +2268,11 @@ static GtkWidget *theme_preview_new(void) {
     theme_preview_label(code, "    return 0;   ← current line", "graptos-theme-preview-current");
     theme_preview_label(code, "selected text", "graptos-theme-preview-selection");
     theme_preview_label(code, "cursor sample |", "graptos-theme-preview-cursor");
+    theme_preview_label(code, "note marker", "graptos-theme-preview-note-dot");
+    theme_preview_label(code, "active note marker", "graptos-theme-preview-note-dot-active");
     gtk_box_append(GTK_BOX(editor), code);
     gtk_box_append(GTK_BOX(box), editor);
+    theme_preview_label(box, "Note popover\n[[src/app.c]]", "graptos-theme-preview-note-popover");
 
     theme_preview_section(box, "Project Tree and Git");
     theme_preview_label(box, "Project Tree\nM  src/app.c\n?  notes.md", "graptos-theme-preview-project");
@@ -2315,6 +2357,11 @@ static GtkWidget *theme_controls_new(ThemeDialogState *dialog) {
     theme_append_color(box, dialog, "Editor foreground", &s->editor_fg_color);
     theme_append_color(box, dialog, "Gutter background", &s->editor_gutter_bg_color);
     theme_append_color(box, dialog, "Gutter foreground", &s->editor_gutter_fg_color);
+    theme_append_color(box, dialog, "Note indicator", &s->note_indicator_color);
+    theme_append_color(box, dialog, "Active note indicator", &s->note_indicator_active_color);
+    theme_append_color(box, dialog, "Note popover background", &s->note_popover_bg_color);
+    theme_append_color(box, dialog, "Note popover foreground", &s->note_popover_fg_color);
+    theme_append_color(box, dialog, "Note popover border", &s->note_popover_border_color);
     theme_append_color(box, dialog, "Current line", &s->editor_current_line_bg_color);
     theme_append_color(box, dialog, "Selection background", &s->editor_selection_bg_color);
     theme_append_color(box, dialog, "Selection foreground", &s->editor_selection_fg_color);
