@@ -64,6 +64,7 @@ dkms.conf
 build/
 .zig-cache/
 git_check.sh
+.graptos/
 
 # Github actions
 .github/

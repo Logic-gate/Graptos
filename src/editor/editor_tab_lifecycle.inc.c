@@ -140,6 +140,7 @@ void editor_tab_cancel_live_work(EditorTab *tab) {
     cancel_timeout_id(&tab->hover_hide_timeout);
     cancel_timeout_id(&tab->hover_lsp_fallback_timeout);
     cancel_timeout_id(&tab->ui_refresh_timeout);
+    cancel_timeout_id(&tab->note_autocomplete_timeout);
 
     if (tab->completion_popover) graptos_popover_hide(tab->completion_popover);
 
@@ -454,6 +455,7 @@ void editor_tab_free(EditorTab *tab) {
     if (tab->tile_group) g_ptr_array_free(tab->tile_group, TRUE);
     if (tab->color_literal_tag_names) g_ptr_array_free(tab->color_literal_tag_names, TRUE);
     if (tab->diagnostics) g_ptr_array_free(tab->diagnostics, TRUE);
+    if (tab->notes) g_ptr_array_free(tab->notes, TRUE);
 
     if (tab->notebook_refs_held) {
         if (tab->tab_widget && GTK_IS_WIDGET(tab->tab_widget)) {

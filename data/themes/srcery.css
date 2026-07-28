@@ -4,6 +4,11 @@
 @define-color graptos_editor_fg #fce8c3;
 @define-color graptos_editor_gutter_bg #121212;
 @define-color graptos_editor_gutter_fg #918175;
+@define-color graptos_note_indicator #f9c74f;
+@define-color graptos_note_indicator_active #ffd166;
+@define-color graptos_note_popover_bg #181a1f;
+@define-color graptos_note_popover_fg #d4d4d4;
+@define-color graptos_note_popover_border #3a4050;
 @define-color graptos_editor_current_line_bg #2d2b28;
 @define-color graptos_editor_selection_bg #3a3935;
 @define-color graptos_editor_selection_fg #fce8c3;
@@ -86,6 +91,7 @@
 .graptos-root { background: @graptos_editor_bg; color: @graptos_editor_fg; }
 .graptos-editor, .graptos-editor text, textview.graptos-editor, textview.graptos-editor text, sourceview.graptos-editor, sourceview.graptos-editor text { background: @graptos_editor_bg; color: @graptos_editor_fg; caret-color: @graptos_editor_cursor; }
 sourceview.graptos-editor gutter, sourceview.graptos-editor gutter * { background: @graptos_editor_gutter_bg; color: @graptos_editor_gutter_fg; }
+.graptos-note-popover, .graptos-note-popover textview, .graptos-note-popover textview text, .graptos-note-popover .graptos-note-input, .graptos-note-popover .graptos-note-status { background: @graptos_note_popover_bg; color: @graptos_note_popover_fg; border-color: @graptos_note_popover_border; }
 sourceview.graptos-editor text selection { background: @graptos_editor_selection_bg; color: @graptos_editor_selection_fg; }
 .graptos-top { background: @graptos_topbar_bg; color: @graptos_topbar_fg; }
 .graptos-bottom, .graptos-search-panel, .graptos-tool-panel { background: @graptos_bottombar_bg; color: @graptos_bottombar_fg; }

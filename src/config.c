@@ -254,6 +254,11 @@ static char *build_managed_theme_css(EditorWindow *win) {
     append_theme_define(css, "editor_fg", win->editor_fg_color, "#d4d4d4");
     append_theme_define(css, "editor_gutter_bg", win->editor_gutter_bg_color, "#181a1f");
     append_theme_define(css, "editor_gutter_fg", win->editor_gutter_fg_color, "#8b949e");
+    append_theme_define(css, "note_indicator", win->note_indicator_color, "#f9c74f");
+    append_theme_define(css, "note_indicator_active", win->note_indicator_active_color, "#ffd166");
+    append_theme_define(css, "note_popover_bg", win->note_popover_bg_color, "#181a1f");
+    append_theme_define(css, "note_popover_fg", win->note_popover_fg_color, "#d4d4d4");
+    append_theme_define(css, "note_popover_border", win->note_popover_border_color, "#3a4050");
     append_theme_define(css, "editor_current_line_bg", win->editor_current_line_bg_color, "#20232b");
     append_theme_define(css, "editor_selection_bg", win->editor_selection_bg_color, "#3a405c");
     append_theme_define(css, "editor_selection_fg", win->editor_selection_fg_color, "#ffffff");
@@ -352,11 +357,27 @@ static char *build_managed_theme_css(EditorWindow *win) {
         "  caret-color: @graptos_editor_cursor;\n"
         "}\n\n"
         "sourceview.graptos-editor gutter,\n"
+        ".graptos-gutter,\n"
         "sourceview.graptos-editor gutter * {\n"
         "  background: @graptos_editor_gutter_bg;\n"
         "  background-color: @graptos_editor_gutter_bg;\n"
         "  color: @graptos_editor_gutter_fg;\n"
         "}\n\n"
+        ".graptos-note-popover {\n"
+        "  background: @graptos_note_popover_bg;\n"
+        "  background-color: @graptos_note_popover_bg;\n"
+        "  color: @graptos_note_popover_fg;\n"
+        "  border: 1px solid @graptos_note_popover_border;\n"
+        "}\n"
+        ".graptos-note-popover textview,\n"
+        ".graptos-note-popover textview text,\n"
+        ".graptos-note-popover .graptos-note-input,\n"
+        ".graptos-note-popover .graptos-note-status {\n"
+        "  background: @graptos_note_popover_bg;\n"
+        "  background-color: @graptos_note_popover_bg;\n"
+        "  color: @graptos_note_popover_fg;\n"
+        "}\n\n");
+    g_string_append(css,
         "sourceview.graptos-editor text selection {\n"
         "  background: @graptos_editor_selection_bg;\n"
         "  background-color: @graptos_editor_selection_bg;\n"
@@ -574,6 +595,11 @@ gboolean graptos_theme_css_load_into_window(EditorWindow *win,
     LOAD_THEME_VAR("editor_fg", editor_fg_color);
     LOAD_THEME_VAR("editor_gutter_bg", editor_gutter_bg_color);
     LOAD_THEME_VAR("editor_gutter_fg", editor_gutter_fg_color);
+    LOAD_THEME_VAR("note_indicator", note_indicator_color);
+    LOAD_THEME_VAR("note_indicator_active", note_indicator_active_color);
+    LOAD_THEME_VAR("note_popover_bg", note_popover_bg_color);
+    LOAD_THEME_VAR("note_popover_fg", note_popover_fg_color);
+    LOAD_THEME_VAR("note_popover_border", note_popover_border_color);
     LOAD_THEME_VAR("editor_current_line_bg", editor_current_line_bg_color);
     LOAD_THEME_VAR("editor_selection_bg", editor_selection_bg_color);
     LOAD_THEME_VAR("editor_selection_fg", editor_selection_fg_color);
@@ -803,6 +829,11 @@ void graptos_config_load(EditorWindow *win) {
     load_color(key_file, "foreground_color", &win->editor_fg_color);
     load_color(key_file, "editor_gutter_background_color", &win->editor_gutter_bg_color);
     load_color(key_file, "editor_gutter_foreground_color", &win->editor_gutter_fg_color);
+    load_color(key_file, "note_indicator_color", &win->note_indicator_color);
+    load_color(key_file, "note_indicator_active_color", &win->note_indicator_active_color);
+    load_color(key_file, "note_popover_background_color", &win->note_popover_bg_color);
+    load_color(key_file, "note_popover_foreground_color", &win->note_popover_fg_color);
+    load_color(key_file, "note_popover_border_color", &win->note_popover_border_color);
     load_color(key_file, "editor_current_line_background_color", &win->editor_current_line_bg_color);
     load_color(key_file, "editor_selection_background_color", &win->editor_selection_bg_color);
     load_color(key_file, "editor_selection_foreground_color", &win->editor_selection_fg_color);

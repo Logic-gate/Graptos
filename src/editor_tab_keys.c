@@ -328,6 +328,19 @@ void menu_comment(GtkWidget *w, gpointer data) { (void)w; editor_tab_toggle_comm
  */
 void menu_complete(GtkWidget *w, gpointer data) { (void)w; editor_tab_show_completion(data, TRUE); }
 
+/**
+ * @brief Menu add note.
+ * @details The note popover owns range detection and storage. Keeping this
+ *          callback tiny prevents context menus and shortcuts from drifting
+ *          into separate note creation behavior.
+ * @param w The w supplied by the caller.
+ * @param data The callback context passed by the caller.
+ */
+void menu_add_note(GtkWidget *w, gpointer data) {
+    (void)w;
+    editor_tab_show_add_note(data);
+}
+
 
 /**
  * @brief Tab unit.
@@ -693,6 +706,12 @@ gboolean on_text_view_key_pressed(GtkEventControllerKey *controller,
     guint key = gdk_keyval_to_lower(keyval);
     gboolean alt = (state & GDK_ALT_MASK) != 0;
     gboolean shift = (state & GDK_SHIFT_MASK) != 0;
+    gboolean ctrl = (state & GDK_CONTROL_MASK) != 0;
+
+    if (ctrl && shift && key == GDK_KEY_m) {
+        editor_tab_show_add_note(tab);
+        return TRUE;
+    }
 
     if (alt || keyval == GDK_KEY_Alt_L || keyval == GDK_KEY_Alt_R) {
         tab->inspect_reference_active = TRUE;

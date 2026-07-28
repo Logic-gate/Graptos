@@ -78,7 +78,10 @@ static void gutter_draw_background(GtkWidget *widget, cairo_t *cr,
 static void gutter_draw_line_number(cairo_t *cr, PangoLayout *layout,
                                     gint gutter_width, gint draw_y,
                                     gint line_height, int line_no,
-                                    gboolean current_line) {
+                                    gboolean current_line,
+                                    gboolean has_note,
+                                    const char *note_color,
+                                    const char *active_note_color) {
     if (current_line) {
         cairo_set_source_rgb(cr, 0.145, 0.154, 0.170);
         cairo_rectangle(cr, 0.0, (double)draw_y,
@@ -100,6 +103,18 @@ static void gutter_draw_line_number(cairo_t *cr, PangoLayout *layout,
     else cairo_set_source_rgb(cr, 0.540, 0.565, 0.600);
     cairo_move_to(cr, (double)draw_x, (double)text_y);
     pango_cairo_show_layout(cr, layout);
+    if (has_note) {
+        GdkRGBA rgba;
+        const char *color = current_line && active_note_color
+            ? active_note_color : note_color;
+        if (!gdk_rgba_parse(&rgba, color ? color : "#f9c74f")) {
+            gdk_rgba_parse(&rgba, "#f9c74f");
+        }
+        cairo_set_source_rgba(cr, rgba.red, rgba.green, rgba.blue, rgba.alpha);
+        double cy = (double)draw_y + ((double)line_height / 2.0);
+        cairo_arc(cr, 8.0, cy, 3.0, 0.0, G_PI * 2.0);
+        cairo_fill(cr);
+    }
     g_free(num);
 }
 
@@ -149,8 +164,11 @@ void on_gutter_draw(GtkDrawingArea *area, cairo_t *cr, int draw_width,
         gtk_text_view_get_line_yrange(view, &iter, &y, &line_height);
         if (y > visible.y + visible.height) break;
 
+        gboolean has_note = editor_notes_find_for_line(tab->notes, line_no) != NULL;
         gutter_draw_line_number(cr, layout, width, y - visible.y, line_height,
-                                line_no, line_no == cursor_line);
+                                line_no, line_no == cursor_line, has_note,
+                                tab->win ? tab->win->note_indicator_color : NULL,
+                                tab->win ? tab->win->note_indicator_active_color : NULL);
         if (line_no >= max_line) break;
         if (!gtk_text_iter_forward_line(&iter)) break;
     }
