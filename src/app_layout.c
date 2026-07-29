@@ -318,6 +318,12 @@ static void action_tool_cut(GtkWidget *widget, gpointer user_data) {
  */
 static void action_tool_copy(GtkWidget *widget, gpointer user_data) {
     (void)widget;
+    EditorWindow *win = user_data;
+    if (win && terminal_panel_has_focus(win->terminal_panel) &&
+        terminal_panel_copy_clipboard(win->terminal_panel)) {
+        return;
+    }
+
     EditorTab *tab = tool_current_tab(user_data);
     if (tab) editor_tab_copy_clipboard(tab);
 }
@@ -330,6 +336,12 @@ static void action_tool_copy(GtkWidget *widget, gpointer user_data) {
  */
 static void action_tool_paste(GtkWidget *widget, gpointer user_data) {
     (void)widget;
+    EditorWindow *win = user_data;
+    if (win && terminal_panel_has_focus(win->terminal_panel) &&
+        terminal_panel_paste_clipboard(win->terminal_panel)) {
+        return;
+    }
+
     EditorTab *tab = tool_current_tab(user_data);
     if (tab) editor_tab_paste_clipboard(tab);
 }

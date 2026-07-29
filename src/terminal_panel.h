@@ -73,4 +73,31 @@ void terminal_panel_sync_to_active_file(TerminalPanel *panel);
  */
 void terminal_panel_apply_colors(TerminalPanel *panel);
 
+/**
+ * @brief Return whether a terminal owns keyboard focus.
+ * @details Clipboard actions are routed at the app layer, so the panel exposes
+ *          only this small focus check instead of leaking VTE widgets outward.
+ * @param panel The panel instance affected by the operation.
+ * @return TRUE when the current terminal should receive focused actions.
+ */
+gboolean terminal_panel_has_focus(TerminalPanel *panel);
+
+/**
+ * @brief Copy the current terminal selection.
+ * @details VTE owns terminal selection state and clipboard formatting. This
+ *          wrapper keeps the copy behavior local to the terminal boundary.
+ * @param panel The panel instance affected by the operation.
+ * @return TRUE when a terminal was available to receive the copy request.
+ */
+gboolean terminal_panel_copy_clipboard(TerminalPanel *panel);
+
+/**
+ * @brief Paste clipboard text into the current terminal.
+ * @details VTE performs terminal-safe paste handling itself. The wrapper keeps
+ *          app actions from depending on the terminal widget type.
+ * @param panel The panel instance affected by the operation.
+ * @return TRUE when a terminal was available to receive the paste request.
+ */
+gboolean terminal_panel_paste_clipboard(TerminalPanel *panel);
+
 #endif /* GRAPTOS_TERMINAL_PANEL_H */

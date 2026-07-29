@@ -121,6 +121,23 @@ static void terminal_panel_finish_close_session(TerminalPanel *panel,
                                                 TerminalSession *session);
 
 /**
+ * @brief Handle terminal-local shortcuts.
+ * @details The terminal keeps Ctrl+C for the shell. Clipboard actions use the
+ *          common terminal chords so app shortcuts do not swallow shell input.
+ * @param controller The controller supplied by the caller.
+ * @param keyval The keyval supplied by the caller.
+ * @param keycode The keycode supplied by the caller.
+ * @param state The state supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
+ * @return TRUE when the terminal handled the key.
+ */
+static gboolean terminal_session_key_pressed(GtkEventControllerKey *controller,
+                                             guint keyval,
+                                             guint keycode,
+                                             GdkModifierType state,
+                                             gpointer user_data);
+
+/**
  * @brief Resolve the shell used by the integrated terminal.
  * @details Terminal handling crosses GTK widgets, VTE child processes, and project directories. The comment keeps the lifetime rule visible so closing tabs and shell exits do not race each other.
  * @return The resolved value for the caller, or NULL when no suitable value is available.
@@ -128,6 +145,35 @@ static void terminal_panel_finish_close_session(TerminalPanel *panel,
 static const char *terminal_panel_shell(void) {
     const char *shell = g_getenv("SHELL");
     return (shell && shell[0] != '\0') ? shell : "/bin/sh";
+}
+
+static gboolean terminal_session_key_pressed(GtkEventControllerKey *controller,
+                                             guint keyval,
+                                             guint keycode,
+                                             GdkModifierType state,
+                                             gpointer user_data) {
+    (void)controller;
+    (void)keycode;
+
+    TerminalSession *session = user_data;
+    guint key = gdk_keyval_to_lower(keyval);
+    gboolean ctrl = (state & GDK_CONTROL_MASK) != 0;
+    gboolean shift = (state & GDK_SHIFT_MASK) != 0;
+
+    if (ctrl && shift && key == GDK_KEY_c && session &&
+        session->terminal) {
+        vte_terminal_copy_clipboard_format(VTE_TERMINAL(session->terminal),
+                                           VTE_FORMAT_TEXT);
+        return TRUE;
+    }
+
+    if (ctrl && shift && key == GDK_KEY_v && session &&
+        session->terminal) {
+        vte_terminal_paste_clipboard(VTE_TERMINAL(session->terminal));
+        return TRUE;
+    }
+
+    return FALSE;
 }
 
 /**
@@ -627,6 +673,10 @@ static TerminalSession *terminal_session_new(TerminalPanel *panel,
     vte_terminal_set_scrollback_lines(VTE_TERMINAL(session->terminal), 10000);
     vte_terminal_set_scroll_on_output(VTE_TERMINAL(session->terminal), FALSE);
     vte_terminal_set_scroll_on_keystroke(VTE_TERMINAL(session->terminal), TRUE);
+    GtkEventController *keys = gtk_event_controller_key_new();
+    g_signal_connect(keys, "key-pressed",
+                     G_CALLBACK(terminal_session_key_pressed), session);
+    gtk_widget_add_controller(session->terminal, keys);
     g_signal_connect(session->terminal, "child-exited",
                      G_CALLBACK(terminal_session_child_exited), session);
     terminal_session_apply_colors(session);
@@ -920,6 +970,50 @@ void terminal_panel_apply_colors(TerminalPanel *panel) {
     for (guint i = 0; i < panel->sessions->len; i++) {
         terminal_session_apply_colors(g_ptr_array_index(panel->sessions, i));
     }
+}
+
+/**
+ * @brief Return whether a terminal owns keyboard focus.
+ * @details Toolbar actions are shared by editor and terminal widgets. This check
+ *          lets copy route to VTE only when the user is working in a terminal.
+ * @param panel The panel instance affected by the operation.
+ * @return TRUE when the current terminal should receive focused actions.
+ */
+gboolean terminal_panel_has_focus(TerminalPanel *panel) {
+    TerminalSession *session = terminal_panel_current_session(panel);
+    return session && session->terminal &&
+           gtk_widget_has_focus(session->terminal);
+}
+
+/**
+ * @brief Copy the current terminal selection.
+ * @details VTE owns terminal selection state and clipboard formatting. The
+ *          caller decides whether terminal focus should make this action active.
+ * @param panel The panel instance affected by the operation.
+ * @return TRUE when a terminal was available to receive the copy request.
+ */
+gboolean terminal_panel_copy_clipboard(TerminalPanel *panel) {
+    TerminalSession *session = terminal_panel_current_session(panel);
+    if (!session || !session->terminal) return FALSE;
+
+    vte_terminal_copy_clipboard_format(VTE_TERMINAL(session->terminal),
+                                       VTE_FORMAT_TEXT);
+    return TRUE;
+}
+
+/**
+ * @brief Paste clipboard text into the current terminal.
+ * @details VTE owns paste filtering and bracketed-paste behavior. This wrapper
+ *          lets the app's Paste action stay focused on routing.
+ * @param panel The panel instance affected by the operation.
+ * @return TRUE when a terminal was available to receive the paste request.
+ */
+gboolean terminal_panel_paste_clipboard(TerminalPanel *panel) {
+    TerminalSession *session = terminal_panel_current_session(panel);
+    if (!session || !session->terminal) return FALSE;
+
+    vte_terminal_paste_clipboard(VTE_TERMINAL(session->terminal));
+    return TRUE;
 }
 
 /**
