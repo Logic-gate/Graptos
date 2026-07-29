@@ -1355,7 +1355,9 @@ void maybe_show_color_preview(EditorTab *tab) {
 
                 graptos_source_cancel(&tab->hover_timeout);
                 tab->hover_timeout = g_timeout_add_full(G_PRIORITY_LOW,
-                                                        GRAPTOS_HOVER_DELAY_MS,
+                                                        tab->win && tab->win->hover_delay_ms > 0u
+                                                            ? tab->win->hover_delay_ms
+                                                            : GRAPTOS_HOVER_DELAY_MS,
                                                         hover_timeout_cb,
                                                         tab,
                                                         NULL);

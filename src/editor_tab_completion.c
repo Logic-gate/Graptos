@@ -698,7 +698,7 @@ void completion_add_row(EditorTab *tab, const char *word) {
  */
 void editor_tab_show_completion(EditorTab *tab, gboolean manual) {
     if (!tab || !tab->autocomplete_enabled) return;
-    if (!manual && !editor_tab_live_features_allowed(tab)) return;
+    if (!manual && !editor_tab_auto_completion_allowed(tab)) return;
 
     GtkTextIter prefix_start;
     GtkTextIter cursor;
@@ -779,14 +779,15 @@ void editor_tab_schedule_completion(EditorTab *tab) {
      * touch import-context logic, so keep it for genuinely small buffers only.
      * Manual completion is still available in larger files.
      */
-    if (!editor_tab_live_features_allowed(tab) ||
-        (guint)gtk_text_buffer_get_char_count(tab->buffer) > GRAPTOS_AUTO_COMPLETION_MAX_CHARS) {
+    if (!editor_tab_auto_completion_allowed(tab)) {
         if (tab->completion_popover) graptos_popover_hide(tab->completion_popover);
         return;
     }
 
     tab->completion_timeout = g_timeout_add_full(G_PRIORITY_LOW,
-                                               GRAPTOS_COMPLETION_DELAY_MS,
+                                               tab->win && tab->win->completion_delay_ms > 0u
+                                                   ? tab->win->completion_delay_ms
+                                                   : GRAPTOS_COMPLETION_DELAY_MS,
                                                completion_timeout_cb,
                                                tab,
                                                NULL);

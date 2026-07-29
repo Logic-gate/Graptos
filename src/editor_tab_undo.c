@@ -24,10 +24,13 @@ void clear_stack(GPtrArray *stack) {
  * @param stack The stack supplied by the caller.
  * @param state The state supplied by the caller.
  */
-void push_limited(GPtrArray *stack, char *state) {
+void push_limited(EditorTab *tab, GPtrArray *stack, char *state) {
     if (!stack || !state) return;
+    guint max_states = tab && tab->win && tab->win->max_undo_states > 0u
+        ? tab->win->max_undo_states
+        : GRAPTOS_MAX_UNDO_STATES;
     g_ptr_array_add(stack, state);
-    while (stack->len > GRAPTOS_MAX_UNDO_STATES) g_ptr_array_remove_index(stack, 0);
+    while (stack->len > max_states) g_ptr_array_remove_index(stack, 0);
 }
 
 
@@ -57,7 +60,10 @@ void reset_undo_state(EditorTab *tab) {
     g_free(tab->last_snapshot);
     tab->last_snapshot = NULL;
     if (tab->buffer &&
-        (guint)gtk_text_buffer_get_char_count(tab->buffer) <= GRAPTOS_MAX_UNDO_CAPTURE_BYTES) {
+        (guint)gtk_text_buffer_get_char_count(tab->buffer) <=
+            (tab->win && tab->win->max_undo_capture_bytes > 0u
+                ? tab->win->max_undo_capture_bytes
+                : GRAPTOS_MAX_UNDO_CAPTURE_BYTES)) {
         tab->last_snapshot = buffer_text(tab);
     }
 }
@@ -73,7 +79,7 @@ void editor_tab_undo(EditorTab *tab) {
     char *prev = pop_stack(tab->undo_stack);
     if (!prev) return;
     char *current = buffer_text(tab);
-    push_limited(tab->redo_stack, current);
+    push_limited(tab, tab->redo_stack, current);
     tab->applying_change = TRUE;
     gtk_text_buffer_set_text(tab->buffer, prev, -1);
     tab->applying_change = FALSE;
@@ -100,7 +106,7 @@ void editor_tab_redo(EditorTab *tab) {
     char *next = pop_stack(tab->redo_stack);
     if (!next) return;
     char *current = buffer_text(tab);
-    push_limited(tab->undo_stack, current);
+    push_limited(tab, tab->undo_stack, current);
     tab->applying_change = TRUE;
     gtk_text_buffer_set_text(tab->buffer, next, -1);
     tab->applying_change = FALSE;
@@ -115,4 +121,3 @@ void editor_tab_redo(EditorTab *tab) {
     editor_tab_update_title(tab);
     editor_tab_update_status(tab);
 }
-

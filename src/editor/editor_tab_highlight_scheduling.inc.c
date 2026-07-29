@@ -44,7 +44,9 @@ void editor_tab_schedule_minimap_update(EditorTab *tab) {
     if (!tab || !tab->win || !tab->win->minimap_enabled) return;
     graptos_source_cancel(&tab->minimap_timeout);
     tab->minimap_timeout = g_timeout_add_full(G_PRIORITY_LOW,
-                                              80u,
+                                              tab->win->minimap_delay_ms > 0u
+                                                  ? tab->win->minimap_delay_ms
+                                                  : GRAPTOS_MINIMAP_DELAY_MS,
                                               minimap_timeout_cb,
                                               tab,
                                               NULL);
@@ -90,7 +92,9 @@ void editor_tab_schedule_preview_update(EditorTab *tab) {
         return;
     }
     tab->preview_timeout = g_timeout_add_full(G_PRIORITY_LOW,
-                                             GRAPTOS_PREVIEW_DELAY_MS,
+                                             tab->win->preview_delay_ms > 0u
+                                                 ? tab->win->preview_delay_ms
+                                                 : GRAPTOS_PREVIEW_DELAY_MS,
                                              preview_timeout_cb,
                                              tab,
                                              NULL);
