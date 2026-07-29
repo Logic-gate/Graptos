@@ -316,7 +316,23 @@ void app_window_add_tab(EditorWindow *win, EditorTab *tab, gboolean switch_to_ta
  * @param win The win supplied by the caller.
  * @param tab The editor tab whose buffer or widgets are being inspected.
  */
-void app_window_close_tab(EditorWindow *win, EditorTab *tab);
+gboolean app_window_close_tab(EditorWindow *win, EditorTab *tab);
+/**
+ * @brief Show the tab close context menu.
+ * @details Tab labels are built by editor tabs, but the window owns tab order
+ *          and close policy. Keeping the menu action here prevents duplicate
+ *          notebook ownership rules.
+ * @param win The win supplied by the caller.
+ * @param tab The editor tab whose label was clicked.
+ * @param parent The widget that should own the popover.
+ * @param x The click x coordinate in parent coordinates.
+ * @param y The click y coordinate in parent coordinates.
+ */
+void app_window_show_tab_context_menu(EditorWindow *win,
+                                      EditorTab *tab,
+                                      GtkWidget *parent,
+                                      double x,
+                                      double y);
 /**
  * @brief App window close all tabs.
  * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
