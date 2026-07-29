@@ -81,8 +81,11 @@ gboolean editor_tab_large_file_mode(EditorTab *tab) {
      * Large buffers skip expensive live features so typing and scrolling stay
      * responsive.
      */
+    guint max_chars = tab->win && tab->win->live_feature_max_chars > 0u
+        ? tab->win->live_feature_max_chars
+        : GRAPTOS_LIVE_FEATURE_MAX_CHARS;
     return (guint)gtk_text_buffer_get_char_count(tab->buffer)
-        > GRAPTOS_LIVE_FEATURE_MAX_CHARS;
+        > max_chars;
 }
 /**
  * @brief Editor tab live features allowed.
@@ -93,6 +96,38 @@ gboolean editor_tab_large_file_mode(EditorTab *tab) {
 gboolean editor_tab_live_features_allowed(EditorTab *tab) {
     // Live features are disabled for large files to avoid editor lag.
     return tab && tab->buffer && !editor_tab_large_file_mode(tab);
+}
+
+/**
+ * @brief Editor tab auto completion allowed.
+ * @details Automatic completion is a typing-time feature, so it keeps the
+ *          smaller autocomplete threshold even when other live features are
+ *          allowed for a larger buffer.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @return TRUE when automatic completion may run.
+ */
+gboolean editor_tab_auto_completion_allowed(EditorTab *tab) {
+    if (!tab || !tab->buffer) return FALSE;
+    guint max_chars = tab->win && tab->win->auto_completion_max_chars > 0u
+        ? tab->win->auto_completion_max_chars
+        : GRAPTOS_AUTO_COMPLETION_MAX_CHARS;
+    return (guint)gtk_text_buffer_get_char_count(tab->buffer) <= max_chars;
+}
+
+/**
+ * @brief Editor tab LSP sync allowed.
+ * @details Language servers can remain useful after local live features have
+ *          been reduced. This guard keeps didChange bounded without tying it to
+ *          selection matching, diagnostics, or local completion scanning.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @return TRUE when LSP didChange may be sent.
+ */
+gboolean editor_tab_lsp_sync_allowed(EditorTab *tab) {
+    if (!tab || !tab->buffer) return FALSE;
+    guint max_chars = tab->win && tab->win->lsp_sync_max_chars > 0u
+        ? tab->win->lsp_sync_max_chars
+        : GRAPTOS_LSP_SYNC_MAX_CHARS;
+    return (guint)gtk_text_buffer_get_char_count(tab->buffer) <= max_chars;
 }
 /**
  * @brief Editor tab highlighting allowed.

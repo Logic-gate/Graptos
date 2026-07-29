@@ -139,18 +139,21 @@ void on_buffer_changed(GtkTextBuffer *buffer, gpointer user_data) {
         if (tab->gutter) gtk_widget_queue_draw(tab->gutter);
     }
     tab->last_line_count = line_count;
-    gboolean large_file = (guint)char_count > GRAPTOS_LIVE_FEATURE_MAX_CHARS;
+    gboolean large_file = !editor_tab_live_features_allowed(tab);
 
     /*
      * The snapshot undo implementation copies the buffer, so keep it only for
      * small files.  Large files rely on reduced live work rather than spending
      * time duplicating megabytes of text after each edit.
      */
-    if (!large_file && (guint)char_count <= GRAPTOS_MAX_UNDO_CAPTURE_BYTES) {
+    guint undo_capture_limit = tab->win && tab->win->max_undo_capture_bytes > 0u
+        ? tab->win->max_undo_capture_bytes
+        : GRAPTOS_MAX_UNDO_CAPTURE_BYTES;
+    if (!large_file && (guint)char_count <= undo_capture_limit) {
         char *current = buffer_text(tab);
         if (!current) return;
         if (tab->last_snapshot && strcmp(tab->last_snapshot, current) != 0) {
-            push_limited(tab->undo_stack, tab->last_snapshot);
+            push_limited(tab, tab->undo_stack, tab->last_snapshot);
             tab->last_snapshot = g_strdup(current);
             clear_stack(tab->redo_stack);
         } else if (!tab->last_snapshot) {
@@ -179,6 +182,7 @@ void on_buffer_changed(GtkTextBuffer *buffer, gpointer user_data) {
             tab->diagnostic_warnings = 0u;
             tab->low_latency_mode_active = TRUE;
         }
+        editor_tab_schedule_lsp_change(tab);
         editor_tab_schedule_minimap_update(tab);
         editor_tab_schedule_lightweight_ui_refresh(tab);
         if (!tab->manual_syntax_override && !tab->file_path) editor_tab_auto_select_syntax(tab);
@@ -226,7 +230,7 @@ gboolean lsp_change_timeout_cb(gpointer user_data) {
     if (!tab) return G_SOURCE_REMOVE;
     tab->lsp_change_timeout = 0u;
     if (tab->win && tab->win->lsp_client && tab->file_path &&
-        editor_tab_live_features_allowed(tab)) {
+        editor_tab_lsp_sync_allowed(tab)) {
         lsp_client_document_changed(tab->win->lsp_client, tab);
     }
     return G_SOURCE_REMOVE;
@@ -242,7 +246,7 @@ gboolean lsp_change_timeout_cb(gpointer user_data) {
 void editor_tab_schedule_lsp_change(EditorTab *tab) {
     if (!tab || !tab->win || !tab->win->lsp_client || !tab->file_path) return;
     graptos_source_cancel(&tab->lsp_change_timeout);
-    if (!editor_tab_live_features_allowed(tab)) return;
+    if (!editor_tab_lsp_sync_allowed(tab)) return;
     tab->lsp_change_timeout = g_timeout_add_full(G_PRIORITY_LOW,
                                                  tab->win->lsp_change_delay_ms > 0u
                                                      ? tab->win->lsp_change_delay_ms

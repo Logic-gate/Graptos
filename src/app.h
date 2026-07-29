@@ -25,6 +25,96 @@
 #define GRAPTOS_APP_ID "io.github.graptos.Editor"
 
 /**
+ * @brief Default maximum buffer chars for local live editor features.
+ */
+#define GRAPTOS_DEFAULT_LIVE_FEATURE_MAX_CHARS (32u * 1024u)
+
+/**
+ * @brief Default maximum buffer chars for automatic completion.
+ */
+#define GRAPTOS_DEFAULT_AUTO_COMPLETION_MAX_CHARS (16u * 1024u)
+
+/**
+ * @brief Default maximum buffer chars for LSP document synchronization.
+ */
+#define GRAPTOS_DEFAULT_LSP_SYNC_MAX_CHARS (256u * 1024u)
+
+/**
+ * @brief Default maximum undo snapshots retained per tab.
+ */
+#define GRAPTOS_DEFAULT_MAX_UNDO_STATES 100u
+
+/**
+ * @brief Default maximum chars for full highlighting work.
+ */
+#define GRAPTOS_DEFAULT_FULL_HIGHLIGHT_MAX_CHARS (256u * 1024u)
+
+/**
+ * @brief Default maximum buffer chars copied into undo snapshots.
+ */
+#define GRAPTOS_DEFAULT_MAX_UNDO_CAPTURE_BYTES (32u * 1024u)
+
+/**
+ * @brief Default editor highlight delay in milliseconds.
+ */
+#define GRAPTOS_DEFAULT_HIGHLIGHT_DELAY_MS 180u
+
+/**
+ * @brief Default automatic completion delay in milliseconds.
+ */
+#define GRAPTOS_DEFAULT_COMPLETION_DELAY_MS 900u
+
+/**
+ * @brief Default minimap refresh delay in milliseconds.
+ */
+#define GRAPTOS_DEFAULT_MINIMAP_DELAY_MS 1500u
+
+/**
+ * @brief Default preview refresh delay in milliseconds.
+ */
+#define GRAPTOS_DEFAULT_PREVIEW_DELAY_MS 1500u
+
+/**
+ * @brief Default syntax diagnostics delay in milliseconds.
+ */
+#define GRAPTOS_DEFAULT_DIAGNOSTICS_DELAY_MS 1500u
+
+/**
+ * @brief Default selection match delay in milliseconds.
+ */
+#define GRAPTOS_DEFAULT_SELECTION_MATCH_DELAY_MS 750u
+
+/**
+ * @brief Default color literal delay in milliseconds.
+ */
+#define GRAPTOS_DEFAULT_COLOR_LITERAL_DELAY_MS 350u
+
+/**
+ * @brief Default hover lookup delay in milliseconds.
+ */
+#define GRAPTOS_DEFAULT_HOVER_DELAY_MS 650u
+
+/**
+ * @brief Default maximum chars for syntax diagnostics.
+ */
+#define GRAPTOS_DEFAULT_DIAGNOSTICS_MAX_CHARS GRAPTOS_DEFAULT_LIVE_FEATURE_MAX_CHARS
+
+/**
+ * @brief Default maximum bytes for minimap source extraction.
+ */
+#define GRAPTOS_DEFAULT_MINIMAP_MAX_BYTES (256u * 1024u)
+
+/**
+ * @brief Default maximum chars for selection match scanning.
+ */
+#define GRAPTOS_DEFAULT_SELECTION_MATCH_MAX_CHARS GRAPTOS_DEFAULT_LIVE_FEATURE_MAX_CHARS
+
+/**
+ * @brief Default maximum chars for color literal scanning.
+ */
+#define GRAPTOS_DEFAULT_COLOR_LITERAL_MAX_CHARS GRAPTOS_DEFAULT_LIVE_FEATURE_MAX_CHARS
+
+/**
  * @brief App type definition.
  * @details This is intentionally a large window-owned state object. GTK code is
  *          already callback-heavy; keeping cross-feature state in one owner is
@@ -179,6 +269,24 @@ typedef struct _EditorWindow {
     guint lsp_completion_retry_delay_ms; /**< Delay before retrying empty LSP completion. */
     guint lsp_references_max_results; /**< Maximum LSP reference locations rendered. */
     guint lsp_change_delay_ms; /**< Debounce delay before sending didChange to LSP. */
+    guint live_feature_max_chars; /**< Maximum buffer chars for local live editor work. */
+    guint auto_completion_max_chars; /**< Maximum buffer chars for automatic completion. */
+    guint lsp_sync_max_chars; /**< Maximum buffer chars for LSP didChange sync. */
+    guint max_undo_states; /**< Maximum undo snapshots retained per tab. */
+    guint full_highlight_max_chars; /**< Maximum chars for full highlighting work. */
+    guint max_undo_capture_bytes; /**< Maximum buffer chars copied into undo snapshots. */
+    guint highlight_delay_ms; /**< Delay before applying editor highlight refresh. */
+    guint completion_delay_ms; /**< Delay before automatic completion. */
+    guint minimap_delay_ms; /**< Delay before minimap refresh. */
+    guint preview_delay_ms; /**< Delay before preview refresh. */
+    guint diagnostics_delay_ms; /**< Delay before syntax diagnostics refresh. */
+    guint selection_match_delay_ms; /**< Delay before selection match refresh. */
+    guint color_literal_delay_ms; /**< Delay before color literal refresh. */
+    guint hover_delay_ms; /**< Delay before hover/reference lookup. */
+    guint diagnostics_max_chars; /**< Maximum chars for syntax diagnostics. */
+    guint minimap_max_bytes; /**< Maximum bytes for minimap source extraction. */
+    guint selection_match_max_chars; /**< Maximum chars for selection match scanning. */
+    guint color_literal_max_chars; /**< Maximum chars for color literal scanning. */
     char *project_root; /**< Project root. */
     GPtrArray *project_roots; /**< char*: all open project root. */
     guint project_refresh_timeout; /**< Debounced project tree filesystem refresh source. */
@@ -316,7 +424,23 @@ void app_window_add_tab(EditorWindow *win, EditorTab *tab, gboolean switch_to_ta
  * @param win The win supplied by the caller.
  * @param tab The editor tab whose buffer or widgets are being inspected.
  */
-void app_window_close_tab(EditorWindow *win, EditorTab *tab);
+gboolean app_window_close_tab(EditorWindow *win, EditorTab *tab);
+/**
+ * @brief Show the tab close context menu.
+ * @details Tab labels are built by editor tabs, but the window owns tab order
+ *          and close policy. Keeping the menu action here prevents duplicate
+ *          notebook ownership rules.
+ * @param win The win supplied by the caller.
+ * @param tab The editor tab whose label was clicked.
+ * @param parent The widget that should own the popover.
+ * @param x The click x coordinate in parent coordinates.
+ * @param y The click y coordinate in parent coordinates.
+ */
+void app_window_show_tab_context_menu(EditorWindow *win,
+                                      EditorTab *tab,
+                                      GtkWidget *parent,
+                                      double x,
+                                      double y);
 /**
  * @brief App window close all tabs.
  * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.

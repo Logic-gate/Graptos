@@ -258,9 +258,11 @@ static void schedule_reference_lookup_at_iter(EditorTab *tab,
     /*
      * Delay the lookup slightly so normal mouse movement does not cause constant
      * indexing work.
-     */
+    */
     tab->hover_timeout = g_timeout_add_full(G_PRIORITY_DEFAULT_IDLE,
-                                            120u,
+                                            tab->win && tab->win->hover_delay_ms > 0u
+                                                ? tab->win->hover_delay_ms
+                                                : GRAPTOS_HOVER_DELAY_MS,
                                             hover_timeout_cb,
                                             tab,
                                             NULL);

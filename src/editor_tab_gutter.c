@@ -318,7 +318,10 @@ void update_selection_matches(EditorTab *tab) {
     gtk_text_buffer_remove_tag_by_name(tab->buffer, "graptos-selection-match", &start, &end);
     clear_minimap_matches(tab);
 
-    if ((guint)gtk_text_buffer_get_char_count(tab->buffer) > GRAPTOS_SELECTION_MATCH_MAX_CHARS) {
+    guint selection_match_max = tab->win && tab->win->selection_match_max_chars > 0u
+        ? tab->win->selection_match_max_chars
+        : GRAPTOS_SELECTION_MATCH_MAX_CHARS;
+    if ((guint)gtk_text_buffer_get_char_count(tab->buffer) > selection_match_max) {
         return;
     }
 
@@ -391,7 +394,9 @@ void editor_tab_schedule_selection_matches(EditorTab *tab) {
     }
 
     tab->selection_match_timeout = g_timeout_add_full(G_PRIORITY_LOW,
-                                                     GRAPTOS_SELECTION_MATCH_DELAY_MS,
+                                                     tab->win && tab->win->selection_match_delay_ms > 0u
+                                                         ? tab->win->selection_match_delay_ms
+                                                         : GRAPTOS_SELECTION_MATCH_DELAY_MS,
                                                      selection_match_timeout_cb,
                                                      tab,
                                                      NULL);
@@ -575,7 +580,10 @@ static guint maybe_apply_color_token(EditorTab *tab,
 void update_color_literals(EditorTab *tab) {
     if (!tab || !tab->buffer) return;
     clear_color_literals(tab);
-    if ((guint)gtk_text_buffer_get_char_count(tab->buffer) > GRAPTOS_COLOR_LITERAL_MAX_CHARS) return;
+    guint color_literal_max = tab->win && tab->win->color_literal_max_chars > 0u
+        ? tab->win->color_literal_max_chars
+        : GRAPTOS_COLOR_LITERAL_MAX_CHARS;
+    if ((guint)gtk_text_buffer_get_char_count(tab->buffer) > color_literal_max) return;
 
     GtkTextIter start;
     GtkTextIter end;
@@ -667,7 +675,9 @@ void editor_tab_schedule_color_literals(EditorTab *tab) {
     }
 
     tab->color_literal_timeout = g_timeout_add_full(G_PRIORITY_LOW,
-                                                   GRAPTOS_COLOR_LITERAL_DELAY_MS,
+                                                   tab->win && tab->win->color_literal_delay_ms > 0u
+                                                       ? tab->win->color_literal_delay_ms
+                                                       : GRAPTOS_COLOR_LITERAL_DELAY_MS,
                                                    color_literal_timeout_cb,
                                                    tab,
                                                    NULL);
@@ -762,6 +772,12 @@ void on_minimap_draw(GtkDrawingArea *area, cairo_t *cr, int width,
     (void)area;
     EditorTab *tab = user_data;
     if (!tab || !tab->buffer || width <= 0 || height <= 0) return;
+    guint minimap_max = tab->win && tab->win->minimap_max_bytes > 0u
+        ? tab->win->minimap_max_bytes
+        : GRAPTOS_MINIMAP_MAX_BYTES;
+    if ((guint)gtk_text_buffer_get_char_count(tab->buffer) > minimap_max) {
+        return;
+    }
 
     cairo_set_source_rgb(cr, 0.075, 0.082, 0.094);
     cairo_rectangle(cr, 0.0, 0.0, (double)width, (double)height);

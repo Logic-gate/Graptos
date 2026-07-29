@@ -417,6 +417,30 @@ static void on_tab_label_pressed(GtkGestureClick *gesture,
 }
 
 /**
+ * @brief Handle a secondary click on an editor tab label.
+ * @details Browser-style close actions need notebook ownership, so the editor
+ *          tab only detects the click and delegates the menu to the window.
+ * @param gesture The gesture supplied by the caller.
+ * @param n_press The n press supplied by the caller.
+ * @param x The x supplied by the caller.
+ * @param y The y supplied by the caller.
+ * @param user_data The callback context passed through GTK signal data.
+ */
+static void on_tab_label_right_pressed(GtkGestureClick *gesture,
+                                       int n_press,
+                                       double x,
+                                       double y,
+                                       gpointer user_data) {
+    (void)n_press;
+    EditorTab *tab = user_data;
+    GtkWidget *widget = gtk_event_controller_get_widget(
+        GTK_EVENT_CONTROLLER(gesture));
+    if (!tab || !tab->win || !widget) return;
+    gtk_gesture_set_state(GTK_GESTURE(gesture), GTK_EVENT_SEQUENCE_CLAIMED);
+    app_window_show_tab_context_menu(tab->win, tab, widget, x, y);
+}
+
+/**
  * @brief Tab create tab label.
  * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
  * @param tab The editor tab whose buffer or widgets are being inspected.
@@ -464,6 +488,14 @@ static void tab_create_tab_label(EditorTab *tab) {
                      G_CALLBACK(on_tab_label_pressed), tab);
     gtk_widget_add_controller(tab->tab_widget,
                               GTK_EVENT_CONTROLLER(tab_click));
+
+    GtkGesture *tab_context_click = gtk_gesture_click_new();
+    gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(tab_context_click),
+                                  GDK_BUTTON_SECONDARY);
+    g_signal_connect(tab_context_click, "pressed",
+                     G_CALLBACK(on_tab_label_right_pressed), tab);
+    gtk_widget_add_controller(tab->tab_widget,
+                              GTK_EVENT_CONTROLLER(tab_context_click));
 }
 
 /**

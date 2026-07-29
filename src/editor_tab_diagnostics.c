@@ -574,8 +574,11 @@ void editor_tab_apply_syntax_diagnostics(EditorTab *tab) {
 
     clear_syntax_diagnostics(tab);
 
+    guint diagnostics_max = tab->win && tab->win->diagnostics_max_chars > 0u
+        ? tab->win->diagnostics_max_chars
+        : GRAPTOS_DIAGNOSTICS_MAX_CHARS;
     if (!tab->active_syntax ||
-        (guint)gtk_text_buffer_get_char_count(tab->buffer) > GRAPTOS_DIAGNOSTICS_MAX_CHARS) {
+        (guint)gtk_text_buffer_get_char_count(tab->buffer) > diagnostics_max) {
         editor_tab_schedule_lightweight_ui_refresh(tab);
         return;
     }
@@ -632,7 +635,9 @@ void editor_tab_schedule_syntax_diagnostics(EditorTab *tab) {
         return;
     }
     tab->diagnostics_timeout = g_timeout_add_full(G_PRIORITY_LOW,
-                                                 GRAPTOS_DIAGNOSTICS_DELAY_MS,
+                                                 tab->win && tab->win->diagnostics_delay_ms > 0u
+                                                     ? tab->win->diagnostics_delay_ms
+                                                     : GRAPTOS_DIAGNOSTICS_DELAY_MS,
                                                  diagnostics_timeout_cb,
                                                  tab,
                                                  NULL);

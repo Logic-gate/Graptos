@@ -30,71 +30,75 @@
 /**
  * @brief Graptoς max undo states macro.
  */
-#define GRAPTOS_MAX_UNDO_STATES 100u
+#define GRAPTOS_MAX_UNDO_STATES GRAPTOS_DEFAULT_MAX_UNDO_STATES
 /**
  * @brief Graptoς live feature max chars macro.
  */
-#define GRAPTOS_LIVE_FEATURE_MAX_CHARS (32u * 1024u)
+#define GRAPTOS_LIVE_FEATURE_MAX_CHARS GRAPTOS_DEFAULT_LIVE_FEATURE_MAX_CHARS
 /**
  * @brief Graptoς full highlight max chars macro.
  */
-#define GRAPTOS_FULL_HIGHLIGHT_MAX_CHARS (256u * 1024u)
+#define GRAPTOS_FULL_HIGHLIGHT_MAX_CHARS GRAPTOS_DEFAULT_FULL_HIGHLIGHT_MAX_CHARS
 /**
  * @brief Graptoς max undo capture bytes macro.
  */
-#define GRAPTOS_MAX_UNDO_CAPTURE_BYTES (32u * 1024u)
+#define GRAPTOS_MAX_UNDO_CAPTURE_BYTES GRAPTOS_DEFAULT_MAX_UNDO_CAPTURE_BYTES
 /**
  * @brief Graptoς highlight delay ms macro.
  */
-#define GRAPTOS_HIGHLIGHT_DELAY_MS 180u
+#define GRAPTOS_HIGHLIGHT_DELAY_MS GRAPTOS_DEFAULT_HIGHLIGHT_DELAY_MS
 /**
  * @brief Graptoς completion delay ms macro.
  */
-#define GRAPTOS_COMPLETION_DELAY_MS 900u
+#define GRAPTOS_COMPLETION_DELAY_MS GRAPTOS_DEFAULT_COMPLETION_DELAY_MS
 /**
  * @brief Graptoς minimap delay ms macro.
  */
-#define GRAPTOS_MINIMAP_DELAY_MS 1500u
+#define GRAPTOS_MINIMAP_DELAY_MS GRAPTOS_DEFAULT_MINIMAP_DELAY_MS
 /**
  * @brief Graptoς preview delay ms macro.
  */
-#define GRAPTOS_PREVIEW_DELAY_MS 1500u
+#define GRAPTOS_PREVIEW_DELAY_MS GRAPTOS_DEFAULT_PREVIEW_DELAY_MS
 /**
  * @brief Graptoς diagnostics delay ms macro.
  */
-#define GRAPTOS_DIAGNOSTICS_DELAY_MS 1500u
+#define GRAPTOS_DIAGNOSTICS_DELAY_MS GRAPTOS_DEFAULT_DIAGNOSTICS_DELAY_MS
 /**
  * @brief Graptoς selection match delay ms macro.
  */
-#define GRAPTOS_SELECTION_MATCH_DELAY_MS 750u
+#define GRAPTOS_SELECTION_MATCH_DELAY_MS GRAPTOS_DEFAULT_SELECTION_MATCH_DELAY_MS
 /**
  * @brief Graptoς color literal delay ms macro.
  */
-#define GRAPTOS_COLOR_LITERAL_DELAY_MS 350u
+#define GRAPTOS_COLOR_LITERAL_DELAY_MS GRAPTOS_DEFAULT_COLOR_LITERAL_DELAY_MS
 /**
  * @brief Graptoς hover delay ms macro.
  */
-#define GRAPTOS_HOVER_DELAY_MS 650u
+#define GRAPTOS_HOVER_DELAY_MS GRAPTOS_DEFAULT_HOVER_DELAY_MS
 /**
  * @brief Graptoς diagnostics max chars macro.
  */
-#define GRAPTOS_DIAGNOSTICS_MAX_CHARS GRAPTOS_LIVE_FEATURE_MAX_CHARS
+#define GRAPTOS_DIAGNOSTICS_MAX_CHARS GRAPTOS_DEFAULT_DIAGNOSTICS_MAX_CHARS
 /**
  * @brief Graptoς minimap max bytes macro.
  */
-#define GRAPTOS_MINIMAP_MAX_BYTES (256u * 1024u)
+#define GRAPTOS_MINIMAP_MAX_BYTES GRAPTOS_DEFAULT_MINIMAP_MAX_BYTES
 /**
  * @brief Graptoς selection match max chars macro.
  */
-#define GRAPTOS_SELECTION_MATCH_MAX_CHARS GRAPTOS_LIVE_FEATURE_MAX_CHARS
+#define GRAPTOS_SELECTION_MATCH_MAX_CHARS GRAPTOS_DEFAULT_SELECTION_MATCH_MAX_CHARS
 /**
  * @brief Graptoς color literal max chars macro.
  */
-#define GRAPTOS_COLOR_LITERAL_MAX_CHARS GRAPTOS_LIVE_FEATURE_MAX_CHARS
+#define GRAPTOS_COLOR_LITERAL_MAX_CHARS GRAPTOS_DEFAULT_COLOR_LITERAL_MAX_CHARS
 /**
  * @brief Graptoς auto completion max chars macro.
  */
-#define GRAPTOS_AUTO_COMPLETION_MAX_CHARS (16u * 1024u)
+#define GRAPTOS_AUTO_COMPLETION_MAX_CHARS GRAPTOS_DEFAULT_AUTO_COMPLETION_MAX_CHARS
+/**
+ * @brief Graptoς LSP sync max chars macro.
+ */
+#define GRAPTOS_LSP_SYNC_MAX_CHARS GRAPTOS_DEFAULT_LSP_SYNC_MAX_CHARS
 
 /**
  * @brief Buffer text.
@@ -140,7 +144,7 @@ void clear_stack(GPtrArray *stack);
  * @param stack The stack supplied by the caller.
  * @param state The state supplied by the caller.
  */
-void push_limited(GPtrArray *stack, char *state);
+void push_limited(EditorTab *tab, GPtrArray *stack, char *state);
 /**
  * @brief Pop stack.
  * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
@@ -175,6 +179,23 @@ gboolean editor_tab_large_file_mode(EditorTab *tab);
  * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean editor_tab_live_features_allowed(EditorTab *tab);
+/**
+ * @brief Return whether automatic completion is allowed for a tab.
+ * @details Automatic completion runs while typing, so it uses its own
+ *          configurable guard instead of the broader live-feature threshold.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @return TRUE when automatic completion may run.
+ */
+gboolean editor_tab_auto_completion_allowed(EditorTab *tab);
+/**
+ * @brief Return whether LSP document sync is allowed for a tab.
+ * @details LSP sync can be useful for larger files than local scanning. It has
+ *          a separate configurable threshold so large-file mode does not make
+ *          language servers stale too early.
+ * @param tab The editor tab whose buffer or widgets are being inspected.
+ * @return TRUE when LSP didChange may be sent.
+ */
+gboolean editor_tab_lsp_sync_allowed(EditorTab *tab);
 /**
  * @brief Editor tab highlighting allowed.
  * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
