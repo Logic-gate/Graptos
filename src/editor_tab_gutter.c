@@ -23,6 +23,59 @@ int decimal_digits(int value) {
     return digits;
 }
 
+/**
+ * @brief Log editor scroll state.
+ * @details Scroll callbacks can fire many times in a short burst.  The message
+ *          stays on one line so `graptos debug` output can be filtered by the
+ *          `Scroll:` prefix while still showing adjustment bounds and visible
+ *          editor lines.
+ * @param tab The editor tab whose scroll state is being inspected.
+ * @param adjustment The vertical adjustment that emitted the scroll change.
+ * @param phase Short label for the scroll path being logged.
+ */
+static void debug_log_scroll_state(EditorTab *tab,
+                                   GtkAdjustment *adjustment,
+                                   const char *phase) {
+    if (!tab || !tab->win || !tab->win->debug_mode || !adjustment) return;
+
+    double value = gtk_adjustment_get_value(adjustment);
+    double lower = gtk_adjustment_get_lower(adjustment);
+    double upper = gtk_adjustment_get_upper(adjustment);
+    double page = gtk_adjustment_get_page_size(adjustment);
+    double max = upper - page;
+    double ratio = max > lower ? (value - lower) / (max - lower) : 0.0;
+    if (ratio < 0.0) ratio = 0.0;
+    if (ratio > 1.0) ratio = 1.0;
+
+    gint top_line = -1;
+    gint bottom_line = -1;
+    gint total_lines = tab->buffer ? gtk_text_buffer_get_line_count(tab->buffer) : 0;
+    if (tab->text_view && gtk_widget_get_mapped(tab->text_view)) {
+        GtkTextView *view = GTK_TEXT_VIEW(tab->text_view);
+        GdkRectangle visible;
+        GtkTextIter top;
+        GtkTextIter bottom;
+        gint ignored = 0;
+        gtk_text_view_get_visible_rect(view, &visible);
+        gtk_text_view_get_line_at_y(view, &top, visible.y, &ignored);
+        gtk_text_view_get_line_at_y(view, &bottom, visible.y + visible.height, &ignored);
+        top_line = gtk_text_iter_get_line(&top) + 1;
+        bottom_line = gtk_text_iter_get_line(&bottom) + 1;
+    }
+
+    g_message("Scroll: %s value=%.2f lower=%.2f upper=%.2f page=%.2f ratio=%.3f lines=%d-%d/%d minimap=%d",
+              phase ? phase : "changed",
+              value,
+              lower,
+              upper,
+              page,
+              ratio,
+              top_line,
+              bottom_line,
+              total_lines,
+              tab->minimap_view ? gtk_widget_get_visible(tab->minimap_view) : 0);
+}
+
 
 /**
  * @brief Update gutter width.
@@ -204,6 +257,13 @@ static void sync_minimap_scroll(EditorTab *tab, GtkAdjustment *main_adj) {
     if (ratio < 0.0) ratio = 0.0;
     if (ratio > 1.0) ratio = 1.0;
     gtk_adjustment_set_value(mini_adj, ratio * mini_max);
+    if (tab->win && tab->win->debug_mode) {
+        g_message("Scroll: minimap-sync main=%.2f ratio=%.3f mini=%.2f mini_max=%.2f",
+                  gtk_adjustment_get_value(main_adj),
+                  ratio,
+                  ratio * mini_max,
+                  mini_max);
+    }
 }
 
 /**
@@ -214,6 +274,7 @@ static void sync_minimap_scroll(EditorTab *tab, GtkAdjustment *main_adj) {
  */
 void on_vadjustment_value_changed(GtkAdjustment *adjustment, gpointer user_data) {
     EditorTab *tab = user_data;
+    debug_log_scroll_state(tab, adjustment, "vadjustment");
     if (tab && tab->gutter) gtk_widget_queue_draw(tab->gutter);
     if (tab) {
         sync_minimap_scroll(tab, adjustment);
@@ -699,6 +760,7 @@ void update_minimap_text(EditorTab *tab) {
     if (tab->scrolled) {
         GtkAdjustment *vadj = gtk_scrolled_window_get_vadjustment(
             GTK_SCROLLED_WINDOW(tab->scrolled));
+        debug_log_scroll_state(tab, vadj, "minimap-update");
         sync_minimap_scroll(tab, vadj);
     }
     tab->minimap_updating = FALSE;
@@ -863,5 +925,12 @@ void on_minimap_click(GtkGestureClick *gesture, int n_press, double x,
     if (y < 0.0) y = 0.0;
     if (y > (double)height) y = (double)height;
     guint target = (guint)(((double)lines * y) / (double)height) + 1u;
+    if (tab->win && tab->win->debug_mode) {
+        g_message("Scroll: minimap-click y=%.2f height=%d target_line=%u total_lines=%d",
+                  y,
+                  height,
+                  target,
+                  lines);
+    }
     editor_tab_jump_to_line_internal(tab, target);
 }

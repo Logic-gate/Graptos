@@ -77,7 +77,13 @@ static void tab_create_text_area(EditorTab *tab, EditorWindow *win) {
     gtk_source_view_set_highlight_current_line(GTK_SOURCE_VIEW(tab->text_view), TRUE);
     gtk_source_view_set_auto_indent(GTK_SOURCE_VIEW(tab->text_view), FALSE);
     gtk_source_view_set_indent_on_tab(GTK_SOURCE_VIEW(tab->text_view), FALSE);
-    gtk_source_view_set_smart_backspace(GTK_SOURCE_VIEW(tab->text_view), TRUE);
+    /**
+     * @brief Keep Backspace on the plain GtkTextBuffer path.
+     * @details GtkSourceView smart backspace performs indentation-aware deletion.
+     *          Graptoς already owns indentation behavior, so keeping deletion plain
+     *          removes one hidden code path while typing latency is being measured.
+     */
+    gtk_source_view_set_smart_backspace(GTK_SOURCE_VIEW(tab->text_view), FALSE);
 }
 
 /**
