@@ -220,6 +220,14 @@ EditorWindow *app_window_new(GtkApplication *application) {
     win->tile_tabs = g_ptr_array_new();
     win->locked_paths = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
     win->git_file_status = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+    win->plugins = graptos_plugin_registry_new();
+    if (win->plugins) {
+        g_autoptr(GError) plugin_error = NULL;
+        if (!graptos_plugin_registry_discover(win->plugins, &plugin_error) &&
+            plugin_error) {
+            g_warning("Plugin discovery failed: %s", plugin_error->message);
+        }
+    }
     win->syntaxes = syntax_load_all();
     graptos_config_load(win);
     win->lsp_client = lsp_client_new(win);
@@ -364,6 +372,7 @@ void app_window_free(EditorWindow *win) {
     if (win->tile_tabs) g_ptr_array_free(win->tile_tabs, TRUE);
     if (win->locked_paths) g_hash_table_destroy(win->locked_paths);
     if (win->git_file_status) g_hash_table_destroy(win->git_file_status);
+    graptos_plugin_registry_free(win->plugins);
     g_free(win->status_error_title);
     g_free(win->status_error_detail);
     g_free(win->editor_bg_color);

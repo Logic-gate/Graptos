@@ -1,0 +1,16 @@
+id: example-plugin
+name: Git Blame Example
+version: 1.0
+description: Adds a Git blame action to the editor line context menu.
+graptos_api_version: 1
+enabled: true
+
+permissions:
+  - editor.read
+  - git
+
+contributes:
+  commands:
+    - git-blame-line
+  menus:
+    - editor-line:Git Blame This Line:git-blame-line

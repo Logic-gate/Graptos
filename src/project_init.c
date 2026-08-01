@@ -8,6 +8,7 @@
  */
 
 #include "project_init.h"
+#include "plugin.h"
 
 #include <errno.h>
 #include <glib/gstdio.h>

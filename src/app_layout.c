@@ -890,7 +890,7 @@ static void show_code_tools(GtkWidget *widget, gpointer user_data) {
                                                   "Toggle selected-regex tester popover",
                                                   G_CALLBACK(action_tool_toggle_regex_tester),
                                                   win));
-    tool_panel_append(win, tool_button_new("Diagnostics", "Show loaded syntax definitions", G_CALLBACK(action_syntax_diagnostics), win));
+    tool_panel_append(win, tool_button_new("Diagnostics", "Show diagnostics and file health", G_CALLBACK(action_syntax_diagnostics), win));
     tool_panel_append(win, tool_button_new("Reload Syntax", "Reload YAML syntax definitions", G_CALLBACK(action_reload_syntax), win));
     update_policy_buttons(win);
     tool_panel_show_ready(win);

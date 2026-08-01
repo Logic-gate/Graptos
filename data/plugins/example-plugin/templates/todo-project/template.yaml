@@ -1,0 +1,31 @@
+version: 1
+id: plugin-todo-project
+name: Plugin Todo Project
+description: Example plugin template that creates a small todo project.
+language: Todo List
+
+variables:
+  owner_name:
+    label: Owner name
+    type: text
+    default: ${project_name}
+
+  initialize_git:
+    label: Initialize Git repository
+    type: boolean
+    default: false
+
+files:
+  - path: README.md
+    template: files/README.md
+
+  - path: tasks.todo
+    template: files/tasks.todo
+
+actions:
+  - type: git-init
+    when: initialize_git
+
+open:
+  project: .
+  file: tasks.todo

@@ -271,6 +271,55 @@ static gboolean run_git_args(const char *repo,
     return ok;
 }
 
+char *graptos_git_blame_line(const char *path, guint line) {
+    if (!path || path[0] == '\0' || line == 0u) {
+        return g_strdup("Git blame needs a saved file and a valid line.");
+    }
+
+    g_autofree char *repo = graptos_git_repo_for_path(path);
+    if (!repo) return g_strdup("This file is not inside a Git repository.");
+
+    g_autofree char *canonical_repo = g_canonicalize_filename(repo, NULL);
+    g_autofree char *canonical_path = g_canonicalize_filename(path, NULL);
+    const char *relative_start = NULL;
+    gsize repo_len = canonical_repo ? strlen(canonical_repo) : 0u;
+    if (repo_len > 0u && g_strcmp0(canonical_repo, canonical_path) == 0) {
+        relative_start = ".";
+    } else if (repo_len > 0u &&
+               g_str_has_prefix(canonical_path, canonical_repo) &&
+               canonical_path[repo_len] == G_DIR_SEPARATOR) {
+        relative_start = canonical_path + repo_len + 1u;
+    }
+    if (!relative_start || relative_start[0] == '\0') {
+        return g_strdup("Git blame could not resolve the file inside the repository.");
+    }
+
+    g_autofree char *range = g_strdup_printf("%u,%u", line, line);
+    GraptosGitResult result = {0};
+    (void)run_git_args(repo,
+                       NULL,
+                       &result,
+                       "blame",
+                       "-L",
+                       range,
+                       "--",
+                       relative_start,
+                       NULL);
+
+    char *text = NULL;
+    if (result.exit_code == 0 && result.out && result.out[0] != '\0') {
+        text = g_strdup(result.out);
+    } else if (result.err && result.err[0] != '\0') {
+        text = g_strdup(result.err);
+    } else if (result.message && result.message[0] != '\0') {
+        text = g_strdup(result.message);
+    } else {
+        text = g_strdup("Git blame returned no output.");
+    }
+    git_result_clear(&result);
+    return text;
+}
+
 /**
  * @brief Chomp dup.
  * @details Git actions are user-facing wrappers around command output. The comment keeps the boundary clear between collecting results and presenting them in Graptoς dialogs.
