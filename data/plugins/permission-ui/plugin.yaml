@@ -1,0 +1,15 @@
+id: permission-ui
+name: UI Demo
+version: 1.0
+description: Adds a plugin information dialog through the editor context menu.
+graptos_api_version: 1
+enabled: true
+
+permissions:
+  - ui
+
+contributes:
+  commands:
+    - show-plugin-info
+  menus:
+    - editor-line:Show Plugin Info:show-plugin-info

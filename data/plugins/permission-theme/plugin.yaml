@@ -1,0 +1,13 @@
+id: permission-theme
+name: Theme Pack Demo
+version: 1.0
+description: Contributes a CSS theme directory for future theme-pack loading.
+graptos_api_version: 1
+enabled: true
+
+permissions:
+  - theme
+
+contributes:
+  themes:
+    - themes

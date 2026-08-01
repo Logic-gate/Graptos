@@ -494,6 +494,59 @@ static gboolean plugin_declares_command(GraptosPlugin *plugin,
 }
 
 /**
+ * @brief Return text for one editor line.
+ * @details Demo plugin commands use GtkTextBuffer APIs through Graptoς core,
+ *          not by exposing the buffer to plugin manifests.
+ * @param tab Editor tab.
+ * @param line One-based line number.
+ * @return Newly allocated line text.
+ */
+static char *plugin_editor_line_text(EditorTab *tab, guint line) {
+    if (!tab || !tab->buffer || line == 0u) return g_strdup("");
+    GtkTextIter start;
+    GtkTextIter end;
+    gtk_text_buffer_get_iter_at_line(tab->buffer, &start, (gint)(line - 1u));
+    end = start;
+    if (!gtk_text_iter_ends_line(&end)) gtk_text_iter_forward_to_line_end(&end);
+    return gtk_text_buffer_get_text(tab->buffer, &start, &end, FALSE);
+}
+
+/**
+ * @brief Count whitespace-delimited words.
+ * @param text Text to inspect.
+ * @return Word count.
+ */
+static guint plugin_count_words(const char *text) {
+    guint words = 0u;
+    gboolean in_word = FALSE;
+    for (const char *p = text ? text : ""; *p; p = g_utf8_next_char(p)) {
+        gunichar ch = g_utf8_get_char(p);
+        if (g_unichar_isspace(ch)) {
+            in_word = FALSE;
+        } else if (!in_word) {
+            words++;
+            in_word = TRUE;
+        }
+    }
+    return words;
+}
+
+/**
+ * @brief Insert a section banner above one line.
+ * @param tab Editor tab.
+ * @param line One-based line number.
+ */
+static void plugin_insert_section_banner(EditorTab *tab, guint line) {
+    if (!tab || !tab->buffer || line == 0u) return;
+    const char *comment = tab->active_syntax && tab->active_syntax->line_comment
+        ? tab->active_syntax->line_comment : "#";
+    g_autofree char *banner = g_strdup_printf("%s ---- Section ----\n", comment);
+    GtkTextIter iter;
+    gtk_text_buffer_get_iter_at_line(tab->buffer, &iter, (gint)(line - 1u));
+    gtk_text_buffer_insert(tab->buffer, &iter, banner, -1);
+}
+
+/**
  * @brief Run one declarative editor command.
  * @details V1 command ids are owned by Graptoς. Plugins expose where commands
  *          appear, while execution stays inside reviewed core code until the
@@ -519,6 +572,77 @@ static void plugin_run_editor_command(GraptosPluginEditorMenuAction *action) {
                       "Git Blame",
                       heading,
                       output ? output : "Git blame returned no output.");
+        return;
+    }
+    if (g_strcmp0(action->command, "line-word-count") == 0) {
+        if (!plugin_has_permission(action->plugin, "editor.read")) {
+            dialog_output(tab->win ? app_window_gtk(tab->win) : NULL,
+                          "Plugin Permission",
+                          "Editor Read Permission Required",
+                          "This plugin command requires the editor.read permission.");
+            return;
+        }
+        g_autofree char *text = plugin_editor_line_text(tab, action->line);
+        guint words = plugin_count_words(text);
+        glong chars = g_utf8_strlen(text ? text : "", -1);
+        g_autofree char *body = g_strdup_printf("Line: %u\nWords: %u\nCharacters: %ld\n\n%s",
+                                                action->line,
+                                                words,
+                                                chars,
+                                                text ? text : "");
+        dialog_output(tab->win ? app_window_gtk(tab->win) : NULL,
+                      "Line Word Count",
+                      "Line Word Count",
+                      body);
+        return;
+    }
+    if (g_strcmp0(action->command, "insert-section-banner") == 0) {
+        if (!plugin_has_permission(action->plugin, "editor.write")) {
+            dialog_output(tab->win ? app_window_gtk(tab->win) : NULL,
+                          "Plugin Permission",
+                          "Editor Write Permission Required",
+                          "This plugin command requires the editor.write permission.");
+            return;
+        }
+        plugin_insert_section_banner(tab, action->line);
+        return;
+    }
+    if (g_strcmp0(action->command, "project-summary") == 0) {
+        if (!plugin_has_permission(action->plugin, "project.read")) {
+            dialog_output(tab->win ? app_window_gtk(tab->win) : NULL,
+                          "Plugin Permission",
+                          "Project Read Permission Required",
+                          "This plugin command requires the project.read permission.");
+            return;
+        }
+        guint roots = tab->win && tab->win->project_roots ? tab->win->project_roots->len : 0u;
+        guint tabs = tab->win ? app_window_tab_count(tab->win) : 0u;
+        g_autofree char *body = g_strdup_printf("Project roots: %u\nOpen tabs: %u\nCurrent file: %s",
+                                                roots,
+                                                tabs,
+                                                tab->file_path ? tab->file_path : "Unsaved");
+        dialog_output(tab->win ? app_window_gtk(tab->win) : NULL,
+                      "Project Summary",
+                      "Project Summary",
+                      body);
+        return;
+    }
+    if (g_strcmp0(action->command, "show-plugin-info") == 0) {
+        if (!plugin_has_permission(action->plugin, "ui")) {
+            dialog_output(tab->win ? app_window_gtk(tab->win) : NULL,
+                          "Plugin Permission",
+                          "UI Permission Required",
+                          "This plugin command requires the ui permission.");
+            return;
+        }
+        g_autofree char *body = g_strdup_printf("%s\n\n%s\nVersion: %s",
+                                                action->plugin && action->plugin->name ? action->plugin->name : "Plugin",
+                                                action->plugin && action->plugin->description ? action->plugin->description : "No description.",
+                                                action->plugin && action->plugin->version ? action->plugin->version : "unknown");
+        dialog_output(tab->win ? app_window_gtk(tab->win) : NULL,
+                      "Plugin Info",
+                      "Plugin Info",
+                      body);
         return;
     }
 

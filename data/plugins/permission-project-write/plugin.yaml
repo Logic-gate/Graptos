@@ -1,0 +1,13 @@
+id: permission-project-write
+name: Project Write Demo
+version: 1.0
+description: Demonstrates the project.write permission shape for future scaffolding commands.
+graptos_api_version: 1
+enabled: true
+
+permissions:
+  - project.write
+
+contributes:
+  commands:
+    - create-project-note

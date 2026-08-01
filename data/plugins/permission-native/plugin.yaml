@@ -1,0 +1,14 @@
+id: permission-native
+name: Native ABI Demo
+version: 1.0
+description: Demonstrates the native permission and ABI manifest shape.
+graptos_api_version: 1
+enabled: true
+native: lib/libgraptos_native_demo.so
+
+permissions:
+  - native
+
+contributes:
+  commands:
+    - native-demo-command

@@ -1,0 +1,9 @@
+/* Graptoς plugin theme demo. Theme-pack loading is a planned consumer. */
+@define-color graptos_editor_bg #000000;
+@define-color graptos_editor_fg #e6edf3;
+@define-color graptos_sidebar_bg #050505;
+@define-color graptos_tabbar_bg #050505;
+@define-color graptos_tab_active_bg #111111;
+@define-color graptos_tab_active_border #57cc99;
+@define-color graptos_dialog_bg #0b0b0b;
+@define-color graptos_dialog_fg #e6edf3;
