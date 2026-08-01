@@ -13,6 +13,7 @@
 #include "dialogs.h"
 #include "ui.h"
 #include "project.h"
+#include "plugin.h"
 #include "git.h"
 #include "config.h"
 #include "codex_client.h"

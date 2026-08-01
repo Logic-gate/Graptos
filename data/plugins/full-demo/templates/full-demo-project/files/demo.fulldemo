@@ -1,0 +1,4 @@
+# Full demo plugin project
+INFO Owner: ${owner}
+WARN This is a showcase template
+ERROR This line is only here to demonstrate highlighting

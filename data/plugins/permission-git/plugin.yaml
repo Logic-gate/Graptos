@@ -1,0 +1,16 @@
+id: permission-git
+name: Git Blame Demo
+version: 1.0
+description: Adds Git blame to the right-click editor line menu.
+graptos_api_version: 1
+enabled: false
+
+permissions:
+  - editor.read
+  - git
+
+contributes:
+  commands:
+    - git-blame-line
+  menus:
+    - editor-line:Git Blame This Line:git-blame-line

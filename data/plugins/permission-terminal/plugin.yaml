@@ -1,0 +1,13 @@
+id: permission-terminal
+name: Terminal Demo
+version: 1.0
+description: Demonstrates the terminal permission shape for future terminal-backed commands.
+graptos_api_version: 1
+enabled: false
+
+permissions:
+  - terminal
+
+contributes:
+  commands:
+    - run-current-file-in-terminal

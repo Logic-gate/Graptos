@@ -7,6 +7,7 @@
  */
 
 #include "app_private.h"
+#include "editor_tab_private.h"
 
 #include <pango/pangocairo.h>
 #include <stdlib.h>

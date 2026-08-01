@@ -43,6 +43,16 @@ void graptos_git_refresh_and_rebuild(EditorWindow *win);
  * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 char *graptos_git_repo_for_path(const char *path);
+/**
+ * @brief Return Git blame information for one file line.
+ * @details Plugin and UI callers use this helper instead of spawning Git
+ *          themselves so Graptoς keeps argv-based execution and bounded output
+ *          in one place.
+ * @param path The tracked file path.
+ * @param line One-based line number.
+ * @return Newly allocated blame output, or an explanatory error string.
+ */
+char *graptos_git_blame_line(const char *path, guint line);
 
 /**
  * @brief Action git status.

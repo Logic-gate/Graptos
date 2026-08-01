@@ -1,0 +1,13 @@
+id: permission-template
+name: Template Demo
+version: 1.0
+description: Contributes a tiny project template.
+graptos_api_version: 1
+enabled: false
+
+permissions:
+  - template
+
+contributes:
+  templates:
+    - templates

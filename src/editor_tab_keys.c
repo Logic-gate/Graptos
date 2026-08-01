@@ -699,7 +699,6 @@ gboolean on_text_view_key_pressed(GtkEventControllerKey *controller,
                                   GdkModifierType state,
                                   gpointer user_data) {
     (void)controller;
-    (void)keycode;
     EditorTab *tab = user_data;
     if (!tab) return FALSE;
 
@@ -707,9 +706,31 @@ gboolean on_text_view_key_pressed(GtkEventControllerKey *controller,
     gboolean alt = (state & GDK_ALT_MASK) != 0;
     gboolean shift = (state & GDK_SHIFT_MASK) != 0;
     gboolean ctrl = (state & GDK_CONTROL_MASK) != 0;
+    gboolean debug_typing = tab->win && tab->win->debug_mode;
+
+    /**
+     * @brief Log editor key entry before Graptoς handles it.
+     * @details Normal text keys usually return FALSE here and are inserted by
+     *          GTK afterward. This log shows whether latency starts in our key
+     *          handler or in the later buffer-changed path.
+     */
+    if (debug_typing) {
+        const char *name = gdk_keyval_name(keyval);
+        g_free(tab->last_typing_debug_key);
+        tab->last_typing_debug_key = g_strdup(name ? name : "(unknown)");
+        g_message("Typing: key key=%s keyval=%u keycode=%u ctrl=%d alt=%d shift=%d completion=%d",
+                  name ? name : "(unknown)",
+                  keyval,
+                  keycode,
+                  ctrl,
+                  alt,
+                  shift,
+                  completion_is_visible(tab));
+    }
 
     if (ctrl && shift && key == GDK_KEY_m) {
         editor_tab_show_add_note(tab);
+        if (debug_typing) g_message("Typing: key-handled action=add-note");
         return TRUE;
     }
 
@@ -720,28 +741,51 @@ gboolean on_text_view_key_pressed(GtkEventControllerKey *controller,
     }
 
     if (completion_is_visible(tab)) {
-        if (key == GDK_KEY_Escape) { editor_tab_hide_completion(tab); return TRUE; }
-        if (key == GDK_KEY_Down) { completion_select_delta(tab, 1); return TRUE; }
-        if (key == GDK_KEY_Up) { completion_select_delta(tab, -1); return TRUE; }
+        if (key == GDK_KEY_Escape) {
+            editor_tab_hide_completion(tab);
+            if (debug_typing) g_message("Typing: key-handled action=completion-hide");
+            return TRUE;
+        }
+        if (key == GDK_KEY_Down) {
+            completion_select_delta(tab, 1);
+            if (debug_typing) g_message("Typing: key-handled action=completion-down");
+            return TRUE;
+        }
+        if (key == GDK_KEY_Up) {
+            completion_select_delta(tab, -1);
+            if (debug_typing) g_message("Typing: key-handled action=completion-up");
+            return TRUE;
+        }
         if (key == GDK_KEY_Tab && !shift) {
             completion_accept_selected(tab);
+            if (debug_typing) g_message("Typing: key-handled action=completion-accept");
             return TRUE;
         }
         editor_tab_hide_completion(tab);
     }
 
-    if (handle_close_pair_key(tab, keyval, state)) return TRUE;
+    if (handle_close_pair_key(tab, keyval, state)) {
+        if (debug_typing) g_message("Typing: key-handled action=close-pair");
+        return TRUE;
+    }
     if (key == GDK_KEY_Return || key == GDK_KEY_KP_Enter) {
-        return handle_return_key(tab);
+        gboolean handled = handle_return_key(tab);
+        if (debug_typing) {
+            g_message("Typing: key-handled action=return handled=%d", handled);
+        }
+        return handled;
     }
     if (keyval == GDK_KEY_ISO_Left_Tab || (key == GDK_KEY_Tab && shift)) {
         unindent_selection_or_line(tab);
+        if (debug_typing) g_message("Typing: key-handled action=unindent");
         return TRUE;
     }
     if (key == GDK_KEY_Tab) {
         insert_tab_or_indent(tab);
+        if (debug_typing) g_message("Typing: key-handled action=tab-indent");
         return TRUE;
     }
+    if (debug_typing) g_message("Typing: key-pass-through");
     return FALSE;
 }
 

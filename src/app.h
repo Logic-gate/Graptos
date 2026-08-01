@@ -14,6 +14,8 @@
 #include "editor_tab.h"
 #include "syntax.h"
 
+typedef struct GraptosPluginRegistry GraptosPluginRegistry;
+
 /**
  * @brief Graptoς display name macro.
  */
@@ -302,6 +304,7 @@ typedef struct _EditorWindow {
     struct _LspClient *lsp_client; /**< Optional language server protocol client. */
     struct _CodexPanel *codex_panel; /**< Codex panel. */
     struct _TerminalPanel *terminal_panel; /**< Integrated terminal panel. */
+    GraptosPluginRegistry *plugins; /**< Discovered plugin registry. */
 } EditorWindow;
 
 /**

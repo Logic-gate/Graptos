@@ -301,10 +301,23 @@ void action_reload_syntax(GtkWidget *widget, gpointer user_data) {
  * @param user_data The callback context passed through GTK signal data.
  */
 void action_syntax_diagnostics(GtkWidget *widget, gpointer user_data) {
-    //Should add functional diagnostics. This is just for show.
     (void)widget;
     EditorWindow *win = user_data;
-    char *diag = syntax_diagnostics(win->syntaxes);
-    dialog_info(app_window_gtk(win), "Syntax Diagnostics", diag);
-    g_free(diag);
+    if (!win) return;
+
+    EditorTab *tab = app_window_current_tab(win);
+    if (tab) {
+        g_autofree char *report = editor_tab_build_diagnostics_report(tab);
+        dialog_output(app_window_gtk(win),
+                      "Diagnostics",
+                      "Diagnostics and File Health",
+                      report ? report : "No diagnostics report is available.");
+        return;
+    }
+
+    g_autofree char *diag = syntax_diagnostics(win->syntaxes);
+    dialog_output(app_window_gtk(win),
+                  "Diagnostics",
+                  "Syntax Definitions",
+                  diag ? diag : "No syntax diagnostics are available.");
 }

@@ -79,6 +79,7 @@ struct _EditorTab {
     char *completion_prefix; /**< Completion prefix. */
     char *lsp_completion_retry_key; /**< Active LSP completion retry key. */
     char *hover_word; /**< Hover word. */
+    char *last_typing_debug_key; /**< Last key name shown in typing debug logs. */
     SyntaxDef *active_syntax; /**< Active syntax. */
 
     GPtrArray *undo_stack; /**< char*. */

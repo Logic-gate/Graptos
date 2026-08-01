@@ -1,0 +1,19 @@
+version: 1
+id: full-demo-project
+name: Full Demo Project
+description: Project template contributed by the full demo plugin.
+language: Full Demo Log
+
+variables:
+  owner:
+    label: Owner
+    type: text
+    default: ${project_name}
+
+files:
+  - path: demo.fulldemo
+    template: files/demo.fulldemo
+
+open:
+  project: .
+  file: demo.fulldemo

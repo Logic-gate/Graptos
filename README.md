@@ -1,8 +1,18 @@
+<div align="center">
+
+<img src="data/logos/graptos-logo-dark.png" alt="drawing" width="200"/>
+
+### γραπτός: Grap-Tos; adj, written or inscribed
+
+[![C CI](https://github.com/Logic-gate/Graptos/actions/workflows/c-cpp.yml/badge.svg)](https://github.com/Logic-gate/Graptos/actions/workflows/c-cpp.yml)
+![C](https://img.shields.io/badge/language-C-blue)
+![Open Source Friendly](https://img.shields.io/badge/open--source-friendly-22c55e)
+![Pull Requests Welcome](https://img.shields.io/badge/pull%20requests-welcome-2563eb)
+
+</div>
+
 ![cleaf](https://i.snipboard.io/1oBVMY.jpg) 
 
-# Graptoς _Previously Cleaf_
-
-γραπτός: Grap-Tos; adj, written or inscribed
 
 Graptoς is a small text editor for Linux, written in pure C with GTK 4 and
 GtkSourceView 5. It is still under active development and is not ready for
@@ -476,6 +486,15 @@ extensions: [.log]
 icon: LOG
 index: false
 ```
+
+## Plugins
+
+Graptoς plugins are local folders with a `plugin.yaml` manifest. The plugin
+layer is the boundary between Graptoς internals and extensions: plugins declare
+what they contribute, and Graptoς decides how those contributions are loaded and
+executed. 
+
+See [docs/PLUGINS.md](docs/PLUGINS.md) for more information.
 
 ### AI Policy
 

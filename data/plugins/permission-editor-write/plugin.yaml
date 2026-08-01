@@ -1,0 +1,15 @@
+id: permission-editor-write
+name: Editor Write Demo
+version: 1.0
+description: Adds an action that inserts a section banner above the clicked line.
+graptos_api_version: 1
+enabled: false
+
+permissions:
+  - editor.write
+
+contributes:
+  commands:
+    - insert-section-banner
+  menus:
+    - editor-line:Insert Section Banner:insert-section-banner

@@ -484,6 +484,7 @@ void editor_tab_free(EditorTab *tab) {
     g_free(tab->completion_prefix);
     g_free(tab->lsp_completion_retry_key);
     g_free(tab->hover_word);
+    g_free(tab->last_typing_debug_key);
 
     if (tab->undo_stack) g_ptr_array_free(tab->undo_stack, TRUE);
     if (tab->redo_stack) g_ptr_array_free(tab->redo_stack, TRUE);

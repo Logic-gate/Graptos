@@ -7,6 +7,8 @@
  */
 
 #include "editor_tab_private.h"
+#include "git.h"
+#include "project.h"
 
 /**
  * @brief Editor tab diagnostics type definition.
@@ -545,6 +547,186 @@ EditorDiagnostic *editor_tab_diagnostic_at_iter(EditorTab *tab, GtkTextIter *ite
         }
     }
     return NULL;
+}
+
+/**
+ * @brief Append one on/off report field.
+ * @details Diagnostics reports are plain text by design, so compact helpers keep
+ *          boolean editor state readable without turning the builder into a long
+ *          chain of repeated ternaries.
+ * @param out Report buffer receiving text.
+ * @param label Field label.
+ * @param value Boolean value to render.
+ */
+static void diagnostics_report_append_bool(GString *out,
+                                           const char *label,
+                                           gboolean value) {
+    if (!out || !label) return;
+    g_string_append_printf(out, "%s: %s\n", label, value ? "yes" : "no");
+}
+
+/**
+ * @brief Append one diagnostic entry to the report.
+ * @details Stored diagnostics use character offsets because hover lookups need
+ *          cheap range checks. The report converts those offsets back to
+ *          user-facing line and column numbers at display time.
+ * @param out Report buffer receiving text.
+ * @param tab The editor tab that owns the buffer.
+ * @param diagnostic Diagnostic entry to format.
+ * @param index One-based diagnostic index.
+ */
+static void diagnostics_report_append_entry(GString *out,
+                                            EditorTab *tab,
+                                            EditorDiagnostic *diagnostic,
+                                            guint index) {
+    if (!out || !tab || !tab->buffer || !diagnostic) return;
+
+    GtkTextIter start;
+    GtkTextIter end;
+    gtk_text_buffer_get_iter_at_offset(tab->buffer, &start,
+                                       diagnostic->start_offset);
+    gtk_text_buffer_get_iter_at_offset(tab->buffer, &end,
+                                       diagnostic->end_offset);
+    g_string_append_printf(out,
+                           "%u. Ln %d, Col %d - Ln %d, Col %d: %s\n",
+                           index,
+                           gtk_text_iter_get_line(&start) + 1,
+                           gtk_text_iter_get_line_offset(&start) + 1,
+                           gtk_text_iter_get_line(&end) + 1,
+                           gtk_text_iter_get_line_offset(&end) + 1,
+                           diagnostic->message ? diagnostic->message : "Diagnostic");
+}
+
+/**
+ * @brief Build an active-tab diagnostics report.
+ * @details The report is intentionally cheap. It reads current editor state,
+ *          cached diagnostics, cached Git status, and configured limits without
+ *          refreshing any subsystem or scanning the file contents.
+ * @param tab The editor tab whose health report should be built.
+ * @return Newly allocated report text, or NULL when no tab is available.
+ */
+char *editor_tab_build_diagnostics_report(EditorTab *tab) {
+    if (!tab || !tab->buffer) return NULL;
+
+    EditorWindow *win = tab->win;
+    gint lines = gtk_text_buffer_get_line_count(tab->buffer);
+    gint chars = gtk_text_buffer_get_char_count(tab->buffer);
+    const char *syntax = tab->active_syntax && tab->active_syntax->name
+        ? tab->active_syntax->name : "Plain Text";
+    const char *lsp_command = tab->active_syntax && tab->active_syntax->lsp_command
+        ? tab->active_syntax->lsp_command : NULL;
+    const char *git_status = tab->file_path && win
+        ? graptos_git_status_for_file(win, tab->file_path) : NULL;
+    const char *project_root = tab->file_path && win
+        ? project_root_for_path(win, tab->file_path) : NULL;
+
+    guint live_limit = win && win->live_feature_max_chars > 0u
+        ? win->live_feature_max_chars : GRAPTOS_LIVE_FEATURE_MAX_CHARS;
+    guint lsp_limit = win && win->lsp_sync_max_chars > 0u
+        ? win->lsp_sync_max_chars : GRAPTOS_LSP_SYNC_MAX_CHARS;
+    guint diagnostics_limit = win && win->diagnostics_max_chars > 0u
+        ? win->diagnostics_max_chars : GRAPTOS_DIAGNOSTICS_MAX_CHARS;
+    guint minimap_limit = win && win->minimap_max_bytes > 0u
+        ? win->minimap_max_bytes : GRAPTOS_MINIMAP_MAX_BYTES;
+    guint color_limit = win && win->color_literal_max_chars > 0u
+        ? win->color_literal_max_chars : GRAPTOS_COLOR_LITERAL_MAX_CHARS;
+    guint completion_limit = win && win->auto_completion_max_chars > 0u
+        ? win->auto_completion_max_chars : GRAPTOS_AUTO_COMPLETION_MAX_CHARS;
+    guint undo_limit = win && win->max_undo_capture_bytes > 0u
+        ? win->max_undo_capture_bytes : GRAPTOS_MAX_UNDO_CAPTURE_BYTES;
+
+    GString *out = g_string_new("Diagnostics Health Report\n");
+    g_string_append(out, "=========================\n\n");
+
+    g_string_append(out, "File\n");
+    g_string_append(out, "----\n");
+    g_autofree char *title = editor_tab_basename(tab);
+    g_string_append_printf(out, "Title: %s\n", title ? title : "Untitled");
+    g_string_append_printf(out, "Path: %s\n", tab->file_path ? tab->file_path : "Unsaved");
+    g_string_append_printf(out, "Project root: %s\n", project_root ? project_root : "None");
+    g_string_append_printf(out, "Git status: %s\n", git_status ? git_status : "None cached");
+    diagnostics_report_append_bool(out, "Modified", tab->modified);
+    diagnostics_report_append_bool(out, "Locked", tab->locked);
+    g_string_append_printf(out, "Lines: %d\n", lines);
+    g_string_append_printf(out, "Characters: %d\n", chars);
+    g_string_append_printf(out, "Syntax: %s\n", syntax);
+    g_string_append_printf(out, "Indent: %s, width %u\n\n",
+                           tab->insert_spaces ? "spaces" : "tabs",
+                           tab->tab_width ? tab->tab_width : 4u);
+
+    g_string_append(out, "Diagnostics\n");
+    g_string_append(out, "-----------\n");
+    diagnostics_report_append_bool(out, "Enabled", win ? win->diagnostics_enabled : FALSE);
+    diagnostics_report_append_bool(out, "Active tags", tab->diagnostics_active);
+    g_string_append_printf(out, "Warnings: %u\n", tab->diagnostic_warnings);
+    g_string_append_printf(out, "Stored details: %u\n",
+                           tab->diagnostics ? tab->diagnostics->len : 0u);
+    g_string_append_printf(out, "Source: %s\n\n",
+                           lsp_command && lsp_command[0] != '\0'
+                               ? "Language server"
+                               : "Graptoς syntax checks");
+
+    if (tab->diagnostics && tab->diagnostics->len > 0u) {
+        g_string_append(out, "Warning Details\n");
+        g_string_append(out, "---------------\n");
+        for (guint i = 0u; i < tab->diagnostics->len; i++) {
+            diagnostics_report_append_entry(out,
+                                            tab,
+                                            g_ptr_array_index(tab->diagnostics, i),
+                                            i + 1u);
+        }
+        g_string_append_c(out, '\n');
+    } else {
+        g_string_append(out, "Warning Details\n");
+        g_string_append(out, "---------------\n");
+        g_string_append(out, "No diagnostic details are currently stored.\n\n");
+    }
+
+    g_string_append(out, "Language Server\n");
+    g_string_append(out, "---------------\n");
+    g_string_append_printf(out, "Command: %s\n",
+                           lsp_command && lsp_command[0] != '\0'
+                               ? lsp_command : "None");
+    diagnostics_report_append_bool(out, "Sync allowed", editor_tab_lsp_sync_allowed(tab));
+    g_string_append_printf(out, "Document version: %u\n", tab->lsp_version);
+    g_string_append_printf(out, "Pending didChange timeout: %u\n\n",
+                           tab->lsp_change_timeout);
+
+    g_string_append(out, "Feature Guards\n");
+    g_string_append(out, "--------------\n");
+    diagnostics_report_append_bool(out, "Live features allowed", editor_tab_live_features_allowed(tab));
+    diagnostics_report_append_bool(out, "Low latency mode", tab->low_latency_mode_active);
+    g_string_append_printf(out, "live_feature_max_chars: %u\n", live_limit);
+    g_string_append_printf(out, "diagnostics_max_chars: %u\n", diagnostics_limit);
+    g_string_append_printf(out, "minimap_max_bytes: %u\n", minimap_limit);
+    g_string_append_printf(out, "color_literal_max_chars: %u\n", color_limit);
+    g_string_append_printf(out, "auto_completion_max_chars: %u\n", completion_limit);
+    g_string_append_printf(out, "lsp_sync_max_chars: %u\n", lsp_limit);
+    g_string_append_printf(out, "max_undo_capture_bytes: %u\n\n", undo_limit);
+
+    g_string_append(out, "Editor State\n");
+    g_string_append(out, "------------\n");
+    diagnostics_report_append_bool(out, "Autocomplete enabled", tab->autocomplete_enabled);
+    diagnostics_report_append_bool(out, "Selection matches active", tab->selection_matches_active);
+    diagnostics_report_append_bool(out, "Color literals active", tab->color_literals_active);
+    g_string_append_printf(out, "Notes: %u\n", tab->notes ? tab->notes->len : 0u);
+    g_string_append_printf(out, "Undo states: %u\n",
+                           tab->undo_stack ? tab->undo_stack->len : 0u);
+    g_string_append_printf(out, "Redo states: %u\n\n",
+                           tab->redo_stack ? tab->redo_stack->len : 0u);
+
+    g_string_append(out, "Pending Work\n");
+    g_string_append(out, "------------\n");
+    g_string_append_printf(out, "minimap_timeout: %u\n", tab->minimap_timeout);
+    g_string_append_printf(out, "preview_timeout: %u\n", tab->preview_timeout);
+    g_string_append_printf(out, "selection_match_timeout: %u\n", tab->selection_match_timeout);
+    g_string_append_printf(out, "color_literal_timeout: %u\n", tab->color_literal_timeout);
+    g_string_append_printf(out, "diagnostics_timeout: %u\n", tab->diagnostics_timeout);
+    g_string_append_printf(out, "completion_timeout: %u\n", tab->completion_timeout);
+    g_string_append_printf(out, "lsp_change_timeout: %u\n", tab->lsp_change_timeout);
+    g_string_append_printf(out, "ui_refresh_timeout: %u\n", tab->ui_refresh_timeout);
+
+    return g_string_free(out, FALSE);
 }
 
 /**

@@ -7,6 +7,7 @@
  */
 
 #include "syntax_private.h"
+#include "plugin.h"
 
 #include <errno.h>
 #include <string.h>
@@ -954,6 +955,23 @@ GPtrArray *syntax_load_all_for_roots(GPtrArray *project_roots) {
     }
     load_syntax_dir(syntaxes, local);
     load_syntax_dir(syntaxes, parent_syntax);
+    {
+        GraptosPluginRegistry *plugins = graptos_plugin_registry_new();
+        if (plugins) {
+            if (graptos_plugin_registry_discover(plugins, NULL)) {
+                GPtrArray *plugin_dirs =
+                    graptos_plugin_registry_contribution_dirs(plugins,
+                        GRAPTOS_PLUGIN_CONTRIBUTION_SYNTAX);
+                if (plugin_dirs) {
+                    for (guint i = 0u; i < plugin_dirs->len; i++) {
+                        load_syntax_dir(syntaxes, g_ptr_array_index(plugin_dirs, i));
+                    }
+                    g_ptr_array_free(plugin_dirs, TRUE);
+                }
+            }
+            graptos_plugin_registry_free(plugins);
+        }
+    }
     load_syntax_dir(syntaxes, system);
 
     g_free(cwd);

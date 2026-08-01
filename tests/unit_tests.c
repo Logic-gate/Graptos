@@ -13,6 +13,7 @@
 #include "../src/codex_protocol.h"
 #include "../src/editor_notes.h"
 #include "../src/formatter.h"
+#include "../src/plugin.h"
 #include "../src/project_init.h"
 #include "../src/syntax.h"
 
@@ -813,6 +814,92 @@ static void test_editor_notes_path_collision(void) {
 }
 
 /**
+ * @brief Create a temporary plugin fixture.
+ * @details Plugin parser tests use a real directory because contribution paths
+ *          are resolved relative to the manifest location.
+ * @param manifest The plugin manifest text to write.
+ * @return The temporary plugin directory.
+ */
+static char *test_plugin_dir(const char *manifest) {
+    g_autoptr(GError) error = NULL;
+    char *dir = g_dir_make_tmp("graptos-plugin-XXXXXX", &error);
+    g_assert_no_error(error);
+    g_assert_nonnull(dir);
+    g_autofree char *syntax = g_build_filename(dir, "syntax", NULL);
+    g_autofree char *templates = g_build_filename(dir, "templates", NULL);
+    g_assert_cmpint(g_mkdir_with_parents(syntax, 0755), ==, 0);
+    g_assert_cmpint(g_mkdir_with_parents(templates, 0755), ==, 0);
+    g_autofree char *manifest_path = g_build_filename(dir, "plugin.yaml", NULL);
+    g_assert_true(g_file_set_contents(manifest_path, manifest, -1, &error));
+    g_assert_no_error(error);
+    return dir;
+}
+
+/**
+ * @brief Verifies plugin manifests expose contribution paths.
+ * @details The manifest remains declarative; Graptoς resolves directories only
+ *          after loading so plugin folders can move between user and system
+ *          install locations.
+ */
+static void test_plugin_manifest_contributions(void) {
+    const char *manifest =
+        "id: example.plugin\n"
+        "name: Example Plugin\n"
+        "version: 1.0\n"
+        "description: Test plugin\n"
+        "graptos_api_version: 1\n"
+        "permissions:\n"
+        "  - editor.read\n"
+        "contributes:\n"
+        "  syntaxes:\n"
+        "    - syntax\n"
+        "  templates:\n"
+        "    - templates\n";
+    g_autofree char *dir = test_plugin_dir(manifest);
+    g_autoptr(GError) error = NULL;
+    GraptosPlugin *plugin = graptos_plugin_load_manifest(dir, &error);
+    g_assert_no_error(error);
+    g_assert_nonnull(plugin);
+    g_assert_cmpstr(plugin->id, ==, "example.plugin");
+    g_assert_cmpuint(plugin->permissions->len, ==, 1u);
+    g_assert_cmpuint(plugin->syntax_dirs->len, ==, 1u);
+    g_assert_cmpuint(plugin->template_dirs->len, ==, 1u);
+
+    GraptosPluginRegistry *registry = graptos_plugin_registry_new();
+    g_ptr_array_add(registry->plugins, plugin);
+    GPtrArray *syntax_dirs =
+        graptos_plugin_registry_contribution_dirs(registry,
+            GRAPTOS_PLUGIN_CONTRIBUTION_SYNTAX);
+    g_assert_cmpuint(syntax_dirs->len, ==, 1u);
+    g_assert_true(g_str_has_suffix(g_ptr_array_index(syntax_dirs, 0u), "syntax"));
+
+    g_ptr_array_free(syntax_dirs, TRUE);
+    graptos_plugin_registry_free(registry);
+    test_remove_tree(dir);
+}
+
+/**
+ * @brief Verifies invalid plugin ids are rejected.
+ * @details Plugin ids become directory, config, and permission keys, so the
+ *          parser rejects names that are not stable lowercase identifiers.
+ */
+static void test_plugin_manifest_rejects_invalid_id(void) {
+    const char *manifest =
+        "id: Bad Plugin\n"
+        "name: Bad Plugin\n"
+        "version: 1.0\n"
+        "graptos_api_version: 1\n";
+    g_autofree char *dir = test_plugin_dir(manifest);
+    g_autoptr(GError) error = NULL;
+    GraptosPlugin *plugin = graptos_plugin_load_manifest(dir, &error);
+    g_assert_null(plugin);
+    g_assert_nonnull(error);
+    g_assert_cmpint(error->domain, ==, GRAPTOS_PLUGIN_ERROR);
+    g_assert_cmpint(error->code, ==, GRAPTOS_PLUGIN_ERROR_INVALID_ID);
+    test_remove_tree(dir);
+}
+
+/**
  * @brief Registers and runs the unit test suite.
  *
  * @param argc Command-line argument count supplied by the test runner.
@@ -821,6 +908,7 @@ static void test_editor_notes_path_collision(void) {
  */
 int main(int argc, char **argv) {
     g_test_init(&argc, &argv, NULL);
+    g_setenv("GRAPTOS_DISABLE_PLUGINS", "1", TRUE);
     g_test_add_func("/codex/protocol/request_round_trip", test_codex_protocol_request_round_trip);
     g_test_add_func("/codex/protocol/rejects_invalid_json", test_codex_protocol_rejects_invalid_json);
     g_test_add_func("/syntax/diagnostics/empty", test_syntax_diagnostics_empty);
@@ -848,5 +936,7 @@ int main(int argc, char **argv) {
     g_test_add_func("/project-init/templates/languages", test_project_init_language_templates);
     g_test_add_func("/editor-notes/round-trip", test_editor_notes_round_trip);
     g_test_add_func("/editor-notes/path-collision", test_editor_notes_path_collision);
+    g_test_add_func("/plugin/manifest/contributions", test_plugin_manifest_contributions);
+    g_test_add_func("/plugin/manifest/rejects-invalid-id", test_plugin_manifest_rejects_invalid_id);
     return g_test_run();
 }

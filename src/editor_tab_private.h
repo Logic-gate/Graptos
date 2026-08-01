@@ -17,6 +17,7 @@
 #include "import_complete.h"
 #include "editor_notes.h"
 #include "lsp_client.h"
+#include "plugin.h"
 #include "ui.h"
 
 #include <errno.h>
@@ -663,6 +664,15 @@ void editor_diagnostic_free(gpointer data);
  * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 EditorDiagnostic *editor_tab_diagnostic_at_iter(EditorTab *tab, GtkTextIter *iter);
+/**
+ * @brief Build an active-tab diagnostics report.
+ * @details The report uses cached editor, Git, LSP, and diagnostic state. It
+ *          must not refresh Git, start language servers, or scan the whole file
+ *          beyond cheap GtkTextBuffer counters.
+ * @param tab The editor tab whose health report should be built.
+ * @return Newly allocated report text, or NULL when no tab is available.
+ */
+char *editor_tab_build_diagnostics_report(EditorTab *tab);
 /**
  * @brief Show diagnostic hover at an iterator.
  * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.

@@ -1,0 +1,40 @@
+id: full-demo
+name: Full Demo Plugin
+version: 1.0
+description: Shows every current permission in one manifest.
+graptos_api_version: 1
+enabled: false
+native: lib/libgraptos_full_demo.so
+
+permissions:
+  - editor.read
+  - editor.write
+  - project.read
+  - project.write
+  - ui
+  - syntax
+  - theme
+  - template
+  - git
+  - terminal
+  - command
+  - native
+
+contributes:
+  syntaxes:
+    - syntax
+  themes:
+    - themes
+  templates:
+    - templates
+  commands:
+    - show-plugin-info
+    - line-word-count
+    - insert-section-banner
+    - project-summary
+    - git-blame-line
+    - run-current-file-in-terminal
+    - run-external-formatter
+    - native-demo-command
+  menus:
+    - editor-line:Full Demo Info:show-plugin-info

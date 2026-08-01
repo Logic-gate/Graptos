@@ -112,6 +112,7 @@ on_text_view_right_click(GtkGestureClick *gesture,
     GtkWidget *popover;
     GtkWidget *box;
     GdkRectangle rect;
+    guint clicked_line = 0u;
 
     (void)n_press;
 
@@ -160,6 +161,23 @@ on_text_view_right_click(GtkGestureClick *gesture,
 
     box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
     graptos_set_all_margins(box, 6);
+
+    if (GTK_IS_TEXT_VIEW(widget)) {
+        int buffer_x = 0;
+        int buffer_y = 0;
+        GtkTextIter iter;
+        gtk_text_view_window_to_buffer_coords(GTK_TEXT_VIEW(widget),
+                                              GTK_TEXT_WINDOW_WIDGET,
+                                              (int)x,
+                                              (int)y,
+                                              &buffer_x,
+                                              &buffer_y);
+        gtk_text_view_get_iter_at_location(GTK_TEXT_VIEW(widget),
+                                           &iter,
+                                           buffer_x,
+                                           buffer_y);
+        clicked_line = (guint)gtk_text_iter_get_line(&iter) + 1u;
+    }
 
     gtk_box_append(GTK_BOX(box),
                    context_button(tab,
@@ -215,6 +233,13 @@ on_text_view_right_click(GtkGestureClick *gesture,
                    context_button(tab,
                                   "Add Note",
                                   G_CALLBACK(menu_add_note)));
+    if (tab->win && tab->win->plugins) {
+        graptos_plugin_append_editor_context_items(tab->win->plugins,
+                                                   tab,
+                                                   box,
+                                                   popover,
+                                                   clicked_line);
+    }
 
     /*
      * Use the click position as a tiny target rectangle so the popover opens

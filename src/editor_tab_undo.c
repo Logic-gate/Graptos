@@ -50,7 +50,9 @@ char *pop_stack(GPtrArray *stack) {
 
 /**
  * @brief Reset undo state.
- * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
+ * @details The snapshot stack is useful for small buffers, but every snapshot is
+ *          a full text copy.  Reset keeps the first snapshot only while the
+ *          configured guard says that cost is still acceptable.
  * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 void reset_undo_state(EditorTab *tab) {

@@ -1,6 +1,6 @@
 APP_NAME := graptos
 APP_ID := io.github.graptos.Editor
-VERSION := 0.23.68
+VERSION := 0.23.73
 PREFIX ?= /usr/local
 CC ?= cc
 BUILD_DIR := build
@@ -44,6 +44,7 @@ SOURCES := \
 	$(SRC_DIR)/project_init.c \
 	$(SRC_DIR)/project_init_ui.c \
 	$(SRC_DIR)/project_search.c \
+	$(SRC_DIR)/plugin.c \
 	$(SRC_DIR)/git.c \
 	$(SRC_DIR)/codex_protocol.c \
 	$(SRC_DIR)/codex_client.c \
@@ -89,7 +90,7 @@ else
 $(error GtkSourceView 5 is required but not detected. Install gtksourceview-5 development files.)
 endif
 
-GTK_PKG := gtk4 gtksourceview-5 json-glib-1.0 vte-2.91-gtk4
+GTK_PKG := gtk4 gtksourceview-5 json-glib-1.0 vte-2.91-gtk4 gmodule-2.0
 GTK_CFLAGS := $(shell $(PKG_CONFIG) --cflags $(GTK_PKG))
 GTK_SYSTEM_CFLAGS := $(foreach flag,$(GTK_CFLAGS),$(if $(filter -I%,$(flag)),-isystem $(patsubst -I%,%,$(flag)),$(flag)))
 GTK_LIBS := $(shell $(PKG_CONFIG) --libs $(GTK_PKG))
@@ -129,8 +130,8 @@ check: $(VERSION_HEADER)
 test: $(BUILD_DIR)/unit_tests
 	$<
 
-$(BUILD_DIR)/unit_tests: $(TEST_DIR)/unit_tests.c $(SRC_DIR)/codex_protocol.c $(SRC_DIR)/syntax_diagnostics.c $(SRC_DIR)/project_init.c $(SRC_DIR)/formatter.c $(SRC_DIR)/formatter_lexer.c $(SRC_DIR)/formatter_layout.c $(SRC_DIR)/formatter_spacing.c $(SRC_DIR)/formatter_scope.c $(SRC_DIR)/syntax.c $(SRC_DIR)/editor_notes.c | $(BUILD_DIR)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARNINGS) $(GTK_SYSTEM_CFLAGS) -std=c11 $^ $(GTK_LIBS) -o $@
+$(BUILD_DIR)/unit_tests: $(TEST_DIR)/unit_tests.c $(SRC_DIR)/codex_protocol.c $(SRC_DIR)/syntax_diagnostics.c $(SRC_DIR)/project_init.c $(SRC_DIR)/formatter.c $(SRC_DIR)/formatter_lexer.c $(SRC_DIR)/formatter_layout.c $(SRC_DIR)/formatter_spacing.c $(SRC_DIR)/formatter_scope.c $(SRC_DIR)/syntax.c $(SRC_DIR)/editor_notes.c $(SRC_DIR)/plugin.c | $(BUILD_DIR)
+	$(CC) $(CPPFLAGS) -DGRAPTOS_PLUGIN_NO_UI $(CFLAGS) $(WARNINGS) $(GTK_SYSTEM_CFLAGS) -std=c11 $^ $(GTK_LIBS) -o $@
 
 smoke-test: $(BUILD_DIR)/smoke_window
 	$<
@@ -160,6 +161,10 @@ install: $(BUILD_DIR)/$(APP_NAME)
 	cp -R data/fonts/Inconsolata/. $(DESTDIR)$(DATADIR)/fonts/Inconsolata/
 	install -d $(DESTDIR)$(DATADIR)/project-templates
 	cp -R data/project-templates/. $(DESTDIR)$(DATADIR)/project-templates/
+	@if [ -d data/plugins ]; then \
+		install -d $(DESTDIR)$(DATADIR)/plugins; \
+		cp -R data/plugins/. $(DESTDIR)$(DATADIR)/plugins/; \
+	fi
 	install -Dm644 data/$(APP_ID).desktop $(DESTDIR)$(PREFIX)/share/applications/$(APP_ID).desktop
 
 uninstall:

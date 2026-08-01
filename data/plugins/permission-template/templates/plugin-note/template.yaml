@@ -1,0 +1,19 @@
+version: 1
+id: plugin-note
+name: Plugin Note
+description: Minimal template contributed by a plugin.
+language: Text
+
+variables:
+  note_title:
+    label: Note title
+    type: text
+    default: ${project_name}
+
+files:
+  - path: README.md
+    template: files/README.md
+
+open:
+  project: .
+  file: README.md

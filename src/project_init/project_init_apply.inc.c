@@ -199,6 +199,26 @@ GPtrArray *graptos_project_init_discover_templates(GError **error) {
     g_autofree char *user = g_build_filename(g_get_user_config_dir(), "graptos", "project-templates", NULL);
     discover_from_root(templates, by_id, builtin, GRAPTOS_PROJECT_TEMPLATE_BUILTIN);
     discover_from_root(templates, by_id, "data/project-templates", GRAPTOS_PROJECT_TEMPLATE_BUILTIN);
+    {
+        GraptosPluginRegistry *plugins = graptos_plugin_registry_new();
+        if (plugins) {
+            if (graptos_plugin_registry_discover(plugins, NULL)) {
+                GPtrArray *plugin_dirs =
+                    graptos_plugin_registry_contribution_dirs(plugins,
+                        GRAPTOS_PLUGIN_CONTRIBUTION_TEMPLATE);
+                if (plugin_dirs) {
+                    for (guint i = 0u; i < plugin_dirs->len; i++) {
+                        discover_from_root(templates,
+                                           by_id,
+                                           g_ptr_array_index(plugin_dirs, i),
+                                           GRAPTOS_PROJECT_TEMPLATE_PLUGIN);
+                    }
+                    g_ptr_array_free(plugin_dirs, TRUE);
+                }
+            }
+            graptos_plugin_registry_free(plugins);
+        }
+    }
     discover_from_root(templates, by_id, user, GRAPTOS_PROJECT_TEMPLATE_USER);
     return templates;
 }
