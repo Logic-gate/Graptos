@@ -1,6 +1,6 @@
 <div align="center">
 
-![graptos](data/logos/graptos-logo-dark.png)
+<img src="data/logos/graptos-logo-dark.png" alt="drawing" width="200"/>
 
 ### γραπτός: Grap-Tos; adj, written or inscribed
 
