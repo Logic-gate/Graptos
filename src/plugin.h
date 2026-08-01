@@ -63,6 +63,7 @@ typedef struct {
     GPtrArray *commands; /**< char*. */
     GPtrArray *menus; /**< char*. */
     gpointer native_handle; /**< Private GModule handle. */
+    GHashTable *native_commands; /**< char* to native command handler. */
 } GraptosPlugin;
 
 /**
@@ -154,5 +155,19 @@ void graptos_plugin_append_editor_context_items(GraptosPluginRegistry *registry,
                                                 GtkWidget *menu_box,
                                                 GtkWidget *popover,
                                                 guint line);
+/**
+ * @brief Append plugin editor tool panel items.
+ * @details Tool panel rows reuse declarative editor-line menu entries, but run
+ *          them against the active cursor line instead of a right-click line.
+ * @param registry Plugin registry to inspect.
+ * @param tab Active editor tab.
+ * @param box Tool panel box receiving button widgets.
+ * @param line One-based active editor line.
+ * @return Number of plugin command rows appended.
+ */
+guint graptos_plugin_append_editor_tool_items(GraptosPluginRegistry *registry,
+                                              EditorTab *tab,
+                                              GtkWidget *box,
+                                              guint line);
 
 #endif /* GRAPTOS_PLUGIN_H */

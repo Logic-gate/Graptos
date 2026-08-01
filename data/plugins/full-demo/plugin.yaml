@@ -3,7 +3,7 @@ name: Full Demo Plugin
 version: 1.0
 description: Shows every current permission in one manifest.
 graptos_api_version: 1
-enabled: true
+enabled: false
 native: lib/libgraptos_full_demo.so
 
 permissions:

@@ -227,6 +227,11 @@ EditorWindow *app_window_new(GtkApplication *application) {
             plugin_error) {
             g_warning("Plugin discovery failed: %s", plugin_error->message);
         }
+        g_clear_error(&plugin_error);
+        if (!graptos_plugin_registry_load_native(win->plugins, &plugin_error) &&
+            plugin_error) {
+            g_warning("Native plugin loading failed: %s", plugin_error->message);
+        }
     }
     win->syntaxes = syntax_load_all();
     graptos_config_load(win);

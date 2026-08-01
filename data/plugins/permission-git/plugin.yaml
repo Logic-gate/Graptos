@@ -3,7 +3,7 @@ name: Git Blame Demo
 version: 1.0
 description: Adds Git blame to the right-click editor line menu.
 graptos_api_version: 1
-enabled: true
+enabled: false
 
 permissions:
   - editor.read

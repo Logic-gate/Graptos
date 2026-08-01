@@ -3,7 +3,7 @@ name: Project Read Demo
 version: 1.0
 description: Shows a small project summary without writing files.
 graptos_api_version: 1
-enabled: true
+enabled: false
 
 permissions:
   - project.read

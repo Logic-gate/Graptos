@@ -1,6 +1,6 @@
 APP_NAME := graptos
 APP_ID := io.github.graptos.Editor
-VERSION := 0.23.69
+VERSION := 0.23.73
 PREFIX ?= /usr/local
 CC ?= cc
 BUILD_DIR := build

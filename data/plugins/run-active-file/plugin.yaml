@@ -1,0 +1,13 @@
+id: run-active-file
+name: Run Active File
+version: 1.0
+description: Runs the active file with a simple extension-based native command.
+graptos_api_version: 1
+enabled: true
+native: lib/libgraptos_run_active_file.so
+
+permissions:
+  - native
+  - editor.read
+  - command
+  - ui

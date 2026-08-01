@@ -34,6 +34,42 @@ struct _GraptosPluginHost {
     GraptosPlugin *plugin; /**< Plugin currently registering native code. */
 };
 
+/**
+ * @brief Plugin command execution context.
+ */
+struct _GraptosPluginCommandContext {
+    GraptosPlugin *plugin; /**< Plugin that owns the command. */
+    EditorTab *tab; /**< Editor tab receiving the command. */
+    const char *command; /**< Command id being executed. */
+    guint line; /**< One-based target line. */
+};
+
+/**
+ * @brief Registered native command handler.
+ */
+typedef struct {
+    GraptosPlugin *plugin; /**< Plugin that owns the handler. */
+    char *command; /**< Command id. */
+    char *label; /**< Optional visible command label. */
+    GraptosPluginCommandFunc callback; /**< Native command callback. */
+    gpointer user_data; /**< Plugin-owned callback data. */
+    GraptosPluginDestroyFunc destroy; /**< Optional user data destroy hook. */
+    gboolean editor_line; /**< TRUE when shown in editor line command surfaces. */
+} GraptosNativeCommand;
+
+/**
+ * @brief Free a native command handler.
+ * @param data Native command handler.
+ */
+static void native_command_free(gpointer data) {
+    GraptosNativeCommand *command = data;
+    if (!command) return;
+    if (command->destroy) command->destroy(command->user_data);
+    g_free(command->command);
+    g_free(command->label);
+    g_free(command);
+}
+
 GQuark graptos_plugin_error_quark(void) {
     return g_quark_from_static_string("graptos-plugin-error-quark");
 }
@@ -45,6 +81,81 @@ guint graptos_plugin_host_api_version(GraptosPluginHost *host) {
 
 const char *graptos_plugin_host_plugin_id(GraptosPluginHost *host) {
     return host && host->plugin ? host->plugin->id : NULL;
+}
+
+/**
+ * @brief Register a native command implementation.
+ * @details Native plugins own their command ids. YAML still owns the trust
+ *          boundary by deciding which plugins can load native code.
+ * @param host The host capability object supplied by Graptoς.
+ * @param command_id Native command id.
+ * @param label Optional visible label.
+ * @param editor_line TRUE when shown in editor line command surfaces.
+ * @param callback Native command callback.
+ * @param user_data Plugin data passed to callback.
+ * @param destroy Optional destroy callback.
+ * @return TRUE when registration succeeds.
+ */
+static gboolean plugin_register_native_command(GraptosPluginHost *host,
+                                               const char *command_id,
+                                               const char *label,
+                                               gboolean editor_line,
+                                               GraptosPluginCommandFunc callback,
+                                               gpointer user_data,
+                                               GraptosPluginDestroyFunc destroy) {
+    if (!host || !host->plugin || !command_id || !command_id[0] ||
+        !callback) {
+        return FALSE;
+    }
+    GraptosPlugin *plugin = host->plugin;
+    if (!plugin->native_commands) {
+        plugin->native_commands = g_hash_table_new_full(g_str_hash,
+                                                        g_str_equal,
+                                                        g_free,
+                                                        native_command_free);
+    }
+    GraptosNativeCommand *command = g_new0(GraptosNativeCommand, 1);
+    if (!command) return FALSE;
+    command->plugin = plugin;
+    command->command = g_strdup(command_id);
+    command->label = label && label[0] ? g_strdup(label) : NULL;
+    command->callback = callback;
+    command->user_data = user_data;
+    command->destroy = destroy;
+    command->editor_line = editor_line;
+    g_hash_table_replace(plugin->native_commands,
+                         g_strdup(command_id),
+                         command);
+    return TRUE;
+}
+
+gboolean graptos_plugin_host_register_command(GraptosPluginHost *host,
+                                              const char *command_id,
+                                              GraptosPluginCommandFunc callback,
+                                              gpointer user_data,
+                                              GraptosPluginDestroyFunc destroy) {
+    return plugin_register_native_command(host,
+                                          command_id,
+                                          NULL,
+                                          FALSE,
+                                          callback,
+                                          user_data,
+                                          destroy);
+}
+
+gboolean graptos_plugin_host_register_editor_line_command(GraptosPluginHost *host,
+                                                          const char *command_id,
+                                                          const char *label,
+                                                          GraptosPluginCommandFunc callback,
+                                                          gpointer user_data,
+                                                          GraptosPluginDestroyFunc destroy) {
+    return plugin_register_native_command(host,
+                                          command_id,
+                                          label,
+                                          TRUE,
+                                          callback,
+                                          user_data,
+                                          destroy);
 }
 
 /**
@@ -158,6 +269,10 @@ static GraptosPlugin *plugin_new(void) {
     plugin->snippet_dirs = g_ptr_array_new_with_free_func(g_free);
     plugin->commands = g_ptr_array_new_with_free_func(g_free);
     plugin->menus = g_ptr_array_new_with_free_func(g_free);
+    plugin->native_commands = g_hash_table_new_full(g_str_hash,
+                                                    g_str_equal,
+                                                    g_free,
+                                                    native_command_free);
     return plugin;
 }
 
@@ -177,6 +292,7 @@ void graptos_plugin_free(GraptosPlugin *plugin) {
     if (plugin->snippet_dirs) g_ptr_array_free(plugin->snippet_dirs, TRUE);
     if (plugin->commands) g_ptr_array_free(plugin->commands, TRUE);
     if (plugin->menus) g_ptr_array_free(plugin->menus, TRUE);
+    if (plugin->native_commands) g_hash_table_destroy(plugin->native_commands);
     g_free(plugin);
 }
 
@@ -511,6 +627,113 @@ static char *plugin_editor_line_text(EditorTab *tab, guint line) {
     return gtk_text_buffer_get_text(tab->buffer, &start, &end, FALSE);
 }
 
+const char *graptos_plugin_context_plugin_id(GraptosPluginCommandContext *context) {
+    return context && context->plugin ? context->plugin->id : NULL;
+}
+
+const char *graptos_plugin_context_command_id(GraptosPluginCommandContext *context) {
+    return context ? context->command : NULL;
+}
+
+guint graptos_plugin_context_line(GraptosPluginCommandContext *context) {
+    return context ? context->line : 0u;
+}
+
+char *graptos_plugin_context_file_path(GraptosPluginCommandContext *context) {
+    if (!context || !context->tab || !context->tab->file_path) return NULL;
+    return g_strdup(context->tab->file_path);
+}
+
+char *graptos_plugin_context_text(GraptosPluginCommandContext *context) {
+    if (!context || !context->tab || !context->tab->buffer) return g_strdup("");
+    GtkTextIter start;
+    GtkTextIter end;
+    gtk_text_buffer_get_bounds(context->tab->buffer, &start, &end);
+    return gtk_text_buffer_get_text(context->tab->buffer, &start, &end, FALSE);
+}
+
+char *graptos_plugin_context_selection(GraptosPluginCommandContext *context) {
+    if (!context || !context->tab || !context->tab->buffer) return g_strdup("");
+    GtkTextIter start;
+    GtkTextIter end;
+    if (!gtk_text_buffer_get_selection_bounds(context->tab->buffer,
+                                              &start,
+                                              &end)) {
+        return g_strdup("");
+    }
+    return gtk_text_buffer_get_text(context->tab->buffer, &start, &end, FALSE);
+}
+
+char *graptos_plugin_context_line_text(GraptosPluginCommandContext *context,
+                                       guint line) {
+    if (!context) return g_strdup("");
+    return plugin_editor_line_text(context->tab, line);
+}
+
+gboolean graptos_plugin_context_insert_text(GraptosPluginCommandContext *context,
+                                            const char *text) {
+    if (!context || !context->tab || !context->tab->buffer || !text) return FALSE;
+    gtk_text_buffer_insert_at_cursor(context->tab->buffer, text, -1);
+    return TRUE;
+}
+
+gboolean graptos_plugin_context_replace_selection(GraptosPluginCommandContext *context,
+                                                  const char *text) {
+    if (!context || !context->tab || !context->tab->buffer || !text) return FALSE;
+    GtkTextIter start;
+    GtkTextIter end;
+    if (gtk_text_buffer_get_selection_bounds(context->tab->buffer,
+                                             &start,
+                                             &end)) {
+        gtk_text_buffer_delete(context->tab->buffer, &start, &end);
+        gtk_text_buffer_insert(context->tab->buffer, &start, text, -1);
+    } else {
+        gtk_text_buffer_insert_at_cursor(context->tab->buffer, text, -1);
+    }
+    return TRUE;
+}
+
+void graptos_plugin_context_show_output(GraptosPluginCommandContext *context,
+                                        const char *title,
+                                        const char *heading,
+                                        const char *body) {
+    GtkWindow *parent = context && context->tab && context->tab->win
+        ? app_window_gtk(context->tab->win)
+        : NULL;
+    dialog_output(parent,
+                  title ? title : "Plugin Output",
+                  heading ? heading : "Plugin Output",
+                  body ? body : "");
+}
+
+void graptos_plugin_context_set_status(GraptosPluginCommandContext *context,
+                                       const char *text) {
+    if (!context || !context->tab || !context->tab->win) return;
+    app_window_set_status(context->tab->win, text ? text : "");
+}
+
+guint graptos_plugin_context_tab_count(GraptosPluginCommandContext *context) {
+    return context && context->tab && context->tab->win
+        ? app_window_tab_count(context->tab->win)
+        : 0u;
+}
+
+char *graptos_plugin_context_project_root(GraptosPluginCommandContext *context) {
+    if (!context || !context->tab || !context->tab->win ||
+        !context->tab->win->project_roots ||
+        context->tab->win->project_roots->len == 0u) {
+        return NULL;
+    }
+    const char *root = g_ptr_array_index(context->tab->win->project_roots, 0u);
+    return root ? g_strdup(root) : NULL;
+}
+
+gboolean graptos_plugin_context_open_file(GraptosPluginCommandContext *context,
+                                          const char *path) {
+    if (!context || !context->tab || !context->tab->win || !path) return FALSE;
+    return app_window_open_file(context->tab->win, path);
+}
+
 /**
  * @brief Count whitespace-delimited words.
  * @param text Text to inspect.
@@ -556,6 +779,18 @@ static void plugin_insert_section_banner(EditorTab *tab, guint line) {
 static void plugin_run_editor_command(GraptosPluginEditorMenuAction *action) {
     if (!action || !action->tab || !action->command) return;
     EditorTab *tab = action->tab;
+    GraptosNativeCommand *native = action->plugin && action->plugin->native_commands
+        ? g_hash_table_lookup(action->plugin->native_commands, action->command)
+        : NULL;
+    if (native && native->callback) {
+        GraptosPluginCommandContext context = {0};
+        context.plugin = action->plugin;
+        context.tab = tab;
+        context.command = action->command;
+        context.line = action->line;
+        native->callback(&context, native->user_data);
+        return;
+    }
     if (g_strcmp0(action->command, "git-blame-line") == 0) {
         if (!plugin_has_permission(action->plugin, "git")) {
             dialog_output(tab->win ? app_window_gtk(tab->win) : NULL,
@@ -667,6 +902,200 @@ static void plugin_editor_menu_clicked(GtkButton *button, gpointer user_data) {
     }
     plugin_run_editor_command(action);
 }
+
+/**
+ * @brief Append one parsed plugin editor command button.
+ * @details Ownership of the action is attached to the GTK button so command
+ *          rows stay valid until the menu or tool panel is rebuilt.
+ * @param plugin Plugin that owns the command.
+ * @param tab Editor tab receiving the command.
+ * @param box Box receiving the button.
+ * @param popover Optional popover to close before running.
+ * @param label Human-facing button label.
+ * @param command Command id.
+ * @param line One-based editor line.
+ */
+static void plugin_append_editor_command_button(GraptosPlugin *plugin,
+                                                EditorTab *tab,
+                                                GtkWidget *box,
+                                                GtkWidget *popover,
+                                                const char *label,
+                                                const char *command,
+                                                guint line) {
+    GraptosPluginEditorMenuAction *action = g_new0(GraptosPluginEditorMenuAction, 1);
+    action->plugin = plugin;
+    action->tab = tab;
+    action->popover = popover;
+    action->label = g_strdup(label);
+    action->command = g_strdup(command);
+    action->line = line;
+
+    GtkWidget *button = graptos_flat_button_new(label,
+                                                NULL,
+                                                G_CALLBACK(plugin_editor_menu_clicked),
+                                                action);
+    g_object_set_data_full(G_OBJECT(button),
+                           "graptos-plugin-menu-action",
+                           action,
+                           plugin_editor_menu_action_free);
+    gtk_box_append(GTK_BOX(box), button);
+}
+
+/**
+ * @brief Append editor-line plugin menu specs.
+ * @details The shared parser keeps context menus and the plugin tool panel on
+ *          the same declarative command path.
+ * @param registry Plugin registry to inspect.
+ * @param tab Editor tab receiving commands.
+ * @param box Box receiving buttons.
+ * @param popover Optional popover to close before running.
+ * @param line One-based editor line.
+ * @param prefix_plugin_name TRUE to include plugin names in row labels.
+ * @return Number of rows appended.
+ */
+static guint plugin_append_editor_line_specs(GraptosPluginRegistry *registry,
+                                             EditorTab *tab,
+                                             GtkWidget *box,
+                                             GtkWidget *popover,
+                                             guint line,
+                                             gboolean prefix_plugin_name) {
+    if (!registry || !registry->plugins || !tab || !box || line == 0u) {
+        return 0u;
+    }
+
+    guint added = 0u;
+    for (guint i = 0u; i < registry->plugins->len; i++) {
+        GraptosPlugin *plugin = g_ptr_array_index(registry->plugins, i);
+        if (!plugin || !plugin->enabled || !plugin->menus) continue;
+        for (guint j = 0u; j < plugin->menus->len; j++) {
+            const char *spec = g_ptr_array_index(plugin->menus, j);
+            if (!spec || spec[0] == '\0') continue;
+            g_auto(GStrv) parts = g_strsplit(spec, ":", 3);
+            if (!parts || g_strcmp0(parts[0], "editor-line") != 0 ||
+                !parts[1] || !parts[2] ||
+                !plugin_declares_command(plugin, parts[2])) {
+                continue;
+            }
+            g_autofree char *owned_label = prefix_plugin_name
+                ? g_strdup_printf("%s: %s",
+                                  plugin->name ? plugin->name : "Plugin",
+                                  parts[1])
+                : NULL;
+            plugin_append_editor_command_button(plugin,
+                                                tab,
+                                                box,
+                                                popover,
+                                                owned_label ? owned_label : parts[1],
+                                                parts[2],
+                                                line);
+            added++;
+        }
+        if (plugin->native_commands) {
+            GHashTableIter iter;
+            gpointer value = NULL;
+            g_hash_table_iter_init(&iter, plugin->native_commands);
+            while (g_hash_table_iter_next(&iter, NULL, &value)) {
+                GraptosNativeCommand *native = value;
+                if (!native || !native->editor_line || !native->label) continue;
+                g_autofree char *owned_label = prefix_plugin_name
+                    ? g_strdup_printf("%s: %s",
+                                      plugin->name ? plugin->name : "Plugin",
+                                      native->label)
+                    : NULL;
+                plugin_append_editor_command_button(plugin,
+                                                    tab,
+                                                    box,
+                                                    popover,
+                                                    owned_label ? owned_label : native->label,
+                                                    native->command,
+                                                    line);
+                added++;
+            }
+        }
+    }
+    return added;
+}
+#else
+const char *graptos_plugin_context_plugin_id(GraptosPluginCommandContext *context) {
+    return context && context->plugin ? context->plugin->id : NULL;
+}
+
+const char *graptos_plugin_context_command_id(GraptosPluginCommandContext *context) {
+    return context ? context->command : NULL;
+}
+
+guint graptos_plugin_context_line(GraptosPluginCommandContext *context) {
+    return context ? context->line : 0u;
+}
+
+char *graptos_plugin_context_file_path(GraptosPluginCommandContext *context) {
+    (void)context;
+    return NULL;
+}
+
+char *graptos_plugin_context_text(GraptosPluginCommandContext *context) {
+    (void)context;
+    return g_strdup("");
+}
+
+char *graptos_plugin_context_selection(GraptosPluginCommandContext *context) {
+    (void)context;
+    return g_strdup("");
+}
+
+char *graptos_plugin_context_line_text(GraptosPluginCommandContext *context,
+                                       guint line) {
+    (void)context;
+    (void)line;
+    return g_strdup("");
+}
+
+gboolean graptos_plugin_context_insert_text(GraptosPluginCommandContext *context,
+                                            const char *text) {
+    (void)context;
+    (void)text;
+    return FALSE;
+}
+
+gboolean graptos_plugin_context_replace_selection(GraptosPluginCommandContext *context,
+                                                  const char *text) {
+    (void)context;
+    (void)text;
+    return FALSE;
+}
+
+void graptos_plugin_context_show_output(GraptosPluginCommandContext *context,
+                                        const char *title,
+                                        const char *heading,
+                                        const char *body) {
+    (void)context;
+    (void)title;
+    (void)heading;
+    (void)body;
+}
+
+void graptos_plugin_context_set_status(GraptosPluginCommandContext *context,
+                                       const char *text) {
+    (void)context;
+    (void)text;
+}
+
+guint graptos_plugin_context_tab_count(GraptosPluginCommandContext *context) {
+    (void)context;
+    return 0u;
+}
+
+char *graptos_plugin_context_project_root(GraptosPluginCommandContext *context) {
+    (void)context;
+    return NULL;
+}
+
+gboolean graptos_plugin_context_open_file(GraptosPluginCommandContext *context,
+                                          const char *path) {
+    (void)context;
+    (void)path;
+    return FALSE;
+}
 #endif /* GRAPTOS_PLUGIN_NO_UI */
 
 GPtrArray *graptos_plugin_registry_contribution_dirs(GraptosPluginRegistry *registry,
@@ -718,6 +1147,12 @@ gboolean graptos_plugin_registry_load_native(GraptosPluginRegistry *registry,
         g_autofree char *path = g_path_is_absolute(plugin->native_library)
             ? g_strdup(plugin->native_library)
             : g_build_filename(plugin->base_path, plugin->native_library, NULL);
+        if (!g_file_test(path, G_FILE_TEST_IS_REGULAR)) {
+            g_message("Plugin %s native library not found: %s",
+                      plugin->id ? plugin->id : "(unknown)",
+                      path);
+            continue;
+        }
         GModule *module = g_module_open(path, G_MODULE_BIND_LOCAL);
         if (!module) {
             g_set_error(error, GRAPTOS_PLUGIN_ERROR,
@@ -770,43 +1205,46 @@ void graptos_plugin_append_editor_context_items(GraptosPluginRegistry *registry,
         return;
     }
 
-    gboolean added_any = FALSE;
-    for (guint i = 0u; i < registry->plugins->len; i++) {
-        GraptosPlugin *plugin = g_ptr_array_index(registry->plugins, i);
-        if (!plugin || !plugin->enabled || !plugin->menus) continue;
-        for (guint j = 0u; j < plugin->menus->len; j++) {
-            const char *spec = g_ptr_array_index(plugin->menus, j);
-            if (!spec || spec[0] == '\0') continue;
-            g_auto(GStrv) parts = g_strsplit(spec, ":", 3);
-            if (!parts || g_strcmp0(parts[0], "editor-line") != 0 ||
-                !parts[1] || !parts[2] ||
-                !plugin_declares_command(plugin, parts[2])) {
-                continue;
-            }
-            if (!added_any) {
-                gtk_box_append(GTK_BOX(menu_box),
-                               gtk_separator_new(GTK_ORIENTATION_HORIZONTAL));
-                added_any = TRUE;
-            }
-
-            GraptosPluginEditorMenuAction *action = g_new0(GraptosPluginEditorMenuAction, 1);
-            action->plugin = plugin;
-            action->tab = tab;
-            action->popover = popover;
-            action->label = g_strdup(parts[1]);
-            action->command = g_strdup(parts[2]);
-            action->line = line;
-
-            GtkWidget *button = graptos_flat_button_new(parts[1],
-                                                        NULL,
-                                                        G_CALLBACK(plugin_editor_menu_clicked),
-                                                        action);
-            g_object_set_data_full(G_OBJECT(button),
-                                   "graptos-plugin-menu-action",
-                                   action,
-                                   plugin_editor_menu_action_free);
-            gtk_box_append(GTK_BOX(menu_box), button);
+    GtkWidget *plugin_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    guint added = plugin_append_editor_line_specs(registry,
+                                                 tab,
+                                                 plugin_box,
+                                                 popover,
+                                                 line,
+                                                 FALSE);
+    if (added > 0u) {
+        gtk_box_append(GTK_BOX(menu_box),
+                       gtk_separator_new(GTK_ORIENTATION_HORIZONTAL));
+        GtkWidget *child = gtk_widget_get_first_child(plugin_box);
+        while (child) {
+            GtkWidget *next = gtk_widget_get_next_sibling(child);
+            g_object_ref(child);
+            gtk_box_remove(GTK_BOX(plugin_box), child);
+            gtk_box_append(GTK_BOX(menu_box), child);
+            g_object_unref(child);
+            child = next;
         }
     }
+    g_object_unref(plugin_box);
+#endif
+}
+
+guint graptos_plugin_append_editor_tool_items(GraptosPluginRegistry *registry,
+                                              EditorTab *tab,
+                                              GtkWidget *box,
+                                              guint line) {
+#ifdef GRAPTOS_PLUGIN_NO_UI
+    (void)registry;
+    (void)tab;
+    (void)box;
+    (void)line;
+    return 0u;
+#else
+    return plugin_append_editor_line_specs(registry,
+                                           tab,
+                                           box,
+                                           NULL,
+                                           line,
+                                           TRUE);
 #endif
 }

@@ -8,7 +8,5 @@ native: lib/libgraptos_native_demo.so
 
 permissions:
   - native
-
-contributes:
-  commands:
-    - native-demo-command
+  - editor.read
+  - ui

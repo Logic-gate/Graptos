@@ -517,6 +517,21 @@ static char *tool_syntax_label(EditorWindow *win) {
 }
 
 /**
+ * @brief Return active editor cursor line for tool commands.
+ * @details Plugin tool commands run from the bottom panel, so they use the
+ *          insert cursor as the line target instead of a pointer location.
+ * @param tab Editor tab to inspect.
+ * @return One-based cursor line, or 1 when no buffer is available.
+ */
+static guint tool_active_editor_line(EditorTab *tab) {
+    if (!tab || !tab->buffer) return 1u;
+    GtkTextMark *insert = gtk_text_buffer_get_insert(tab->buffer);
+    GtkTextIter iter;
+    gtk_text_buffer_get_iter_at_mark(tab->buffer, &iter, insert);
+    return (guint)gtk_text_iter_get_line(&iter) + 1u;
+}
+
+/**
  * @brief Set a button label from an owned string.
  * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
  * @param button The button that emitted the action signal.
@@ -937,6 +952,30 @@ static void show_git_tools(GtkWidget *widget, gpointer user_data) {
 }
 
 /**
+ * @brief Show plugin tools.
+ * @details Declarative plugin menu commands are also available from the bottom
+ *          tool panel so plugins are not limited to editor right-click menus.
+ * @param widget The widget that emitted the callback or receives the update.
+ * @param user_data The callback context passed through GTK signal data.
+ */
+static void show_plugin_tools(GtkWidget *widget, gpointer user_data) {
+    (void)widget;
+    EditorWindow *win = user_data;
+    if (!win || !win->tool_panel) return;
+    tool_panel_begin(win, "Plugins");
+
+    EditorTab *tab = app_window_current_tab(win);
+    guint added = graptos_plugin_append_editor_tool_items(win->plugins,
+                                                          tab,
+                                                          win->tool_panel,
+                                                          tool_active_editor_line(tab));
+    if (added == 0u) {
+        tool_panel_append(win, menu_small_label("No plugin commands for the active editor"));
+    }
+    tool_panel_show_ready(win);
+}
+
+/**
  * @brief Show view tools.
  * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
  * @param widget The widget that emitted the callback or receives the update.
@@ -1043,6 +1082,7 @@ GtkWidget *build_bottom_bar(EditorWindow *win) {
     gtk_box_append(GTK_BOX(bottom), tool_icon_button_new("code-context-symbolic", "Show code commands", G_CALLBACK(show_code_tools), win));
     gtk_box_append(GTK_BOX(bottom), tool_icon_button_new("applications-science-symbolic", "Show AI commands", G_CALLBACK(show_ai_tools), win));
     gtk_box_append(GTK_BOX(bottom), tool_icon_button_new("vcs-branch-symbolic", "Show Git commands", G_CALLBACK(show_git_tools), win));
+    gtk_box_append(GTK_BOX(bottom), tool_icon_button_new("application-x-addon-symbolic", "Show plugin commands", G_CALLBACK(show_plugin_tools), win));
     gtk_box_append(GTK_BOX(bottom), tool_icon_button_new("view-grid-symbolic", "Show view commands", G_CALLBACK(show_view_tools), win));
 
     return bottom;
