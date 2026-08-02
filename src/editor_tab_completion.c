@@ -29,7 +29,8 @@ static void completion_add_source_header(EditorTab *tab, const char *label_text)
  */
 typedef enum {
     COMPLETION_SOURCE_GRAPTOS, /**< Graptoς YAML/index/import source. */
-    COMPLETION_SOURCE_LSP /**< Language Server Protocol source. */
+    COMPLETION_SOURCE_LSP, /**< Language Server Protocol source. */
+    COMPLETION_SOURCE_PLUGIN /**< Native plugin completion source. */
 } CompletionSource;
 
 /**
@@ -456,7 +457,9 @@ static void completion_update_popup_size(EditorTab *tab,
  * @param tab The editor tab whose buffer or widgets are being inspected.
  * @param candidates The candidates supplied by the caller.
  */
-static void completion_populate_rows(EditorTab *tab, GPtrArray *candidates) {
+static void completion_populate_rows(EditorTab *tab,
+                                     GPtrArray *candidates,
+                                     const char *plugin_source_label) {
     completion_clear_rows(tab);
     if (!candidates) {
         completion_update_popup_size(tab, 0u, FALSE);
@@ -473,6 +476,8 @@ static void completion_populate_rows(EditorTab *tab, GPtrArray *candidates) {
             completion_add_source_header(tab,
                                          candidate->source == COMPLETION_SOURCE_LSP
                                              ? "LSP"
+                                             : candidate->source == COMPLETION_SOURCE_PLUGIN
+                                             ? (plugin_source_label ? plugin_source_label : "Plugins")
                                              : "Graptoς");
             last_source = candidate->source;
         }
@@ -578,10 +583,18 @@ void completion_clear_rows(EditorTab *tab) {
 void completion_insert_word(EditorTab *tab, const char *word) {
     if (!tab || tab->locked || !word || word[0] == '\0') return;
 
-    GtkTextIter start;
     GtkTextIter cursor;
-    char *prefix = completion_prefix_at_cursor(tab->buffer, &start, &cursor);
+    GtkTextIter start;
+    GtkTextMark *insert = gtk_text_buffer_get_insert(tab->buffer);
+    gtk_text_buffer_get_iter_at_mark(tab->buffer, &cursor, insert);
+    char *prefix = tab->completion_prefix
+        ? g_strdup(tab->completion_prefix)
+        : completion_prefix_at_cursor(tab->buffer, &start, &cursor);
     if (!prefix) return;
+
+    start = cursor;
+    gint chars = (gint)g_utf8_strlen(prefix, -1);
+    while (chars > 0 && gtk_text_iter_backward_char(&start)) chars--;
 
     gint start_offset = gtk_text_iter_get_offset(&start);
     gtk_text_buffer_begin_user_action(tab->buffer);
@@ -691,6 +704,49 @@ void completion_add_row(EditorTab *tab, const char *word) {
 }
 
 /**
+ * @brief Show plugin supplied literal completions.
+ * @details Native completion providers return the exact prefix to replace, so
+ *          path-like values containing `/`, `.`, or `~` can use the same popup
+ *          as normal word completion without exposing GTK internals.
+ * @param tab The editor tab whose completion popup should be shown.
+ * @param replace_prefix Text immediately before the cursor to replace.
+ * @param source_label Visible source heading.
+ * @param candidates GPtrArray of char* insertable candidates.
+ * @param manual TRUE when triggered by an explicit shortcut.
+ */
+void editor_tab_show_plugin_completion(EditorTab *tab,
+                                       const char *replace_prefix,
+                                       const char *source_label,
+                                       GPtrArray *candidates,
+                                       gboolean manual) {
+    if (!tab || !replace_prefix || replace_prefix[0] == '\0' ||
+        !candidates || candidates->len == 0u) {
+        return;
+    }
+    GtkTextIter cursor;
+    GtkTextMark *insert = gtk_text_buffer_get_insert(tab->buffer);
+    gtk_text_buffer_get_iter_at_mark(tab->buffer, &cursor, insert);
+
+    GPtrArray *items = g_ptr_array_new_with_free_func(completion_candidate_free);
+    if (!items) return;
+    for (guint i = 0u; i < candidates->len; i++) {
+        const char *candidate = g_ptr_array_index(candidates, i);
+        completion_add_sourced(items, candidate, COMPLETION_SOURCE_PLUGIN);
+    }
+    if (items->len == 0u) {
+        g_ptr_array_free(items, TRUE);
+        return;
+    }
+
+    completion_populate_rows(tab, items, source_label);
+    g_ptr_array_free(items, TRUE);
+    g_free(tab->completion_prefix);
+    tab->completion_prefix = g_strdup(replace_prefix);
+    tab->completion_manual = manual;
+    completion_place_popover(tab, &cursor, manual);
+}
+
+/**
  * @brief Editor tab show completion.
  * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
  * @param tab The editor tab whose buffer or widgets are being inspected.
@@ -705,6 +761,26 @@ void editor_tab_show_completion(EditorTab *tab, gboolean manual) {
     char *prefix = completion_prefix_at_cursor(tab->buffer, &prefix_start,
                                                &cursor);
     if (!prefix) return;
+
+    g_autofree char *plugin_replace_prefix = NULL;
+    g_autofree char *plugin_source_label = NULL;
+    GPtrArray *plugin_items = tab->win && tab->win->plugins
+        ? graptos_plugin_registry_completion_candidates(tab->win->plugins,
+                                                        tab,
+                                                        &plugin_replace_prefix,
+                                                        &plugin_source_label)
+        : NULL;
+    if (plugin_items && plugin_items->len > 0u && plugin_replace_prefix) {
+        editor_tab_show_plugin_completion(tab,
+                                          plugin_replace_prefix,
+                                          plugin_source_label,
+                                          plugin_items,
+                                          manual);
+        g_ptr_array_free(plugin_items, TRUE);
+        g_free(prefix);
+        return;
+    }
+    if (plugin_items) g_ptr_array_free(plugin_items, TRUE);
 
     gboolean is_import = import_completion_tab_is_import_context(tab);
     MemberCompletionContext member_ctx = {0};
@@ -741,7 +817,7 @@ void editor_tab_show_completion(EditorTab *tab, gboolean manual) {
         return;
     }
 
-    completion_populate_rows(tab, candidates);
+    completion_populate_rows(tab, candidates, NULL);
     g_ptr_array_free(candidates, TRUE);
     g_free(tab->completion_prefix);
     tab->completion_prefix = prefix;

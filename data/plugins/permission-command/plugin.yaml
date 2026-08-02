@@ -3,7 +3,7 @@ name: External Command Demo
 version: 1.0
 description: Demonstrates the command permission shape for future external process commands.
 graptos_api_version: 1
-enabled: false
+enabled: true
 
 permissions:
   - command

@@ -3,7 +3,7 @@ name: Terminal Demo
 version: 1.0
 description: Demonstrates the terminal permission shape for future terminal-backed commands.
 graptos_api_version: 1
-enabled: false
+enabled: true
 
 permissions:
   - terminal

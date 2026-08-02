@@ -4,9 +4,10 @@
 
 ### γραπτός: Grap-Tos; adj, written or inscribed
 
+![linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
 [![C CI](https://github.com/Logic-gate/Graptos/actions/workflows/c-cpp.yml/badge.svg)](https://github.com/Logic-gate/Graptos/actions/workflows/c-cpp.yml)
 ![C](https://img.shields.io/badge/language-C-blue)
-![Open Source Friendly](https://img.shields.io/badge/open--source-friendly-22c55e)
+![Open Source](https://img.shields.io/badge/open-source-22c55e)
 ![Pull Requests Welcome](https://img.shields.io/badge/pull%20requests-welcome-2563eb)
 
 </div>
@@ -48,11 +49,13 @@ costs.
 * Tabbed editing
 * Project folder sidebar with live refresh and Git file indicators
 * Optional split and tiled editing for up to three tabs
+* Per-line and multi-line notes with gutter indicators and comment conversion
 * Toggleable minimap and scroll preview
 * Markdown and LaTeX previews that can be resized or detached
 * Project-wide literal search and replacement
 * Manual completion with `Ctrl+Space`
 * Optional automatic completion
+* Native path autocomplete plugin with `Ctrl+Alt+P`
 * LSP completion, diagnostics, references, and go-to-definition when a
   configured language server is available
 * Graptoς YAML fallback completion, references, import completion, and project
@@ -64,7 +67,7 @@ costs.
 * Regex tester popover for selected regex-like text
 * Integrated terminal with single-terminal and dynamic-directory modes
 * Init Project dialog for generating projects from declarative templates
-* Live theme editor with previews and persistent `config.ini` support
+* Live CSS theme editor with previews and persistent `config.ini` support
 * Config migration that adds new keys without replacing existing values
 * Bundled themes including Dracula, GitHub Dark, Apprentice, Gruvbox Dark,
   Tokyo Night, Srcery, and Moonfly
@@ -72,6 +75,7 @@ costs.
   and per-turn change review
 * Git status, diffs, staging, commits, pulls, pushes, and credential-helper
   support
+* Native plugin ABI for commands, shortcuts, and completion providers
 * YAML-configurable highlighting, completion, formatting, imports, LSP commands,
   and project indexing
 
@@ -80,10 +84,6 @@ costs.
 Graptoς is still early software. Some parts are incomplete or deliberately
 limited:
 
-* The theme editor is live and persistent, but not every widget can be themed
-  yet.
-* Plugin support is not available. Graptoς can currently be extended through
-  configuration files, but there is no stable plugin API.
 * Some UI details still need work, especially around edge cases, panel
   behavior, and less common GTK themes.
 * Automated testing is growing, but it does not yet cover every editor workflow.
@@ -147,15 +147,22 @@ make install PREFIX="$HOME/.local"
 ## Theme and preferences
 
 Open `File > Theme` to change Graptoς colors and fonts. Changes are previewed
-inside the dialog before they are saved. The theme editor writes to:
+inside the dialog before they are saved. Graptoς stores preferences in:
 
 ```text
 ~/.config/graptos/config.ini
 ```
 
-The file can also be edited manually. Use `Reload config.ini` in the Theme
-dialog to apply manual changes without restarting Graptoς. The current config
-keys are documented in [docs/PREFERENCES.md](docs/PREFERENCES.md).
+CSS themes are the active theme format. `config.ini` stores the active CSS theme
+path, and the default user theme is:
+
+```text
+~/.config/graptos/theme.css
+```
+
+The files can also be edited manually. Use `Reload config.ini` in the Theme
+dialog to apply manual preference changes without restarting Graptoς. The
+current config keys and CSS theme roles are documented in [docs/PREFERENCES.md](docs/PREFERENCES.md).
 
 When a newer build introduces config keys, Graptoς adds only the missing keys to
 an existing `config.ini`. Existing values are not changed. If the file does not
@@ -184,6 +191,8 @@ Open `File > Shortcuts` for the full in-app list. Common shortcuts include:
 | `Ctrl+G`            | Go to line                                |
 | `Ctrl+J`            | Format selected code or surrounding block |
 | `Ctrl+Space`        | Show completion                           |
+| `Ctrl+Alt+P`        | Show path completion                      |
+| `Ctrl+Shift+M`      | Add note                                  |
 
 ## Git support
 
@@ -390,6 +399,17 @@ Python completion sources may include:
 
 Press `Ctrl+Space` to request suggestions manually.
 
+## Notes
+
+Notes can be attached to a line or a multi-line selection. Note indicators are
+shown in the editor gutter, and hovering over an indicator shows the note text.
+Right-click a note indicator to edit, delete, or convert the note into a
+language comment using the active syntax's `line_comment` setting.
+
+Notes are stored as local text databases outside the source file, keyed by the
+source filename, so they can be shared separately from source edits when a
+project chooses to include them.
+
 ## Project search
 
 Open a project folder, then select `Edit > Project Search`.
@@ -490,9 +510,13 @@ index: false
 ## Plugins
 
 Graptoς plugins are local folders with a `plugin.yaml` manifest. The plugin
-layer is the boundary between Graptoς internals and extensions: plugins declare
-what they contribute, and Graptoς decides how those contributions are loaded and
-executed. 
+layer is the boundary between Graptoς internals and extensions. YAML manifests
+declare identity, permissions, native library paths, and static asset
+contributions. Native `.so` plugins can register commands, shortcut-backed
+commands, and completion providers through the opaque Graptoς plugin ABI.
+
+The source tree includes example native plugins for path autocomplete and
+running the active file.
 
 See [docs/PLUGINS.md](docs/PLUGINS.md) for more information.
 

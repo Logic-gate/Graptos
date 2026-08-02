@@ -3,7 +3,7 @@ name: UI Demo
 version: 1.0
 description: Adds a plugin information dialog through the editor context menu.
 graptos_api_version: 1
-enabled: false
+enabled: true
 
 permissions:
   - ui
