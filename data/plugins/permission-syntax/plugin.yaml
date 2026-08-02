@@ -3,7 +3,7 @@ name: QML Syntax Demo
 version: 1.0
 description: Contributes a small QML syntax definition.
 graptos_api_version: 1
-enabled: false
+enabled: true
 
 permissions:
   - syntax

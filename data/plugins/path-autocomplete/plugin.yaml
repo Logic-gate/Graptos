@@ -1,0 +1,12 @@
+id: path-autocomplete
+name: Path Autocomplete
+version: 1.0
+description: Completes filesystem paths from a native completion provider.
+graptos_api_version: 1
+enabled: true
+native: lib/libgraptos_path_autocomplete.so
+
+permissions:
+  - native
+  - editor.read
+  - ui

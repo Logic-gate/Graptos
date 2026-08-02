@@ -3,7 +3,7 @@ name: Editor Read Demo
 version: 1.0
 description: Adds a line word-count action that only reads editor text.
 graptos_api_version: 1
-enabled: false
+enabled: true
 
 permissions:
   - editor.read

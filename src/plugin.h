@@ -64,6 +64,7 @@ typedef struct {
     GPtrArray *menus; /**< char*. */
     gpointer native_handle; /**< Private GModule handle. */
     GHashTable *native_commands; /**< char* to native command handler. */
+    GPtrArray *native_completion_providers; /**< Native completion providers. */
 } GraptosPlugin;
 
 /**
@@ -169,5 +170,33 @@ guint graptos_plugin_append_editor_tool_items(GraptosPluginRegistry *registry,
                                               EditorTab *tab,
                                               GtkWidget *box,
                                               guint line);
+/**
+ * @brief Run a plugin shortcut command.
+ * @details Keyboard handling passes stable shortcut ids here so plugins can
+ *          own behavior without the editor knowing command ids.
+ * @param registry Plugin registry to inspect.
+ * @param tab Active editor tab.
+ * @param shortcut Stable shortcut id, such as `Ctrl+Alt+P`.
+ * @param line One-based active editor line.
+ * @return TRUE when a plugin handled the shortcut.
+ */
+gboolean graptos_plugin_registry_run_shortcut(GraptosPluginRegistry *registry,
+                                              EditorTab *tab,
+                                              const char *shortcut,
+                                              guint line);
+/**
+ * @brief Collect native plugin completion candidates.
+ * @details The first provider that returns candidates owns the replacement
+ *          prefix and visible source label for this completion popup.
+ * @param registry Plugin registry to inspect.
+ * @param tab Active editor tab.
+ * @param replace_prefix_out Owned prefix text to replace on accept.
+ * @param source_label_out Owned source label for the popup header.
+ * @return GPtrArray of owned char* candidates, or NULL.
+ */
+GPtrArray *graptos_plugin_registry_completion_candidates(GraptosPluginRegistry *registry,
+                                                        EditorTab *tab,
+                                                        char **replace_prefix_out,
+                                                        char **source_label_out);
 
 #endif /* GRAPTOS_PLUGIN_H */

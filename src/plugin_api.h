@@ -38,6 +38,20 @@ typedef void (*GraptosPluginCommandFunc)(GraptosPluginCommandContext *context,
                                          gpointer user_data);
 
 /**
+ * @brief Native plugin completion callback.
+ * @details Providers inspect the command context and return insertable strings
+ *          for the current cursor. Set replace_prefix_out to the exact text
+ *          Graptoς should replace when a candidate is accepted.
+ * @param context Opaque execution context for the current editor cursor.
+ * @param replace_prefix_out Owned replacement prefix returned by the plugin.
+ * @param user_data Plugin data supplied during provider registration.
+ * @return GPtrArray of owned char* candidates, or NULL when there are none.
+ */
+typedef GPtrArray *(*GraptosPluginCompletionFunc)(GraptosPluginCommandContext *context,
+                                                  char **replace_prefix_out,
+                                                  gpointer user_data);
+
+/**
  * @brief Native plugin data destroy callback.
  * @param user_data Plugin-owned data supplied during command registration.
  */
@@ -110,6 +124,47 @@ gboolean graptos_plugin_host_register_editor_line_command(GraptosPluginHost *hos
                                                           GraptosPluginDestroyFunc destroy);
 
 /**
+ * @brief Register a native editor line command with a shortcut.
+ * @details The shortcut is a stable text id such as `Ctrl+Alt+P`. Graptoς owns
+ *          key matching and invokes the registered command when it is pressed.
+ * @param host The host capability object supplied by Graptoς.
+ * @param command_id Stable command id owned by the plugin.
+ * @param label Human-facing command label.
+ * @param shortcut Shortcut id, or NULL for no shortcut.
+ * @param callback Native function to run for the command.
+ * @param user_data Plugin data passed to the callback.
+ * @param destroy Optional destroy callback for user_data.
+ * @return TRUE when the command was accepted.
+ */
+gboolean graptos_plugin_host_register_editor_line_command_with_shortcut(GraptosPluginHost *host,
+                                                                        const char *command_id,
+                                                                        const char *label,
+                                                                        const char *shortcut,
+                                                                        GraptosPluginCommandFunc callback,
+                                                                        gpointer user_data,
+                                                                        GraptosPluginDestroyFunc destroy);
+
+/**
+ * @brief Register a native completion provider.
+ * @details Providers are asked during normal editor completion. The provider
+ *          decides when it applies by returning candidates only for matching
+ *          cursor context.
+ * @param host The host capability object supplied by Graptoς.
+ * @param provider_id Stable provider id owned by the plugin.
+ * @param label Human-facing source label.
+ * @param callback Native completion callback.
+ * @param user_data Plugin data passed to the callback.
+ * @param destroy Optional destroy callback for user_data.
+ * @return TRUE when the provider was accepted.
+ */
+gboolean graptos_plugin_host_register_completion_provider(GraptosPluginHost *host,
+                                                          const char *provider_id,
+                                                          const char *label,
+                                                          GraptosPluginCompletionFunc callback,
+                                                          gpointer user_data,
+                                                          GraptosPluginDestroyFunc destroy);
+
+/**
  * @brief Return the plugin id for a command context.
  * @param context Command context supplied by Graptoς.
  * @return Plugin id, or NULL.
@@ -169,6 +224,15 @@ char *graptos_plugin_context_line_text(GraptosPluginCommandContext *context,
                                        guint line);
 
 /**
+ * @brief Return text before the cursor on the active line.
+ * @details The returned string is owned by the caller and must be freed with
+ *          g_free().
+ * @param context Command context supplied by Graptoς.
+ * @return Owned line prefix text, or an empty string when unavailable.
+ */
+char *graptos_plugin_context_line_prefix(GraptosPluginCommandContext *context);
+
+/**
  * @brief Insert text at the active cursor.
  * @param context Command context supplied by Graptoς.
  * @param text Text to insert.
@@ -205,6 +269,21 @@ void graptos_plugin_context_show_output(GraptosPluginCommandContext *context,
  */
 void graptos_plugin_context_set_status(GraptosPluginCommandContext *context,
                                        const char *text);
+
+/**
+ * @brief Show plugin supplied completions.
+ * @details The provider passes the exact prefix to replace and a list of owned
+ *          or borrowed candidate strings. Graptoς copies candidate text before
+ *          showing the popup.
+ * @param context Command context supplied by Graptoς.
+ * @param replace_prefix Text immediately before the cursor to replace.
+ * @param source_label Visible source heading.
+ * @param candidates GPtrArray of char* candidate text.
+ */
+void graptos_plugin_context_show_completions(GraptosPluginCommandContext *context,
+                                             const char *replace_prefix,
+                                             const char *source_label,
+                                             GPtrArray *candidates);
 
 /**
  * @brief Return the number of open editor tabs.

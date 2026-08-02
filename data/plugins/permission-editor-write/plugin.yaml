@@ -3,7 +3,7 @@ name: Editor Write Demo
 version: 1.0
 description: Adds an action that inserts a section banner above the clicked line.
 graptos_api_version: 1
-enabled: false
+enabled: true
 
 permissions:
   - editor.write

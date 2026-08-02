@@ -359,6 +359,21 @@ void editor_tab_select_all(EditorTab *tab);
  */
 void editor_tab_show_completion(EditorTab *tab, gboolean manual);
 /**
+ * @brief Show plugin supplied literal completions.
+ * @details Plugins pass the exact prefix to replace, so completion can handle
+ *          non-word tokens such as filesystem paths.
+ * @param tab The editor tab whose completion popup should be shown.
+ * @param replace_prefix Text immediately before the cursor to replace.
+ * @param source_label Visible source heading.
+ * @param candidates GPtrArray of char* insertable candidates.
+ * @param manual TRUE when triggered by an explicit shortcut.
+ */
+void editor_tab_show_plugin_completion(EditorTab *tab,
+                                       const char *replace_prefix,
+                                       const char *source_label,
+                                       GPtrArray *candidates,
+                                       gboolean manual);
+/**
  * @brief Editor tab hide completion.
  * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
  * @param tab The editor tab whose buffer or widgets are being inspected.

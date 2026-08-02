@@ -3,7 +3,7 @@ name: Project Write Demo
 version: 1.0
 description: Demonstrates the project.write permission shape for future scaffolding commands.
 graptos_api_version: 1
-enabled: false
+enabled: true
 
 permissions:
   - project.write

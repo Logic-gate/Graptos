@@ -51,6 +51,7 @@ typedef struct {
     GraptosPlugin *plugin; /**< Plugin that owns the handler. */
     char *command; /**< Command id. */
     char *label; /**< Optional visible command label. */
+    char *shortcut; /**< Optional stable shortcut id. */
     GraptosPluginCommandFunc callback; /**< Native command callback. */
     gpointer user_data; /**< Plugin-owned callback data. */
     GraptosPluginDestroyFunc destroy; /**< Optional user data destroy hook. */
@@ -67,7 +68,33 @@ static void native_command_free(gpointer data) {
     if (command->destroy) command->destroy(command->user_data);
     g_free(command->command);
     g_free(command->label);
+    g_free(command->shortcut);
     g_free(command);
+}
+
+/**
+ * @brief Registered native completion provider.
+ */
+typedef struct {
+    GraptosPlugin *plugin; /**< Plugin that owns the provider. */
+    char *provider_id; /**< Provider id. */
+    char *label; /**< Visible source label. */
+    GraptosPluginCompletionFunc callback; /**< Completion callback. */
+    gpointer user_data; /**< Plugin-owned callback data. */
+    GraptosPluginDestroyFunc destroy; /**< Optional user data destroy hook. */
+} GraptosNativeCompletionProvider;
+
+/**
+ * @brief Free a native completion provider.
+ * @param data Native completion provider.
+ */
+static void native_completion_provider_free(gpointer data) {
+    GraptosNativeCompletionProvider *provider = data;
+    if (!provider) return;
+    if (provider->destroy) provider->destroy(provider->user_data);
+    g_free(provider->provider_id);
+    g_free(provider->label);
+    g_free(provider);
 }
 
 GQuark graptos_plugin_error_quark(void) {
@@ -99,6 +126,7 @@ const char *graptos_plugin_host_plugin_id(GraptosPluginHost *host) {
 static gboolean plugin_register_native_command(GraptosPluginHost *host,
                                                const char *command_id,
                                                const char *label,
+                                               const char *shortcut,
                                                gboolean editor_line,
                                                GraptosPluginCommandFunc callback,
                                                gpointer user_data,
@@ -119,6 +147,7 @@ static gboolean plugin_register_native_command(GraptosPluginHost *host,
     command->plugin = plugin;
     command->command = g_strdup(command_id);
     command->label = label && label[0] ? g_strdup(label) : NULL;
+    command->shortcut = shortcut && shortcut[0] ? g_strdup(shortcut) : NULL;
     command->callback = callback;
     command->user_data = user_data;
     command->destroy = destroy;
@@ -137,6 +166,7 @@ gboolean graptos_plugin_host_register_command(GraptosPluginHost *host,
     return plugin_register_native_command(host,
                                           command_id,
                                           NULL,
+                                          NULL,
                                           FALSE,
                                           callback,
                                           user_data,
@@ -152,10 +182,55 @@ gboolean graptos_plugin_host_register_editor_line_command(GraptosPluginHost *hos
     return plugin_register_native_command(host,
                                           command_id,
                                           label,
+                                          NULL,
                                           TRUE,
                                           callback,
                                           user_data,
                                           destroy);
+}
+
+gboolean graptos_plugin_host_register_editor_line_command_with_shortcut(GraptosPluginHost *host,
+                                                                        const char *command_id,
+                                                                        const char *label,
+                                                                        const char *shortcut,
+                                                                        GraptosPluginCommandFunc callback,
+                                                                        gpointer user_data,
+                                                                        GraptosPluginDestroyFunc destroy) {
+    return plugin_register_native_command(host,
+                                          command_id,
+                                          label,
+                                          shortcut,
+                                          TRUE,
+                                          callback,
+                                          user_data,
+                                          destroy);
+}
+
+gboolean graptos_plugin_host_register_completion_provider(GraptosPluginHost *host,
+                                                          const char *provider_id,
+                                                          const char *label,
+                                                          GraptosPluginCompletionFunc callback,
+                                                          gpointer user_data,
+                                                          GraptosPluginDestroyFunc destroy) {
+    if (!host || !host->plugin || !provider_id || !provider_id[0] ||
+        !callback) {
+        return FALSE;
+    }
+    GraptosPlugin *plugin = host->plugin;
+    if (!plugin->native_completion_providers) {
+        plugin->native_completion_providers =
+            g_ptr_array_new_with_free_func(native_completion_provider_free);
+    }
+    GraptosNativeCompletionProvider *provider = g_new0(GraptosNativeCompletionProvider, 1);
+    if (!provider) return FALSE;
+    provider->plugin = plugin;
+    provider->provider_id = g_strdup(provider_id);
+    provider->label = g_strdup(label && label[0] ? label : "Plugin");
+    provider->callback = callback;
+    provider->user_data = user_data;
+    provider->destroy = destroy;
+    g_ptr_array_add(plugin->native_completion_providers, provider);
+    return TRUE;
 }
 
 /**
@@ -273,6 +348,8 @@ static GraptosPlugin *plugin_new(void) {
                                                     g_str_equal,
                                                     g_free,
                                                     native_command_free);
+    plugin->native_completion_providers =
+        g_ptr_array_new_with_free_func(native_completion_provider_free);
     return plugin;
 }
 
@@ -293,6 +370,9 @@ void graptos_plugin_free(GraptosPlugin *plugin) {
     if (plugin->commands) g_ptr_array_free(plugin->commands, TRUE);
     if (plugin->menus) g_ptr_array_free(plugin->menus, TRUE);
     if (plugin->native_commands) g_hash_table_destroy(plugin->native_commands);
+    if (plugin->native_completion_providers) {
+        g_ptr_array_free(plugin->native_completion_providers, TRUE);
+    }
     g_free(plugin);
 }
 
@@ -580,6 +660,12 @@ typedef struct {
     guint line; /**< One-based editor line. */
 } GraptosPluginEditorMenuAction;
 
+static guint plugin_tab_cursor_line(EditorTab *tab);
+static void plugin_run_native_command(GraptosPlugin *plugin,
+                                      GraptosNativeCommand *command,
+                                      EditorTab *tab,
+                                      guint line);
+
 /**
  * @brief Free a plugin editor menu action.
  * @param data Menu action data.
@@ -670,6 +756,19 @@ char *graptos_plugin_context_line_text(GraptosPluginCommandContext *context,
     return plugin_editor_line_text(context->tab, line);
 }
 
+char *graptos_plugin_context_line_prefix(GraptosPluginCommandContext *context) {
+    if (!context || !context->tab || !context->tab->buffer) return g_strdup("");
+    GtkTextIter cursor;
+    GtkTextMark *insert = gtk_text_buffer_get_insert(context->tab->buffer);
+    gtk_text_buffer_get_iter_at_mark(context->tab->buffer, &cursor, insert);
+    GtkTextIter start = cursor;
+    gtk_text_iter_set_line_offset(&start, 0);
+    return gtk_text_buffer_get_text(context->tab->buffer,
+                                    &start,
+                                    &cursor,
+                                    FALSE);
+}
+
 gboolean graptos_plugin_context_insert_text(GraptosPluginCommandContext *context,
                                             const char *text) {
     if (!context || !context->tab || !context->tab->buffer || !text) return FALSE;
@@ -710,6 +809,18 @@ void graptos_plugin_context_set_status(GraptosPluginCommandContext *context,
                                        const char *text) {
     if (!context || !context->tab || !context->tab->win) return;
     app_window_set_status(context->tab->win, text ? text : "");
+}
+
+void graptos_plugin_context_show_completions(GraptosPluginCommandContext *context,
+                                             const char *replace_prefix,
+                                             const char *source_label,
+                                             GPtrArray *candidates) {
+    if (!context || !context->tab) return;
+    editor_tab_show_plugin_completion(context->tab,
+                                      replace_prefix,
+                                      source_label,
+                                      candidates,
+                                      TRUE);
 }
 
 guint graptos_plugin_context_tab_count(GraptosPluginCommandContext *context) {
@@ -783,12 +894,7 @@ static void plugin_run_editor_command(GraptosPluginEditorMenuAction *action) {
         ? g_hash_table_lookup(action->plugin->native_commands, action->command)
         : NULL;
     if (native && native->callback) {
-        GraptosPluginCommandContext context = {0};
-        context.plugin = action->plugin;
-        context.tab = tab;
-        context.command = action->command;
-        context.line = action->line;
-        native->callback(&context, native->user_data);
+        plugin_run_native_command(action->plugin, native, tab, action->line);
         return;
     }
     if (g_strcmp0(action->command, "git-blame-line") == 0) {
@@ -1015,6 +1121,38 @@ static guint plugin_append_editor_line_specs(GraptosPluginRegistry *registry,
     }
     return added;
 }
+
+/**
+ * @brief Return active cursor line for plugin command context.
+ * @param tab Editor tab to inspect.
+ * @return One-based cursor line.
+ */
+static guint plugin_tab_cursor_line(EditorTab *tab) {
+    if (!tab || !tab->buffer) return 1u;
+    GtkTextIter iter;
+    GtkTextMark *insert = gtk_text_buffer_get_insert(tab->buffer);
+    gtk_text_buffer_get_iter_at_mark(tab->buffer, &iter, insert);
+    return (guint)gtk_text_iter_get_line(&iter) + 1u;
+}
+
+/**
+ * @brief Run one native command against a tab.
+ * @param plugin Plugin owning the command.
+ * @param command Native command to run.
+ * @param tab Editor tab receiving the command.
+ */
+static void plugin_run_native_command(GraptosPlugin *plugin,
+                                      GraptosNativeCommand *command,
+                                      EditorTab *tab,
+                                      guint line) {
+    if (!plugin || !command || !command->callback || !tab) return;
+    GraptosPluginCommandContext context = {0};
+    context.plugin = plugin;
+    context.tab = tab;
+    context.command = command->command;
+    context.line = line ? line : plugin_tab_cursor_line(tab);
+    command->callback(&context, command->user_data);
+}
 #else
 const char *graptos_plugin_context_plugin_id(GraptosPluginCommandContext *context) {
     return context && context->plugin ? context->plugin->id : NULL;
@@ -1050,6 +1188,11 @@ char *graptos_plugin_context_line_text(GraptosPluginCommandContext *context,
     return g_strdup("");
 }
 
+char *graptos_plugin_context_line_prefix(GraptosPluginCommandContext *context) {
+    (void)context;
+    return g_strdup("");
+}
+
 gboolean graptos_plugin_context_insert_text(GraptosPluginCommandContext *context,
                                             const char *text) {
     (void)context;
@@ -1078,6 +1221,16 @@ void graptos_plugin_context_set_status(GraptosPluginCommandContext *context,
                                        const char *text) {
     (void)context;
     (void)text;
+}
+
+void graptos_plugin_context_show_completions(GraptosPluginCommandContext *context,
+                                             const char *replace_prefix,
+                                             const char *source_label,
+                                             GPtrArray *candidates) {
+    (void)context;
+    (void)replace_prefix;
+    (void)source_label;
+    (void)candidates;
 }
 
 guint graptos_plugin_context_tab_count(GraptosPluginCommandContext *context) {
@@ -1246,5 +1399,89 @@ guint graptos_plugin_append_editor_tool_items(GraptosPluginRegistry *registry,
                                            NULL,
                                            line,
                                            TRUE);
+#endif
+}
+
+gboolean graptos_plugin_registry_run_shortcut(GraptosPluginRegistry *registry,
+                                              EditorTab *tab,
+                                              const char *shortcut,
+                                              guint line) {
+#ifdef GRAPTOS_PLUGIN_NO_UI
+    (void)registry;
+    (void)tab;
+    (void)shortcut;
+    (void)line;
+    return FALSE;
+#else
+    if (!registry || !registry->plugins || !tab || !shortcut) return FALSE;
+    for (guint i = 0u; i < registry->plugins->len; i++) {
+        GraptosPlugin *plugin = g_ptr_array_index(registry->plugins, i);
+        if (!plugin || !plugin->enabled || !plugin->native_commands) continue;
+        GHashTableIter iter;
+        gpointer value = NULL;
+        g_hash_table_iter_init(&iter, plugin->native_commands);
+        while (g_hash_table_iter_next(&iter, NULL, &value)) {
+            GraptosNativeCommand *command = value;
+            if (!command || g_strcmp0(command->shortcut, shortcut) != 0) {
+                continue;
+            }
+            plugin_run_native_command(plugin, command, tab, line);
+            return TRUE;
+        }
+    }
+    return FALSE;
+#endif
+}
+
+GPtrArray *graptos_plugin_registry_completion_candidates(GraptosPluginRegistry *registry,
+                                                        EditorTab *tab,
+                                                        char **replace_prefix_out,
+                                                        char **source_label_out) {
+#ifdef GRAPTOS_PLUGIN_NO_UI
+    (void)registry;
+    (void)tab;
+    (void)replace_prefix_out;
+    (void)source_label_out;
+    return NULL;
+#else
+    if (replace_prefix_out) *replace_prefix_out = NULL;
+    if (source_label_out) *source_label_out = NULL;
+    if (!registry || !registry->plugins || !tab) return NULL;
+    for (guint i = 0u; i < registry->plugins->len; i++) {
+        GraptosPlugin *plugin = g_ptr_array_index(registry->plugins, i);
+        if (!plugin || !plugin->enabled ||
+            !plugin->native_completion_providers) {
+            continue;
+        }
+        for (guint j = 0u; j < plugin->native_completion_providers->len; j++) {
+            GraptosNativeCompletionProvider *provider =
+                g_ptr_array_index(plugin->native_completion_providers, j);
+            if (!provider || !provider->callback) continue;
+            GraptosPluginCommandContext context = {0};
+            context.plugin = plugin;
+            context.tab = tab;
+            context.command = provider->provider_id;
+            context.line = plugin_tab_cursor_line(tab);
+            g_autofree char *replace_prefix = NULL;
+            GPtrArray *items = provider->callback(&context,
+                                                  &replace_prefix,
+                                                  provider->user_data);
+            if (!items || items->len == 0u || !replace_prefix ||
+                replace_prefix[0] == '\0') {
+                if (items) g_ptr_array_free(items, TRUE);
+                continue;
+            }
+            if (replace_prefix_out) {
+                *replace_prefix_out = g_steal_pointer(&replace_prefix);
+            }
+            if (source_label_out) {
+                *source_label_out = g_strdup(provider->label
+                                             ? provider->label
+                                             : "Plugin");
+            }
+            return items;
+        }
+    }
+    return NULL;
 #endif
 }
