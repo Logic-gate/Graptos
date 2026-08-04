@@ -11,8 +11,10 @@
 
 #ifndef GRAPTOS_PLUGIN_NO_UI
 #include "app.h"
+#include "config.h"
 #include "dialogs.h"
 #include "editor_tab.h"
+#include "editor_tab_private.h"
 #include "git.h"
 #include "ui.h"
 #endif
@@ -90,6 +92,57 @@ typedef struct {
  */
 static void native_completion_provider_free(gpointer data) {
     GraptosNativeCompletionProvider *provider = data;
+    if (!provider) return;
+    if (provider->destroy) provider->destroy(provider->user_data);
+    g_free(provider->provider_id);
+    g_free(provider->label);
+    g_free(provider);
+}
+
+/**
+ * @brief Registered native plugin hub.
+ */
+typedef struct {
+    GraptosPlugin *plugin; /**< Plugin that owns the hub. */
+    char *hub_id; /**< Stable hub id. */
+    char *label; /**< Visible hub label. */
+    GraptosPluginHubRenderFunc render; /**< Hub render callback. */
+    GraptosPluginHubActionFunc action; /**< Hub action callback. */
+    gpointer user_data; /**< Plugin-owned callback data. */
+    GraptosPluginDestroyFunc destroy; /**< Optional user data destroy hook. */
+} GraptosNativeHub;
+
+/**
+ * @brief Free a native plugin hub.
+ * @param data Native hub.
+ */
+static void native_hub_free(gpointer data) {
+    GraptosNativeHub *hub = data;
+    if (!hub) return;
+    if (hub->destroy) hub->destroy(hub->user_data);
+    g_free(hub->hub_id);
+    g_free(hub->label);
+    g_free(hub);
+}
+
+/**
+ * @brief Registered native hover provider.
+ */
+typedef struct {
+    GraptosPlugin *plugin; /**< Plugin that owns the provider. */
+    char *provider_id; /**< Provider id. */
+    char *label; /**< Visible hover heading. */
+    GraptosPluginHoverFunc callback; /**< Hover callback. */
+    gpointer user_data; /**< Plugin-owned callback data. */
+    GraptosPluginDestroyFunc destroy; /**< Optional user data destroy hook. */
+} GraptosNativeHoverProvider;
+
+/**
+ * @brief Free a native hover provider.
+ * @param data Native hover provider.
+ */
+static void native_hover_provider_free(gpointer data) {
+    GraptosNativeHoverProvider *provider = data;
     if (!provider) return;
     if (provider->destroy) provider->destroy(provider->user_data);
     g_free(provider->provider_id);
@@ -233,6 +286,60 @@ gboolean graptos_plugin_host_register_completion_provider(GraptosPluginHost *hos
     return TRUE;
 }
 
+gboolean graptos_plugin_host_register_hover_provider(GraptosPluginHost *host,
+                                                     const char *provider_id,
+                                                     const char *label,
+                                                     GraptosPluginHoverFunc callback,
+                                                     gpointer user_data,
+                                                     GraptosPluginDestroyFunc destroy) {
+    if (!host || !host->plugin || !provider_id || !provider_id[0] ||
+        !callback) {
+        return FALSE;
+    }
+    GraptosPlugin *plugin = host->plugin;
+    if (!plugin->native_hover_providers) {
+        plugin->native_hover_providers =
+            g_ptr_array_new_with_free_func(native_hover_provider_free);
+    }
+    GraptosNativeHoverProvider *provider = g_new0(GraptosNativeHoverProvider, 1);
+    if (!provider) return FALSE;
+    provider->plugin = plugin;
+    provider->provider_id = g_strdup(provider_id);
+    provider->label = g_strdup(label && label[0] ? label : "Plugin");
+    provider->callback = callback;
+    provider->user_data = user_data;
+    provider->destroy = destroy;
+    g_ptr_array_add(plugin->native_hover_providers, provider);
+    return TRUE;
+}
+
+gboolean graptos_plugin_host_register_hub(GraptosPluginHost *host,
+                                          const char *hub_id,
+                                          const char *label,
+                                          GraptosPluginHubRenderFunc render,
+                                          GraptosPluginHubActionFunc action,
+                                          gpointer user_data,
+                                          GraptosPluginDestroyFunc destroy) {
+    if (!host || !host->plugin || !hub_id || !hub_id[0] || !render || !action) {
+        return FALSE;
+    }
+    GraptosPlugin *plugin = host->plugin;
+    if (!plugin->native_hubs) {
+        plugin->native_hubs = g_ptr_array_new_with_free_func(native_hub_free);
+    }
+    GraptosNativeHub *hub = g_new0(GraptosNativeHub, 1);
+    if (!hub) return FALSE;
+    hub->plugin = plugin;
+    hub->hub_id = g_strdup(hub_id);
+    hub->label = g_strdup(label && label[0] ? label : "Plugin Hub");
+    hub->render = render;
+    hub->action = action;
+    hub->user_data = user_data;
+    hub->destroy = destroy;
+    g_ptr_array_add(plugin->native_hubs, hub);
+    return TRUE;
+}
+
 /**
  * @brief Strip a line comment.
  * @details Plugin manifests do not support quoted hashes yet. Matching the
@@ -336,6 +443,7 @@ static GraptosPlugin *plugin_new(void) {
     GraptosPlugin *plugin = g_new0(GraptosPlugin, 1);
     if (!plugin) return NULL;
     plugin->enabled = TRUE;
+    plugin->default_enabled = TRUE;
     plugin->graptos_api_version = GRAPTOS_PLUGIN_API_VERSION;
     plugin->permissions = g_ptr_array_new_with_free_func(g_free);
     plugin->syntax_dirs = g_ptr_array_new_with_free_func(g_free);
@@ -350,6 +458,10 @@ static GraptosPlugin *plugin_new(void) {
                                                     native_command_free);
     plugin->native_completion_providers =
         g_ptr_array_new_with_free_func(native_completion_provider_free);
+    plugin->native_hover_providers =
+        g_ptr_array_new_with_free_func(native_hover_provider_free);
+    plugin->native_hubs =
+        g_ptr_array_new_with_free_func(native_hub_free);
     return plugin;
 }
 
@@ -372,6 +484,12 @@ void graptos_plugin_free(GraptosPlugin *plugin) {
     if (plugin->native_commands) g_hash_table_destroy(plugin->native_commands);
     if (plugin->native_completion_providers) {
         g_ptr_array_free(plugin->native_completion_providers, TRUE);
+    }
+    if (plugin->native_hover_providers) {
+        g_ptr_array_free(plugin->native_hover_providers, TRUE);
+    }
+    if (plugin->native_hubs) {
+        g_ptr_array_free(plugin->native_hubs, TRUE);
     }
     g_free(plugin);
 }
@@ -539,6 +657,7 @@ GraptosPlugin *graptos_plugin_load_manifest(const char *plugin_dir, GError **err
                     GRAPTOS_PLUGIN_API_VERSION);
         goto fail;
     }
+    plugin->default_enabled = plugin->enabled;
     return plugin;
 
 fail:
@@ -604,6 +723,115 @@ gboolean graptos_plugin_registry_discover(GraptosPluginRegistry *registry,
     discover_root(registry, by_id, system);
     discover_root(registry, by_id, "data/plugins");
     return TRUE;
+}
+
+/**
+ * @brief Return the user plugin state path.
+ * @details Plugin enable choices are editor preferences, not plugin package
+ *          data, so they live beside the main Graptoς config file.
+ * @return Owned plugin state path.
+ */
+static char *plugin_state_path(void) {
+    const char *base = g_get_user_config_dir();
+    if (!base || base[0] == '\0') return NULL;
+    return g_build_filename(base, "graptos", "plugins.ini", NULL);
+}
+
+/**
+ * @brief Return whether a string list contains a plugin id.
+ * @param values String list returned by GKeyFile.
+ * @param id Plugin id to find.
+ * @return TRUE when the id exists in the list.
+ */
+static gboolean plugin_id_list_contains(char **values, const char *id) {
+    if (!values || !id) return FALSE;
+    for (guint i = 0u; values[i]; i++) {
+        if (g_strcmp0(values[i], id) == 0) return TRUE;
+    }
+    return FALSE;
+}
+
+void graptos_plugin_registry_apply_user_state(GraptosPluginRegistry *registry) {
+    if (!registry || !registry->plugins) return;
+    g_autofree char *path = plugin_state_path();
+    if (!path || !g_file_test(path, G_FILE_TEST_EXISTS)) return;
+    g_autoptr(GKeyFile) key_file = g_key_file_new();
+    if (!g_key_file_load_from_file(key_file, path, G_KEY_FILE_NONE, NULL)) return;
+
+    gsize disabled_len = 0u;
+    g_auto(GStrv) disabled =
+        g_key_file_get_string_list(key_file, "Plugins", "disabled", &disabled_len, NULL);
+    gsize enabled_len = 0u;
+    g_auto(GStrv) enabled =
+        g_key_file_get_string_list(key_file, "Plugins", "enabled", &enabled_len, NULL);
+    (void)disabled_len;
+    (void)enabled_len;
+    for (guint i = 0u; i < registry->plugins->len; i++) {
+        GraptosPlugin *plugin = g_ptr_array_index(registry->plugins, i);
+        if (!plugin || !plugin->id) continue;
+        if (plugin_id_list_contains(enabled, plugin->id)) {
+            plugin->enabled = TRUE;
+        } else if (plugin_id_list_contains(disabled, plugin->id)) {
+            plugin->enabled = FALSE;
+        }
+    }
+}
+
+gboolean graptos_plugin_registry_save_user_state(GraptosPluginRegistry *registry) {
+    if (!registry || !registry->plugins) return FALSE;
+    g_autofree char *path = plugin_state_path();
+    if (!path) return FALSE;
+
+    GPtrArray *enabled = g_ptr_array_new();
+    GPtrArray *disabled = g_ptr_array_new();
+    if (!enabled || !disabled) {
+        if (enabled) g_ptr_array_free(enabled, TRUE);
+        if (disabled) g_ptr_array_free(disabled, TRUE);
+        return FALSE;
+    }
+    for (guint i = 0u; i < registry->plugins->len; i++) {
+        GraptosPlugin *plugin = g_ptr_array_index(registry->plugins, i);
+        if (!plugin || !plugin->id) continue;
+        if (!plugin->default_enabled && plugin->enabled) {
+            g_ptr_array_add(enabled, plugin->id);
+        } else if (plugin->default_enabled && !plugin->enabled) {
+            g_ptr_array_add(disabled, plugin->id);
+        }
+    }
+
+    g_autoptr(GKeyFile) key_file = g_key_file_new();
+    g_key_file_set_string_list(key_file,
+                               "Plugins",
+                               "enabled",
+                               (const gchar * const *)enabled->pdata,
+                               enabled->len);
+    g_key_file_set_string_list(key_file,
+                               "Plugins",
+                               "disabled",
+                               (const gchar * const *)disabled->pdata,
+                               disabled->len);
+    g_ptr_array_free(enabled, TRUE);
+    g_ptr_array_free(disabled, TRUE);
+
+    gsize len = 0u;
+    g_autofree char *data = g_key_file_to_data(key_file, &len, NULL);
+    g_autofree char *dir = g_path_get_dirname(path);
+    if (!data || g_mkdir_with_parents(dir, 0700) != 0) return FALSE;
+    return g_file_set_contents(path, data, (gssize)len, NULL);
+}
+
+gboolean graptos_plugin_registry_set_enabled(GraptosPluginRegistry *registry,
+                                             const char *plugin_id,
+                                             gboolean enabled) {
+    if (!registry || !registry->plugins || !plugin_id) return FALSE;
+    for (guint i = 0u; i < registry->plugins->len; i++) {
+        GraptosPlugin *plugin = g_ptr_array_index(registry->plugins, i);
+        if (plugin && g_strcmp0(plugin->id, plugin_id) == 0) {
+            plugin->enabled = enabled;
+            return TRUE;
+        }
+    }
+    return FALSE;
 }
 
 /**
@@ -769,6 +997,16 @@ char *graptos_plugin_context_line_prefix(GraptosPluginCommandContext *context) {
                                     FALSE);
 }
 
+const char *graptos_plugin_context_syntax_name(GraptosPluginCommandContext *context) {
+    return context && context->tab && context->tab->active_syntax
+        ? context->tab->active_syntax->name
+        : NULL;
+}
+
+gboolean graptos_plugin_context_is_modified(GraptosPluginCommandContext *context) {
+    return context && context->tab ? context->tab->modified : FALSE;
+}
+
 gboolean graptos_plugin_context_insert_text(GraptosPluginCommandContext *context,
                                             const char *text) {
     if (!context || !context->tab || !context->tab->buffer || !text) return FALSE;
@@ -792,6 +1030,42 @@ gboolean graptos_plugin_context_replace_selection(GraptosPluginCommandContext *c
     return TRUE;
 }
 
+gboolean graptos_plugin_context_replace_text(GraptosPluginCommandContext *context,
+                                             const char *text) {
+    if (!context || !context->tab || !context->tab->buffer || !text ||
+        context->tab->locked) {
+        return FALSE;
+    }
+
+    gtk_text_buffer_begin_user_action(context->tab->buffer);
+    gtk_text_buffer_set_text(context->tab->buffer, text, -1);
+    gtk_text_buffer_end_user_action(context->tab->buffer);
+
+    editor_tab_schedule_lightweight_ui_refresh(context->tab);
+    editor_tab_schedule_syntax_diagnostics(context->tab);
+    return TRUE;
+}
+
+void graptos_plugin_context_clear_diagnostics(GraptosPluginCommandContext *context) {
+    if (!context || !context->tab) return;
+    clear_syntax_diagnostics(context->tab);
+    editor_tab_schedule_lightweight_ui_refresh(context->tab);
+}
+
+gboolean graptos_plugin_context_add_line_diagnostic(GraptosPluginCommandContext *context,
+                                                    guint line,
+                                                    const char *message) {
+    if (!context || !context->tab || line == 0u) return FALSE;
+    gboolean applied = editor_tab_apply_external_diagnostic(context->tab,
+                                                           (gint)(line - 1u),
+                                                           0,
+                                                           (gint)(line - 1u),
+                                                           G_MAXINT,
+                                                           message);
+    if (applied) editor_tab_schedule_lightweight_ui_refresh(context->tab);
+    return applied;
+}
+
 void graptos_plugin_context_show_output(GraptosPluginCommandContext *context,
                                         const char *title,
                                         const char *heading,
@@ -803,6 +1077,159 @@ void graptos_plugin_context_show_output(GraptosPluginCommandContext *context,
                   title ? title : "Plugin Output",
                   heading ? heading : "Plugin Output",
                   body ? body : "");
+}
+
+/**
+ * @brief Return a safe generated file stem.
+ * @param basename Requested basename.
+ * @return Owned safe basename.
+ */
+static char *plugin_safe_basename(const char *basename) {
+    GString *out = g_string_new(NULL);
+    for (const char *p = basename && basename[0] ? basename : "plugin-report"; *p; p++) {
+        if (g_ascii_isalnum(*p) || *p == '-' || *p == '_') {
+            g_string_append_c(out, *p);
+        } else {
+            g_string_append_c(out, '-');
+        }
+    }
+    if (out->len == 0u) g_string_append(out, "plugin-report");
+    return g_string_free(out, FALSE);
+}
+
+/**
+ * @brief Open a plugin-generated PDF.
+ * @param context Command context supplied by Graptoς.
+ * @param pdf_path Path to generated PDF.
+ * @return TRUE when the default application launched.
+ */
+static gboolean plugin_open_pdf(GraptosPluginCommandContext *context,
+                                const char *pdf_path) {
+    g_autoptr(GError) error = NULL;
+    g_autofree char *uri = g_filename_to_uri(pdf_path, NULL, &error);
+    if (!uri) {
+        if (context && context->tab && context->tab->win) {
+            app_window_set_error_status(context->tab->win,
+                                        "Could not open exported PDF",
+                                        error ? error->message : "Invalid PDF path");
+        }
+        return FALSE;
+    }
+    if (!g_app_info_launch_default_for_uri(uri, NULL, &error)) {
+        if (context && context->tab && context->tab->win) {
+            app_window_set_error_status(context->tab->win,
+                                        "Could not open exported PDF",
+                                        error ? error->message : "No default PDF application");
+        }
+        return FALSE;
+    }
+    return TRUE;
+}
+
+void graptos_plugin_context_show_preview(GraptosPluginCommandContext *context,
+                                         const char *title,
+                                         const char *body) {
+    if (!context || !context->tab || !context->tab->preview_buffer) return;
+    EditorTab *tab = context->tab;
+    g_free(tab->plugin_preview_title);
+    g_free(tab->plugin_preview_body);
+    tab->plugin_preview_title = g_strdup(title && title[0] ? title : "Plugin Preview");
+    tab->plugin_preview_body = g_strdup(body ? body : "");
+    tab->plugin_preview_active = TRUE;
+    if (tab->win) tab->win->preview_enabled = TRUE;
+    editor_tab_update_preview(tab);
+    editor_tab_set_preview_visible(tab, TRUE);
+    if (tab->win) {
+        app_window_update_ui(tab->win);
+        app_window_set_status(tab->win, "Plugin preview updated.");
+    }
+}
+
+void graptos_plugin_context_set_preview_visible(GraptosPluginCommandContext *context,
+                                                gboolean visible) {
+    if (!context || !context->tab || !context->tab->win) return;
+    context->tab->win->preview_enabled = visible;
+    editor_tab_set_preview_visible(context->tab, visible);
+    app_window_update_ui(context->tab->win);
+}
+
+gboolean graptos_plugin_context_export_latex_pdf(GraptosPluginCommandContext *context,
+                                                 const char *basename,
+                                                 const char *latex_source) {
+    if (!context || !context->tab || !context->tab->win || !latex_source) {
+        return FALSE;
+    }
+    EditorTab *tab = context->tab;
+    if (!tab->file_path || !tab->file_path[0]) {
+        app_window_set_error_status(tab->win,
+                                    "Export requires a saved file",
+                                    "Open or save the active file before exporting a plugin PDF.");
+        return FALSE;
+    }
+    g_autofree char *command = graptos_latex_resolve_command(tab->win);
+    if (!command) {
+        app_window_set_error_status(tab->win,
+                                    "LaTeX command not found",
+                                    "Install pdflatex, xelatex, or lualatex, or set latex_command in config.ini.");
+        return FALSE;
+    }
+
+    g_autofree char *dir = g_path_get_dirname(tab->file_path);
+    g_autofree char *output_dir = g_build_filename(dir, ".graptos-beancount-build", NULL);
+    if (g_mkdir_with_parents(output_dir, 0700) != 0) {
+        app_window_set_error_status(tab->win,
+                                    "Could not create export dir",
+                                    "Graptoς could not create .graptos-beancount-build.");
+        return FALSE;
+    }
+
+    g_autofree char *safe = plugin_safe_basename(basename);
+    g_autofree char *tex_name = g_strdup_printf("%s.tex", safe);
+    g_autofree char *pdf_name = g_strdup_printf("%s.pdf", safe);
+    g_autofree char *tex_path = g_build_filename(output_dir, tex_name, NULL);
+    g_autofree char *pdf_path = g_build_filename(output_dir, pdf_name, NULL);
+    g_autoptr(GError) error = NULL;
+    if (!write_text_atomic(tex_path, latex_source, &error)) {
+        app_window_set_error_status(tab->win,
+                                    "Could not write LaTeX report",
+                                    error ? error->message : tex_path);
+        return FALSE;
+    }
+
+    g_autofree char *stdout_text = NULL;
+    g_autofree char *stderr_text = NULL;
+    g_auto(GStrv) argv = graptos_latex_build_argv(tab->win,
+                                                  command,
+                                                  output_dir,
+                                                  tex_path,
+                                                  &error);
+    if (!argv) {
+        app_window_set_error_status(tab->win,
+                                    "LaTeX arguments invalid",
+                                    error ? error->message : "Could not parse latex_arguments.");
+        return FALSE;
+    }
+    int status = 0;
+    if (!g_spawn_sync(output_dir, argv, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL,
+                      &stdout_text, &stderr_text, &status, &error) ||
+        status != 0) {
+        g_autofree char *message = g_strdup_printf("%s\n%s",
+                                                   error ? error->message : "LaTeX export failed.",
+                                                   stderr_text ? stderr_text : "");
+        app_window_set_error_status(tab->win, "LaTeX export failed", message);
+        return FALSE;
+    }
+    if (!g_file_test(pdf_path, G_FILE_TEST_IS_REGULAR)) {
+        app_window_set_error_status(tab->win,
+                                    "Exported PDF not found",
+                                    "LaTeX finished, but Graptoς could not find the report PDF.");
+        return FALSE;
+    }
+    if (plugin_open_pdf(context, pdf_path)) {
+        app_window_set_status(tab->win, "Plugin PDF exported.");
+        return TRUE;
+    }
+    return FALSE;
 }
 
 void graptos_plugin_context_set_status(GraptosPluginCommandContext *context,
@@ -1193,6 +1620,16 @@ char *graptos_plugin_context_line_prefix(GraptosPluginCommandContext *context) {
     return g_strdup("");
 }
 
+const char *graptos_plugin_context_syntax_name(GraptosPluginCommandContext *context) {
+    (void)context;
+    return NULL;
+}
+
+gboolean graptos_plugin_context_is_modified(GraptosPluginCommandContext *context) {
+    (void)context;
+    return FALSE;
+}
+
 gboolean graptos_plugin_context_insert_text(GraptosPluginCommandContext *context,
                                             const char *text) {
     (void)context;
@@ -1207,6 +1644,26 @@ gboolean graptos_plugin_context_replace_selection(GraptosPluginCommandContext *c
     return FALSE;
 }
 
+gboolean graptos_plugin_context_replace_text(GraptosPluginCommandContext *context,
+                                             const char *text) {
+    (void)context;
+    (void)text;
+    return FALSE;
+}
+
+void graptos_plugin_context_clear_diagnostics(GraptosPluginCommandContext *context) {
+    (void)context;
+}
+
+gboolean graptos_plugin_context_add_line_diagnostic(GraptosPluginCommandContext *context,
+                                                    guint line,
+                                                    const char *message) {
+    (void)context;
+    (void)line;
+    (void)message;
+    return FALSE;
+}
+
 void graptos_plugin_context_show_output(GraptosPluginCommandContext *context,
                                         const char *title,
                                         const char *heading,
@@ -1215,6 +1672,29 @@ void graptos_plugin_context_show_output(GraptosPluginCommandContext *context,
     (void)title;
     (void)heading;
     (void)body;
+}
+
+void graptos_plugin_context_show_preview(GraptosPluginCommandContext *context,
+                                         const char *title,
+                                         const char *body) {
+    (void)context;
+    (void)title;
+    (void)body;
+}
+
+void graptos_plugin_context_set_preview_visible(GraptosPluginCommandContext *context,
+                                                gboolean visible) {
+    (void)context;
+    (void)visible;
+}
+
+gboolean graptos_plugin_context_export_latex_pdf(GraptosPluginCommandContext *context,
+                                                 const char *basename,
+                                                 const char *latex_source) {
+    (void)context;
+    (void)basename;
+    (void)latex_source;
+    return FALSE;
 }
 
 void graptos_plugin_context_set_status(GraptosPluginCommandContext *context,
@@ -1290,6 +1770,7 @@ gboolean graptos_plugin_registry_load_native(GraptosPluginRegistry *registry,
             plugin->native_library[0] == '\0') {
             continue;
         }
+        if (plugin->native_handle) continue;
         if (!plugin_has_permission(plugin, "native")) {
             g_set_error(error, GRAPTOS_PLUGIN_ERROR,
                         GRAPTOS_PLUGIN_ERROR_NATIVE,
@@ -1378,7 +1859,6 @@ void graptos_plugin_append_editor_context_items(GraptosPluginRegistry *registry,
             child = next;
         }
     }
-    g_object_unref(plugin_box);
 #endif
 }
 
@@ -1397,6 +1877,28 @@ guint graptos_plugin_append_editor_tool_items(GraptosPluginRegistry *registry,
                                            tab,
                                            box,
                                            NULL,
+                                           line,
+                                           TRUE);
+#endif
+}
+
+guint graptos_plugin_append_editor_tool_menu_items(GraptosPluginRegistry *registry,
+                                                   EditorTab *tab,
+                                                   GtkWidget *box,
+                                                   GtkWidget *popover,
+                                                   guint line) {
+#ifdef GRAPTOS_PLUGIN_NO_UI
+    (void)registry;
+    (void)tab;
+    (void)box;
+    (void)popover;
+    (void)line;
+    return 0u;
+#else
+    return plugin_append_editor_line_specs(registry,
+                                           tab,
+                                           box,
+                                           popover,
                                            line,
                                            TRUE);
 #endif
@@ -1483,5 +1985,156 @@ GPtrArray *graptos_plugin_registry_completion_candidates(GraptosPluginRegistry *
         }
     }
     return NULL;
+#endif
+}
+
+char *graptos_plugin_registry_hover_text(GraptosPluginRegistry *registry,
+                                         EditorTab *tab,
+                                         const char *word,
+                                         char **source_label_out) {
+#ifdef GRAPTOS_PLUGIN_NO_UI
+    (void)registry;
+    (void)tab;
+    (void)word;
+    (void)source_label_out;
+    return NULL;
+#else
+    if (source_label_out) *source_label_out = NULL;
+    if (!registry || !registry->plugins || !tab || !word || !word[0]) {
+        return NULL;
+    }
+    for (guint i = 0u; i < registry->plugins->len; i++) {
+        GraptosPlugin *plugin = g_ptr_array_index(registry->plugins, i);
+        if (!plugin || !plugin->enabled || !plugin->native_hover_providers) {
+            continue;
+        }
+        for (guint j = 0u; j < plugin->native_hover_providers->len; j++) {
+            GraptosNativeHoverProvider *provider =
+                g_ptr_array_index(plugin->native_hover_providers, j);
+            if (!provider || !provider->callback) continue;
+            GraptosPluginCommandContext context = {0};
+            context.plugin = plugin;
+            context.tab = tab;
+            context.command = provider->provider_id;
+            context.line = plugin_tab_cursor_line(tab);
+            char *body = provider->callback(&context, word, provider->user_data);
+            if (!body || !body[0]) {
+                g_free(body);
+                continue;
+            }
+            if (source_label_out) {
+                *source_label_out = g_strdup(provider->label
+                                             ? provider->label
+                                             : "Plugin");
+            }
+            return body;
+        }
+    }
+    return NULL;
+#endif
+}
+
+void graptos_plugin_hub_view_free(gpointer data) {
+    GraptosPluginHubView *view = data;
+    if (!view) return;
+    g_free(view->plugin_id);
+    g_free(view->hub_id);
+    g_free(view->label);
+    g_free(view);
+}
+
+GPtrArray *graptos_plugin_registry_hub_views(GraptosPluginRegistry *registry) {
+    GPtrArray *views = g_ptr_array_new_with_free_func(graptos_plugin_hub_view_free);
+    if (!views) return NULL;
+    if (!registry || !registry->plugins) return views;
+    for (guint i = 0u; i < registry->plugins->len; i++) {
+        GraptosPlugin *plugin = g_ptr_array_index(registry->plugins, i);
+        if (!plugin || !plugin->enabled || !plugin->native_hubs) continue;
+        for (guint j = 0u; j < plugin->native_hubs->len; j++) {
+            GraptosNativeHub *hub = g_ptr_array_index(plugin->native_hubs, j);
+            if (!hub || !hub->render || !hub->action) continue;
+            GraptosPluginHubView *view = g_new0(GraptosPluginHubView, 1);
+            view->plugin_id = g_strdup(plugin->id);
+            view->hub_id = g_strdup(hub->hub_id);
+            view->label = g_strdup(hub->label ? hub->label : "Plugin Hub");
+            g_ptr_array_add(views, view);
+        }
+    }
+    return views;
+}
+
+#ifndef GRAPTOS_PLUGIN_NO_UI
+static GraptosNativeHub *plugin_find_hub(GraptosPluginRegistry *registry,
+                                         const char *plugin_id,
+                                         const char *hub_id,
+                                         GraptosPlugin **plugin_out) {
+    if (plugin_out) *plugin_out = NULL;
+    if (!registry || !registry->plugins || !plugin_id || !hub_id) return NULL;
+    for (guint i = 0u; i < registry->plugins->len; i++) {
+        GraptosPlugin *plugin = g_ptr_array_index(registry->plugins, i);
+        if (!plugin || !plugin->enabled || g_strcmp0(plugin->id, plugin_id) != 0 ||
+            !plugin->native_hubs) {
+            continue;
+        }
+        for (guint j = 0u; j < plugin->native_hubs->len; j++) {
+            GraptosNativeHub *hub = g_ptr_array_index(plugin->native_hubs, j);
+            if (hub && g_strcmp0(hub->hub_id, hub_id) == 0) {
+                if (plugin_out) *plugin_out = plugin;
+                return hub;
+            }
+        }
+    }
+    return NULL;
+}
+#endif
+
+char *graptos_plugin_registry_render_hub(GraptosPluginRegistry *registry,
+                                         EditorTab *tab,
+                                         const char *plugin_id,
+                                         const char *hub_id) {
+#ifdef GRAPTOS_PLUGIN_NO_UI
+    (void)registry;
+    (void)tab;
+    (void)plugin_id;
+    (void)hub_id;
+    return NULL;
+#else
+    GraptosPlugin *plugin = NULL;
+    GraptosNativeHub *hub = plugin_find_hub(registry, plugin_id, hub_id, &plugin);
+    if (!hub || !hub->render || !plugin || !tab) return NULL;
+    GraptosPluginCommandContext context = {0};
+    context.plugin = plugin;
+    context.tab = tab;
+    context.command = hub->hub_id;
+    context.line = plugin_tab_cursor_line(tab);
+    return hub->render(&context, hub->user_data);
+#endif
+}
+
+gboolean graptos_plugin_registry_run_hub_action(GraptosPluginRegistry *registry,
+                                                EditorTab *tab,
+                                                const char *plugin_id,
+                                                const char *hub_id,
+                                                const char *action_id,
+                                                const char *input) {
+#ifdef GRAPTOS_PLUGIN_NO_UI
+    (void)registry;
+    (void)tab;
+    (void)plugin_id;
+    (void)hub_id;
+    (void)action_id;
+    (void)input;
+    return FALSE;
+#else
+    GraptosPlugin *plugin = NULL;
+    GraptosNativeHub *hub = plugin_find_hub(registry, plugin_id, hub_id, &plugin);
+    if (!hub || !hub->action || !plugin || !tab || !action_id) return FALSE;
+    GraptosPluginCommandContext context = {0};
+    context.plugin = plugin;
+    context.tab = tab;
+    context.command = hub->hub_id;
+    context.line = plugin_tab_cursor_line(tab);
+    hub->action(&context, action_id, input, hub->user_data);
+    return TRUE;
 #endif
 }

@@ -744,6 +744,17 @@ gboolean on_text_view_key_pressed(GtkEventControllerKey *controller,
         if (debug_typing) g_message("Typing: key-handled action=path-completion");
         return TRUE;
     }
+    if (ctrl && alt && key == GDK_KEY_b) {
+        gboolean handled = tab->win && tab->win->plugins
+            ? graptos_plugin_registry_run_shortcut(tab->win->plugins,
+                                                   tab,
+                                                   "Ctrl+Alt+B",
+                                                   0u)
+            : FALSE;
+        if (!handled) editor_tab_show_completion(tab, TRUE);
+        if (debug_typing) g_message("Typing: key-handled action=beancount-completion");
+        return TRUE;
+    }
 
     if (alt || keyval == GDK_KEY_Alt_L || keyval == GDK_KEY_Alt_R) {
         tab->inspect_reference_active = TRUE;

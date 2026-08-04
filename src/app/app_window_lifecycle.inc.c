@@ -103,6 +103,8 @@ EditorWindow *app_window_new(GtkApplication *application) {
     win->preview_font = g_strdup("");
     win->terminal_font = g_strdup("");
     win->code_font = g_strdup("monospace");
+    win->latex_command = g_strdup("");
+    win->latex_arguments = g_strdup("-interaction=nonstopmode -halt-on-error -file-line-error -no-shell-escape -output-directory {output_dir} {source_path}");
     {
         const char *config_dir = g_get_user_config_dir();
         win->theme_css_path = config_dir && config_dir[0] != '\0'
@@ -202,6 +204,7 @@ EditorWindow *app_window_new(GtkApplication *application) {
     win->lsp_sync_max_chars = GRAPTOS_DEFAULT_LSP_SYNC_MAX_CHARS;
     win->max_undo_states = GRAPTOS_DEFAULT_MAX_UNDO_STATES;
     win->full_highlight_max_chars = GRAPTOS_DEFAULT_FULL_HIGHLIGHT_MAX_CHARS;
+    win->custom_highlight_mode = g_strdup("auto");
     win->max_undo_capture_bytes = GRAPTOS_DEFAULT_MAX_UNDO_CAPTURE_BYTES;
     win->highlight_delay_ms = GRAPTOS_DEFAULT_HIGHLIGHT_DELAY_MS;
     win->completion_delay_ms = GRAPTOS_DEFAULT_COMPLETION_DELAY_MS;
@@ -227,6 +230,7 @@ EditorWindow *app_window_new(GtkApplication *application) {
             plugin_error) {
             g_warning("Plugin discovery failed: %s", plugin_error->message);
         }
+        graptos_plugin_registry_apply_user_state(win->plugins);
         g_clear_error(&plugin_error);
         if (!graptos_plugin_registry_load_native(win->plugins, &plugin_error) &&
             plugin_error) {
@@ -266,9 +270,16 @@ EditorWindow *app_window_new(GtkApplication *application) {
     GtkWidget *top = build_top_bar(win);
     gtk_box_append(GTK_BOX(root), top);
 
+    win->work_pane = gtk_paned_new(GTK_ORIENTATION_VERTICAL);
+    gtk_widget_add_css_class(win->work_pane, "graptos-work-pane");
+    gtk_widget_set_vexpand(win->work_pane, TRUE);
+    gtk_box_append(GTK_BOX(root), win->work_pane);
+
     GtkWidget *main_pane = gtk_paned_new(GTK_ORIENTATION_HORIZONTAL);
     gtk_widget_set_vexpand(main_pane, TRUE);
-    gtk_box_append(GTK_BOX(root), main_pane);
+    gtk_paned_set_start_child(GTK_PANED(win->work_pane), main_pane);
+    gtk_paned_set_resize_start_child(GTK_PANED(win->work_pane), TRUE);
+    gtk_paned_set_shrink_start_child(GTK_PANED(win->work_pane), FALSE);
 
     win->project_revealer = gtk_revealer_new();
     gtk_revealer_set_transition_type(GTK_REVEALER(win->project_revealer), GTK_REVEALER_TRANSITION_TYPE_SLIDE_RIGHT);
@@ -301,14 +312,29 @@ EditorWindow *app_window_new(GtkApplication *application) {
     gtk_paned_set_position(GTK_PANED(main_pane), 240);
     g_signal_connect(win->notebook, "switch-page", G_CALLBACK(on_switch_page), win);
 
+    win->bottom_pane = gtk_paned_new(GTK_ORIENTATION_VERTICAL);
+    g_object_ref_sink(win->bottom_pane);
+    gtk_widget_add_css_class(win->bottom_pane, "graptos-bottom-pane");
+    gtk_widget_set_vexpand(win->bottom_pane, TRUE);
+    gtk_widget_set_visible(win->bottom_pane, FALSE);
+
     win->terminal_panel = terminal_panel_new(win);
-    gtk_box_append(GTK_BOX(root), terminal_panel_widget(win->terminal_panel));
+    gtk_paned_set_start_child(GTK_PANED(win->bottom_pane),
+                              terminal_panel_widget(win->terminal_panel));
+    gtk_paned_set_resize_start_child(GTK_PANED(win->bottom_pane), TRUE);
+    gtk_paned_set_shrink_start_child(GTK_PANED(win->bottom_pane), FALSE);
 
     GtkWidget *search_panel = build_search_panel(win);
     gtk_box_append(GTK_BOX(root), search_panel);
 
     GtkWidget *tool_panel = build_tool_panel(win);
     gtk_box_append(GTK_BOX(root), tool_panel);
+
+    GtkWidget *plugin_hub_panel = build_plugin_hub_panel(win);
+    gtk_paned_set_end_child(GTK_PANED(win->bottom_pane), plugin_hub_panel);
+    gtk_paned_set_resize_end_child(GTK_PANED(win->bottom_pane), TRUE);
+    gtk_paned_set_shrink_end_child(GTK_PANED(win->bottom_pane), FALSE);
+    gtk_paned_set_position(GTK_PANED(win->bottom_pane), 150);
 
     GtkWidget *bottom = build_bottom_bar(win);
     gtk_box_append(GTK_BOX(root), bottom);
@@ -368,6 +394,11 @@ void app_window_free(EditorWindow *win) {
     lsp_client_free(win->lsp_client);
     codex_panel_free(win->codex_panel);
     terminal_panel_free(win->terminal_panel);
+    if (win->bottom_pane_attached && win->work_pane) {
+        gtk_paned_set_end_child(GTK_PANED(win->work_pane), NULL);
+        win->bottom_pane_attached = FALSE;
+    }
+    g_clear_object(&win->bottom_pane);
     graptos_config_save(win);
     if (win->syntaxes) g_ptr_array_free(win->syntaxes, TRUE);
     if (win->project_expanded) g_hash_table_destroy(win->project_expanded);
@@ -467,7 +498,10 @@ void app_window_free(EditorWindow *win) {
     g_free(win->preview_font);
     g_free(win->terminal_font);
     g_free(win->code_font);
+    g_free(win->custom_highlight_mode);
     g_free(win->theme_css_path);
+    g_free(win->latex_command);
+    g_free(win->latex_arguments);
     g_free(win->project_root);
     g_free(win);
 }

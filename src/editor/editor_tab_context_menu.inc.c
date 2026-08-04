@@ -78,56 +78,47 @@ context_button(EditorTab *tab,
     return graptos_flat_button_new(label, NULL, callback, tab);
 }
 
+/**
+ * @brief Return whether one widget is under another widget.
+ * @details Right-click capture is installed on the editor overlay so Graptoς
+ *          sees the event before GtkSourceView. This helper keeps the handler
+ *          limited to clicks that actually landed inside the text view.
+ * @param widget Widget picked at the click location.
+ * @param ancestor Expected ancestor widget.
+ * @return TRUE when @widget is @ancestor or one of its descendants.
+ */
+static gboolean context_widget_is_descendant(GtkWidget *widget,
+                                             GtkWidget *ancestor) {
+    while (widget) {
+        if (widget == ancestor) return TRUE;
+        widget = gtk_widget_get_parent(widget);
+    }
+    return FALSE;
+}
+
 
 /**
- * on_text_view_right_click:
- * @gesture: the click gesture that received the right-button event
- * @n_press: the number of presses in the current click sequence
- * @x: the horizontal click position relative to the text view
- * @y: the vertical click position relative to the text view
- * @user_data: the #EditorTab associated with the text view
- *
- * Opens the editor context menu at the pointer position.
- *
- * Any previously stored context popover is destroyed before the new one is
- * attached. This keeps one active context menu per text view and prevents
- * stale popovers from retaining references to editor state.
- * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
- * @param gesture The gesture supplied by the caller.
- * @param n_press The n press supplied by the caller.
- * @param x The x supplied by the caller.
- * @param y The y supplied by the caller.
- * @param user_data The callback context passed through GTK signal data.
+ * @brief Show the editor context menu.
+ * @details The caller already decided this is Graptoς's secondary-click menu.
+ *          Keeping menu construction separate from the event controller lets us
+ *          stop GtkTextView's built-in context menu before opening ours.
+ * @param tab Editor tab receiving the menu.
+ * @param widget Text view owning the menu.
+ * @param x Horizontal click position.
+ * @param y Vertical click position.
  */
-void
-on_text_view_right_click(GtkGestureClick *gesture,
-                         int n_press,
-                         double x,
-                         double y,
-                         gpointer user_data)
-{
-    EditorTab *tab = user_data;
-    GtkWidget *widget;
+static void editor_tab_show_context_menu_at(EditorTab *tab,
+                                            GtkWidget *widget,
+                                            double x,
+                                            double y) {
     GtkWidget *old_popover;
     GtkWidget *popover;
     GtkWidget *box;
     GdkRectangle rect;
     guint clicked_line = 0u;
 
-    (void)n_press;
-
-    widget = gtk_event_controller_get_widget(
-        GTK_EVENT_CONTROLLER(gesture));
-
     if (!tab || !widget)
         return;
-
-    /*
-     * Claim the sequence so the right-click is handled by Graptoς's context menu
-     * instead of falling through to other gesture handlers.
-     */
-    gtk_gesture_set_state(GTK_GESTURE(gesture),
-                          GTK_EVENT_SEQUENCE_CLAIMED);
 
     /*
      * Only one context popover should exist per text view. Destroy the previous
@@ -265,4 +256,42 @@ on_text_view_right_click(GtkGestureClick *gesture,
                      widget);
 
     graptos_popover_show(popover);
+}
+
+/**
+ * @brief Handle a captured text-view right click.
+ * @details GtkSourceView owns a default context menu. Graptoς claims the click
+ *          sequence at capture phase before opening its own menu, which keeps
+ *          the built-in menu from racing the editor context menu.
+ * @param gesture Secondary-button gesture installed on the text view.
+ * @param n_press Number of presses reported by GTK.
+ * @param x Horizontal click position in text-view coordinates.
+ * @param y Vertical click position in text-view coordinates.
+ * @param user_data EditorTab owning the text view.
+ */
+void on_text_view_right_click(GtkGestureClick *gesture,
+                              int n_press,
+                              double x,
+                              double y,
+                              gpointer user_data) {
+    (void)n_press;
+    EditorTab *tab = user_data;
+    if (!gesture) return;
+    GtkWidget *widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gesture));
+    if (!widget || !tab || !tab->text_view) return;
+    GtkWidget *picked = gtk_widget_pick(widget, x, y, GTK_PICK_DEFAULT);
+    if (!context_widget_is_descendant(picked, tab->text_view)) return;
+
+    double text_x = x;
+    double text_y = y;
+    if (widget != tab->text_view) {
+        graphene_point_t from = GRAPHENE_POINT_INIT((float)x, (float)y);
+        graphene_point_t to = GRAPHENE_POINT_INIT(0.0f, 0.0f);
+        if (gtk_widget_compute_point(widget, tab->text_view, &from, &to)) {
+            text_x = to.x;
+            text_y = to.y;
+        }
+    }
+    gtk_gesture_set_state(GTK_GESTURE(gesture), GTK_EVENT_SEQUENCE_CLAIMED);
+    editor_tab_show_context_menu_at(tab, tab->text_view, text_x, text_y);
 }

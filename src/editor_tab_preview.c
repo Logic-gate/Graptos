@@ -318,7 +318,9 @@ gboolean editor_tab_is_latex(EditorTab *tab) {
  * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean preview_is_supported(EditorTab *tab) {
-    return preview_is_markdown(tab) || editor_tab_is_latex(tab);
+    return (tab && tab->plugin_preview_active) ||
+           preview_is_markdown(tab) ||
+           editor_tab_is_latex(tab);
 }
 
 /**
@@ -1057,8 +1059,22 @@ void editor_tab_update_preview(EditorTab *tab) {
     tab->preview_updating = TRUE;
     gtk_text_buffer_set_text(tab->preview_buffer, "", 0);
     preview_ensure_tags(tab);
-    if (preview_is_markdown(tab)) preview_render_markdown(tab, text);
-    else if (editor_tab_is_latex(tab)) preview_render_latex(tab, text);
+    if (tab->plugin_preview_active) {
+        GString *report = g_string_new(NULL);
+        if (tab->plugin_preview_title && tab->plugin_preview_title[0]) {
+            g_string_append_printf(report, "%s\n\n", tab->plugin_preview_title);
+        }
+        g_string_append(report,
+                        tab->plugin_preview_body && tab->plugin_preview_body[0]
+                            ? tab->plugin_preview_body
+                            : "No plugin preview.");
+        gtk_text_buffer_set_text(tab->preview_buffer, report->str, -1);
+        g_string_free(report, TRUE);
+    } else if (preview_is_markdown(tab)) {
+        preview_render_markdown(tab, text);
+    } else if (editor_tab_is_latex(tab)) {
+        preview_render_latex(tab, text);
+    }
     tab->preview_updating = FALSE;
 
     preview_set_container_visible(tab, TRUE);

@@ -52,6 +52,44 @@ typedef GPtrArray *(*GraptosPluginCompletionFunc)(GraptosPluginCommandContext *c
                                                   gpointer user_data);
 
 /**
+ * @brief Native plugin hover callback.
+ * @details Providers inspect the current hover word and may return a short
+ *          plain-text body for Graptoς to show in the hover popover.
+ * @param context Opaque execution context for the current editor hover.
+ * @param word Word or token under the pointer.
+ * @param user_data Plugin data supplied during provider registration.
+ * @return Owned hover body, or NULL when the provider does not apply.
+ */
+typedef char *(*GraptosPluginHoverFunc)(GraptosPluginCommandContext *context,
+                                        const char *word,
+                                        gpointer user_data);
+
+/**
+ * @brief Native plugin hub render callback.
+ * @details Hubs provide one focused tool surface without adding many command
+ *          rows. The returned text is shown in the tool panel.
+ * @param context Command context for the active editor/project.
+ * @param user_data Plugin data supplied during hub registration.
+ * @return Owned plain-text hub body.
+ */
+typedef char *(*GraptosPluginHubRenderFunc)(GraptosPluginCommandContext *context,
+                                            gpointer user_data);
+
+/**
+ * @brief Native plugin hub action callback.
+ * @details Graptoς owns the compact hub controls and passes action ids plus
+ *          prompt text to the plugin.
+ * @param context Command context for the active editor/project.
+ * @param action_id Stable action id such as add, modify, done, delete, priority.
+ * @param input Prompt text supplied by the user, or NULL.
+ * @param user_data Plugin data supplied during hub registration.
+ */
+typedef void (*GraptosPluginHubActionFunc)(GraptosPluginCommandContext *context,
+                                           const char *action_id,
+                                           const char *input,
+                                           gpointer user_data);
+
+/**
  * @brief Native plugin data destroy callback.
  * @param user_data Plugin-owned data supplied during command registration.
  */
@@ -165,6 +203,46 @@ gboolean graptos_plugin_host_register_completion_provider(GraptosPluginHost *hos
                                                           GraptosPluginDestroyFunc destroy);
 
 /**
+ * @brief Register a native hover provider.
+ * @details Providers are asked before built-in reference lookup. The first
+ *          provider that returns text owns the hover body.
+ * @param host The host capability object supplied by Graptoς.
+ * @param provider_id Stable provider id owned by the plugin.
+ * @param label Human-facing hover heading.
+ * @param callback Native hover callback.
+ * @param user_data Plugin data passed to the callback.
+ * @param destroy Optional destroy callback for user_data.
+ * @return TRUE when the provider was accepted.
+ */
+gboolean graptos_plugin_host_register_hover_provider(GraptosPluginHost *host,
+                                                     const char *provider_id,
+                                                     const char *label,
+                                                     GraptosPluginHoverFunc callback,
+                                                     gpointer user_data,
+                                                     GraptosPluginDestroyFunc destroy);
+
+/**
+ * @brief Register a focused native plugin hub.
+ * @details A hub appears as one plugin tool entry and opens a compact tool
+ *          panel instead of contributing many command menu rows.
+ * @param host The host capability object supplied by Graptoς.
+ * @param hub_id Stable hub id owned by the plugin.
+ * @param label Human-facing hub label.
+ * @param render Render callback.
+ * @param action Action callback.
+ * @param user_data Plugin data passed to callbacks.
+ * @param destroy Optional user data destroy hook.
+ * @return TRUE when the hub was accepted.
+ */
+gboolean graptos_plugin_host_register_hub(GraptosPluginHost *host,
+                                          const char *hub_id,
+                                          const char *label,
+                                          GraptosPluginHubRenderFunc render,
+                                          GraptosPluginHubActionFunc action,
+                                          gpointer user_data,
+                                          GraptosPluginDestroyFunc destroy);
+
+/**
  * @brief Return the plugin id for a command context.
  * @param context Command context supplied by Graptoς.
  * @return Plugin id, or NULL.
@@ -233,6 +311,24 @@ char *graptos_plugin_context_line_text(GraptosPluginCommandContext *context,
 char *graptos_plugin_context_line_prefix(GraptosPluginCommandContext *context);
 
 /**
+ * @brief Return the active syntax name.
+ * @details Native plugins use this to stay language-aware without reading
+ *          editor internals or duplicating Graptoς syntax detection.
+ * @param context Command context supplied by Graptoς.
+ * @return Syntax name owned by Graptoς, or NULL when no syntax is active.
+ */
+const char *graptos_plugin_context_syntax_name(GraptosPluginCommandContext *context);
+
+/**
+ * @brief Return whether the active editor has unsaved changes.
+ * @details Plugins that invoke file-backed command line tools should use this
+ *          before reading the on-disk file.
+ * @param context Command context supplied by Graptoς.
+ * @return TRUE when the active buffer differs from disk.
+ */
+gboolean graptos_plugin_context_is_modified(GraptosPluginCommandContext *context);
+
+/**
  * @brief Insert text at the active cursor.
  * @param context Command context supplied by Graptoς.
  * @param text Text to insert.
@@ -251,6 +347,38 @@ gboolean graptos_plugin_context_replace_selection(GraptosPluginCommandContext *c
                                                   const char *text);
 
 /**
+ * @brief Replace the entire active editor text.
+ * @details This is intended for formatter-style plugins. Graptoς owns the GTK
+ *          buffer edit so undo state and editor refreshes stay consistent.
+ * @param context Command context supplied by Graptoς.
+ * @param text New complete buffer text.
+ * @return TRUE when the buffer was updated.
+ */
+gboolean graptos_plugin_context_replace_text(GraptosPluginCommandContext *context,
+                                             const char *text);
+
+/**
+ * @brief Clear diagnostics currently shown in the active editor.
+ * @details External tool plugins can clear stale results before publishing
+ *          fresh diagnostics from a validation run.
+ * @param context Command context supplied by Graptoς.
+ */
+void graptos_plugin_context_clear_diagnostics(GraptosPluginCommandContext *context);
+
+/**
+ * @brief Add a diagnostic to one editor line.
+ * @details The line is one-based to match command-line tool output and the
+ *          editor gutter. Graptoς clamps the range to the live buffer.
+ * @param context Command context supplied by Graptoς.
+ * @param line One-based target line.
+ * @param message Diagnostic message shown on hover.
+ * @return TRUE when the diagnostic was applied.
+ */
+gboolean graptos_plugin_context_add_line_diagnostic(GraptosPluginCommandContext *context,
+                                                    guint line,
+                                                    const char *message);
+
+/**
  * @brief Show command output in a Graptoς dialog.
  * @param context Command context supplied by Graptoς.
  * @param title Dialog title.
@@ -261,6 +389,43 @@ void graptos_plugin_context_show_output(GraptosPluginCommandContext *context,
                                         const char *title,
                                         const char *heading,
                                         const char *body);
+
+/**
+ * @brief Show plugin text in the active editor preview pane.
+ * @details Plugins use this for derived reports that belong beside the editor
+ *          instead of in a transient dialog. Graptoς owns the preview widgets
+ *          and copies both strings before returning.
+ * @param context Command context supplied by Graptoς.
+ * @param title Preview title.
+ * @param body Plain-text preview body.
+ */
+void graptos_plugin_context_show_preview(GraptosPluginCommandContext *context,
+                                         const char *title,
+                                         const char *body);
+
+/**
+ * @brief Set active editor preview visibility.
+ * @details This lets report plugins bring the side preview into view without
+ *          exposing the preview widget tree through the plugin ABI.
+ * @param context Command context supplied by Graptoς.
+ * @param visible TRUE to show preview, FALSE to hide it.
+ */
+void graptos_plugin_context_set_preview_visible(GraptosPluginCommandContext *context,
+                                                gboolean visible);
+
+/**
+ * @brief Export plugin supplied LaTeX to a PDF.
+ * @details Graptoς writes the source into a build directory beside the active
+ *          file, runs a detected LaTeX engine without shell expansion, and
+ *          opens the generated PDF.
+ * @param context Command context supplied by Graptoς.
+ * @param basename Safe base name for generated files.
+ * @param latex_source Complete LaTeX source.
+ * @return TRUE when a PDF was generated and opened.
+ */
+gboolean graptos_plugin_context_export_latex_pdf(GraptosPluginCommandContext *context,
+                                                 const char *basename,
+                                                 const char *latex_source);
 
 /**
  * @brief Set the Graptoς status text.

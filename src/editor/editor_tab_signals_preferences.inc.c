@@ -259,7 +259,10 @@ void on_buffer_changed(GtkTextBuffer *buffer, gpointer user_data) {
         editor_tab_schedule_lightweight_ui_refresh(tab);
         if (debug_typing) ui_schedule_ms = typing_elapsed_ms(part_start_us, g_get_monotonic_time());
         part_start_us = debug_typing ? g_get_monotonic_time() : 0;
-        if (!tab->manual_syntax_override && !tab->file_path) editor_tab_auto_select_syntax(tab);
+        if (!tab->manual_syntax_override && !tab->file_path) {
+            editor_tab_auto_select_syntax(tab);
+            editor_tab_schedule_highlight(tab);
+        }
         if (debug_typing) syntax_schedule_ms = typing_elapsed_ms(part_start_us, g_get_monotonic_time());
         if (debug_typing) {
             schedule_ms = typing_elapsed_ms(schedule_start_us, g_get_monotonic_time());
@@ -327,7 +330,10 @@ void on_buffer_changed(GtkTextBuffer *buffer, gpointer user_data) {
     editor_tab_schedule_syntax_diagnostics(tab);
     if (debug_typing) diagnostics_schedule_ms = typing_elapsed_ms(part_start_us, g_get_monotonic_time());
     part_start_us = debug_typing ? g_get_monotonic_time() : 0;
-    if (!tab->manual_syntax_override && !tab->file_path) editor_tab_auto_select_syntax(tab);
+    if (!tab->manual_syntax_override && !tab->file_path) {
+        editor_tab_auto_select_syntax(tab);
+    }
+    editor_tab_schedule_highlight(tab);
     if (debug_typing) syntax_schedule_ms = typing_elapsed_ms(part_start_us, g_get_monotonic_time());
     part_start_us = debug_typing ? g_get_monotonic_time() : 0;
     editor_tab_schedule_completion(tab);

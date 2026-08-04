@@ -148,8 +148,13 @@ typedef struct _EditorWindow {
     GtkWidget *preview_button; /**< Preview button. */
     GtkWidget *syntax_override_button; /**< Syntax override button. */
     GtkWidget *search_revealer; /**< Search revealer. */
+    GtkWidget *work_pane; /**< Resizable editor-versus-bottom pane. */
+    GtkWidget *bottom_pane; /**< Resizable stacked bottom tool/terminal area. */
+    gboolean bottom_pane_attached; /**< Bottom pane is currently attached to the work pane. */
     GtkWidget *tool_revealer; /**< Tool revealer. */
     GtkWidget *tool_panel; /**< Tool panel. */
+    GtkWidget *plugin_hub_revealer; /**< Resizable plugin hub revealer. */
+    GtkWidget *plugin_hub_panel; /**< Resizable plugin hub panel. */
     GtkWidget *find_entry; /**< Find entry. */
     GtkWidget *replace_label; /**< Replace label. */
     GtkWidget *replace_entry; /**< Replace entry. */
@@ -184,6 +189,8 @@ typedef struct _EditorWindow {
     char *terminal_font; /**< Terminal font description, or empty for VTE default. */
     char *code_font; /**< Code snippet and auxiliary code font description. */
     char *theme_css_path; /**< Active CSS theme path. */
+    char *latex_command; /**< Preferred LaTeX executable, or empty for auto-detect. */
+    char *latex_arguments; /**< LaTeX argv tail with {output_dir} and {source_path}. */
     char *editor_bg_color; /**< Editor bg color. */
     char *editor_fg_color; /**< Editor fg color. */
     char *editor_gutter_bg_color; /**< Editor gutter bg color. */
@@ -276,6 +283,7 @@ typedef struct _EditorWindow {
     guint lsp_sync_max_chars; /**< Maximum buffer chars for LSP didChange sync. */
     guint max_undo_states; /**< Maximum undo snapshots retained per tab. */
     guint full_highlight_max_chars; /**< Maximum chars for full highlighting work. */
+    char *custom_highlight_mode; /**< Custom YAML highlight mode: auto, viewport, background, or full. */
     guint max_undo_capture_bytes; /**< Maximum buffer chars copied into undo snapshots. */
     guint highlight_delay_ms; /**< Delay before applying editor highlight refresh. */
     guint completion_delay_ms; /**< Delay before automatic completion. */
@@ -314,6 +322,8 @@ typedef struct _EditorWindow {
  * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 EditorWindow *app_window_new(GtkApplication *application);
+void app_window_show_bottom_pane(EditorWindow *win);
+void app_window_hide_bottom_pane_if_empty(EditorWindow *win);
 /**
  * @brief App window free.
  * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.

@@ -121,6 +121,7 @@ GtkWidget *build_search_panel(EditorWindow *win);
  * @return The resolved value for the caller, or NULL when no suitable value is available.
  */
 GtkWidget *build_tool_panel(EditorWindow *win);
+GtkWidget *build_plugin_hub_panel(EditorWindow *win);
 /**
  * @brief Build bottom bar.
  * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.

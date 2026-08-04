@@ -8,6 +8,8 @@
 
 #include "editor_tab_private.h"
 
+static GtkWidget *tab_symbolic_icon(const char *primary, const char **fallbacks);
+
 /**
  * @brief Tab init state.
  * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
@@ -125,7 +127,9 @@ static void tab_create_preview(EditorTab *tab, EditorWindow *win) {
     gtk_widget_set_hexpand(header, TRUE);
     GtkWidget *spacer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_widget_set_hexpand(spacer, TRUE);
-    tab->preview_detach_button = gtk_button_new_from_icon_name("window-new-symbolic");
+    tab->preview_detach_button = gtk_button_new();
+    gtk_button_set_child(GTK_BUTTON(tab->preview_detach_button),
+                         tab_symbolic_icon("window-new-symbolic", NULL));
     gtk_widget_add_css_class(tab->preview_detach_button, "graptos-flat-button");
     gtk_widget_add_css_class(tab->preview_detach_button, "graptos-preview-detach-button");
     gtk_widget_set_tooltip_text(tab->preview_detach_button,
@@ -544,14 +548,16 @@ static void tab_connect_signals(EditorTab *tab) {
     g_signal_connect(motion, "leave", G_CALLBACK(on_text_view_leave), tab);
     gtk_widget_add_controller(tab->text_view, motion);
 
-    GtkGesture *right_click = gtk_gesture_click_new();
-    gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(right_click),
+    GtkGesture *context = gtk_gesture_click_new();
+    gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(context),
                                   GDK_BUTTON_SECONDARY);
-    gtk_event_controller_set_propagation_phase(
-        GTK_EVENT_CONTROLLER(right_click), GTK_PHASE_CAPTURE);
-    g_signal_connect(right_click, "pressed",
+    gtk_gesture_single_set_exclusive(GTK_GESTURE_SINGLE(context), TRUE);
+    gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(context),
+                                               GTK_PHASE_CAPTURE);
+    g_signal_connect(context, "pressed",
                      G_CALLBACK(on_text_view_right_click), tab);
-    gtk_widget_add_controller(tab->text_view, GTK_EVENT_CONTROLLER(right_click));
+    gtk_widget_add_controller(tab->popover_parent,
+                              GTK_EVENT_CONTROLLER(context));
 
     GtkGesture *minimap_click = gtk_gesture_click_new();
     gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(minimap_click),

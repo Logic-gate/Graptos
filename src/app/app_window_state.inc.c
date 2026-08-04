@@ -268,6 +268,7 @@ void app_window_note_path_renamed(EditorWindow *win,
              */
             tab->manual_syntax_override = FALSE;
             editor_tab_auto_select_syntax(tab);
+            editor_tab_update_highlight_engine(tab);
 
             // Refresh tab state after the path change.
             editor_tab_set_locked(tab,

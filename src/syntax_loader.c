@@ -937,12 +937,18 @@ GPtrArray *syntax_load_all_for_roots(GPtrArray *project_roots) {
     char *local = g_build_filename(cwd, "syntax", NULL);
     char *parent = g_path_get_dirname(cwd);
     char *parent_syntax = g_build_filename(parent, "syntax", NULL);
+    char *exe_path = g_file_read_link("/proc/self/exe", NULL);
+    char *exe_dir = exe_path ? g_path_get_dirname(exe_path) : NULL;
+    char *exe_parent = exe_dir ? g_path_get_dirname(exe_dir) : NULL;
+    char *exe_syntax = exe_dir ? g_build_filename(exe_dir, "syntax", NULL) : NULL;
+    char *exe_parent_syntax = exe_parent ? g_build_filename(exe_parent, "syntax", NULL) : NULL;
     char *system = g_build_filename(DATADIR, "syntax", NULL);
 
     /*
      * Earlier directories win when duplicate language names are removed below.
      * User config remains highest priority, then open project roots, then
-     * process-local development folders, then installed system syntaxes.
+     * process-local and executable-local development folders, then installed
+     * system syntaxes.
      */
     load_syntax_dir(syntaxes, config_syntax);
     load_syntax_dir(syntaxes, config_root);
@@ -955,10 +961,13 @@ GPtrArray *syntax_load_all_for_roots(GPtrArray *project_roots) {
     }
     load_syntax_dir(syntaxes, local);
     load_syntax_dir(syntaxes, parent_syntax);
+    load_syntax_dir(syntaxes, exe_syntax);
+    load_syntax_dir(syntaxes, exe_parent_syntax);
     {
         GraptosPluginRegistry *plugins = graptos_plugin_registry_new();
         if (plugins) {
             if (graptos_plugin_registry_discover(plugins, NULL)) {
+                graptos_plugin_registry_apply_user_state(plugins);
                 GPtrArray *plugin_dirs =
                     graptos_plugin_registry_contribution_dirs(plugins,
                         GRAPTOS_PLUGIN_CONTRIBUTION_SYNTAX);
@@ -981,6 +990,11 @@ GPtrArray *syntax_load_all_for_roots(GPtrArray *project_roots) {
     g_free(local);
     g_free(parent);
     g_free(parent_syntax);
+    g_free(exe_path);
+    g_free(exe_dir);
+    g_free(exe_parent);
+    g_free(exe_syntax);
+    g_free(exe_parent_syntax);
     g_free(system);
 
     remove_duplicate_syntaxes(syntaxes);

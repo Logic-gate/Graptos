@@ -30,6 +30,31 @@ void graptos_config_save(EditorWindow *win);
  */
 char *graptos_config_path(void);
 /**
+ * @brief Resolve the configured LaTeX executable.
+ * @details The window config wins, then the legacy GRAPTOS_LATEX_COMMAND
+ *          environment variable, then auto-detection.
+ * @param win The window whose config is read.
+ * @return Owned command, or NULL when no command is available.
+ */
+char *graptos_latex_resolve_command(EditorWindow *win);
+/**
+ * @brief Build a LaTeX argv from configured arguments.
+ * @details Arguments are parsed with shell quoting rules but are executed
+ *          directly without a shell. Supported placeholders are {output_dir}
+ *          and {source_path}.
+ * @param win The window whose config is read.
+ * @param command Resolved LaTeX executable.
+ * @param output_dir Output directory placeholder value.
+ * @param source_path Source path placeholder value.
+ * @param error Error output for invalid argument syntax.
+ * @return NULL-terminated argv owned by the caller, or NULL.
+ */
+char **graptos_latex_build_argv(EditorWindow *win,
+                                const char *command,
+                                const char *output_dir,
+                                const char *source_path,
+                                GError **error);
+/**
  * @brief Load theme values from a Graptoς CSS theme file.
  * @details CSS is the primary theme source. This parser reads the managed
  *          `@define-color graptos_*` values and font metadata comments into the

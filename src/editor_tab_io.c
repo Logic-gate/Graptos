@@ -13,6 +13,14 @@
 #include <time.h>
 
 /**
+ * @brief Disk change debounce delay.
+ */
+#define DISK_CHANGE_DEBOUNCE_MS 250u
+
+static void editor_tab_update_file_monitor(EditorTab *tab);
+static gboolean editor_tab_disk_change_timeout_cb(gpointer user_data);
+
+/**
  * @brief Write all fd.
  * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
  * @param fd The fd supplied by the caller.
@@ -161,6 +169,200 @@ static gboolean editor_tab_file_matches_buffer(EditorTab *tab,
 }
 
 /**
+ * @brief Save the current buffer to a separate path.
+ * @details Save Copy must not move the tab to the copy path or mark the
+ *          original external change as resolved. It only preserves the current
+ *          editor buffer before the user chooses what to do with the changed
+ *          source file.
+ * @param tab The editor tab whose buffer should be written.
+ * @return TRUE when a copy was written.
+ */
+static gboolean editor_tab_save_copy(EditorTab *tab) {
+    if (!tab) return FALSE;
+    g_autofree char *path = graptos_save_file_dialog(app_window_gtk(tab->win),
+                                                     "Save Copy");
+    if (!path) return FALSE;
+    g_autofree char *text = buffer_text(tab);
+    g_autoptr(GError) error = NULL;
+    if (!write_text_atomic(path, text, &error)) {
+        app_window_report_error(tab->win,
+                                "Could not save copy",
+                                error ? error->message : path,
+                                TRUE);
+        return FALSE;
+    }
+    if (tab->win) {
+        g_autofree char *msg = g_strdup_printf("Saved copy to %s", path);
+        app_window_set_status(tab->win, msg);
+    }
+    return TRUE;
+}
+
+/**
+ * @brief Reload the current tab from disk.
+ * @details Reloading is a user-selected conflict resolution path. The normal
+ *          loader owns buffer replacement, syntax refresh, title state, LSP,
+ *          Git, and monitor reset.
+ * @param tab The editor tab to reload.
+ * @return TRUE when the tab was reloaded.
+ */
+static gboolean editor_tab_reload_from_disk(EditorTab *tab) {
+    if (!tab || !tab->file_path) return FALSE;
+    g_autofree char *path = g_strdup(tab->file_path);
+    return editor_tab_load_file(tab, path);
+}
+
+/**
+ * @brief Show the changed-on-disk conflict dialog.
+ * @param tab The editor tab whose file changed externally.
+ */
+static void editor_tab_prompt_disk_change(EditorTab *tab) {
+    if (!tab || !tab->file_path || tab->disk_change_prompt_visible) return;
+    tab->disk_change_prompt_visible = TRUE;
+    g_autofree char *base = editor_tab_basename(tab);
+    g_autofree char *heading = g_strdup_printf("%s changed on disk", base);
+    g_autofree char *body = g_strdup_printf(
+        "The file was changed by another process.\n\n"
+        "Path: %s\n\n"
+        "Reload replaces the editor buffer with the disk version. "
+        "Save Copy writes the current editor buffer to a separate file. "
+        "Keep leaves the editor buffer unchanged.",
+        tab->file_path);
+    GraptosDialogAction actions[] = {
+        { "Keep", "Keep the editor buffer as-is", GTK_RESPONSE_REJECT, FALSE, TRUE },
+        { "Save Copy", "Save the current editor buffer to another file", GTK_RESPONSE_APPLY, FALSE, FALSE },
+        { "Reload", "Reload the file from disk", GTK_RESPONSE_ACCEPT, TRUE, FALSE },
+    };
+    int response = dialog_run_message(app_window_gtk(tab->win),
+                                      "File Changed On Disk",
+                                      heading,
+                                      body,
+                                      560,
+                                      230,
+                                      actions,
+                                      G_N_ELEMENTS(actions),
+                                      GTK_RESPONSE_REJECT);
+    tab->disk_change_prompt_visible = FALSE;
+    tab->disk_change_pending = FALSE;
+    if (response == GTK_RESPONSE_ACCEPT) {
+        (void)editor_tab_reload_from_disk(tab);
+    } else if (response == GTK_RESPONSE_APPLY) {
+        (void)editor_tab_save_copy(tab);
+    } else if (tab->win) {
+        app_window_set_status(tab->win, "Kept editor buffer after disk change.");
+    }
+}
+
+/**
+ * @brief Handle a settled external disk change event.
+ * @param user_data Editor tab.
+ * @return G_SOURCE_REMOVE after handling.
+ */
+static gboolean editor_tab_disk_change_timeout_cb(gpointer user_data) {
+    EditorTab *tab = user_data;
+    if (!tab) return G_SOURCE_REMOVE;
+    tab->disk_change_timeout = 0u;
+    if (!tab->file_path || !tab->disk_change_pending || tab->applying_change) {
+        return G_SOURCE_REMOVE;
+    }
+    if (!g_file_test(tab->file_path, G_FILE_TEST_EXISTS)) {
+        editor_tab_prompt_disk_change(tab);
+        return G_SOURCE_REMOVE;
+    }
+    if (editor_tab_file_matches_buffer(tab, tab->file_path)) {
+        tab->disk_change_pending = FALSE;
+        return G_SOURCE_REMOVE;
+    }
+    editor_tab_prompt_disk_change(tab);
+    return G_SOURCE_REMOVE;
+}
+
+/**
+ * @brief Schedule changed-on-disk handling.
+ * @param tab The editor tab whose monitor emitted.
+ */
+static void editor_tab_schedule_disk_change_prompt(EditorTab *tab) {
+    if (!tab || tab->disposing || tab->applying_change) return;
+    tab->disk_change_pending = TRUE;
+    graptos_source_cancel(&tab->disk_change_timeout);
+    tab->disk_change_timeout = g_timeout_add_full(G_PRIORITY_DEFAULT,
+                                                  DISK_CHANGE_DEBOUNCE_MS,
+                                                  editor_tab_disk_change_timeout_cb,
+                                                  tab,
+                                                  NULL);
+}
+
+/**
+ * @brief File monitor callback for editor tabs.
+ * @param monitor Monitor that emitted the event.
+ * @param file Changed file.
+ * @param other_file Secondary file for move events.
+ * @param event_type File monitor event type.
+ * @param user_data Editor tab.
+ */
+static void editor_tab_file_monitor_changed(GFileMonitor *monitor,
+                                            GFile *file,
+                                            GFile *other_file,
+                                            GFileMonitorEvent event_type,
+                                            gpointer user_data) {
+    (void)monitor;
+    (void)file;
+    (void)other_file;
+    EditorTab *tab = user_data;
+    if (!tab || !tab->file_path) return;
+    switch (event_type) {
+        case G_FILE_MONITOR_EVENT_CHANGES_DONE_HINT:
+        case G_FILE_MONITOR_EVENT_CREATED:
+        case G_FILE_MONITOR_EVENT_DELETED:
+        case G_FILE_MONITOR_EVENT_MOVED_IN:
+        case G_FILE_MONITOR_EVENT_MOVED_OUT:
+        case G_FILE_MONITOR_EVENT_RENAMED:
+            editor_tab_schedule_disk_change_prompt(tab);
+            break;
+        default:
+            break;
+    }
+}
+
+/**
+ * @brief Stop monitoring the current editor file.
+ * @param tab The editor tab whose monitor should be cleared.
+ */
+void editor_tab_clear_file_monitor(EditorTab *tab) {
+    if (!tab) return;
+    graptos_source_cancel(&tab->disk_change_timeout);
+    tab->disk_change_pending = FALSE;
+    if (!tab->file_monitor) return;
+    g_signal_handlers_disconnect_by_data(tab->file_monitor, tab);
+    g_file_monitor_cancel(tab->file_monitor);
+    g_object_unref(tab->file_monitor);
+    tab->file_monitor = NULL;
+}
+
+/**
+ * @brief Refresh the editor file monitor for the current path.
+ * @details The monitor follows the tab path after load, save, or Save As.
+ *          Unsaved tabs are not monitored.
+ * @param tab The editor tab whose path should be watched.
+ */
+static void editor_tab_update_file_monitor(EditorTab *tab) {
+    if (!tab) return;
+    editor_tab_clear_file_monitor(tab);
+    if (!tab->file_path || !tab->file_path[0]) return;
+    g_autoptr(GFile) file = g_file_new_for_path(tab->file_path);
+    g_autoptr(GError) error = NULL;
+    tab->file_monitor = g_file_monitor_file(file,
+                                            G_FILE_MONITOR_NONE,
+                                            NULL,
+                                            &error);
+    if (!tab->file_monitor) return;
+    g_signal_connect(tab->file_monitor,
+                     "changed",
+                     G_CALLBACK(editor_tab_file_monitor_changed),
+                     tab);
+}
+
+/**
  * @brief Editor tab load file.
  * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
  * @param tab The editor tab whose buffer or widgets are being inspected.
@@ -197,10 +399,15 @@ gboolean editor_tab_load_file(EditorTab *tab, const char *path) {
     tab->applying_change = TRUE;
     gtk_text_buffer_set_text(tab->buffer, contents, (gint)length);
     tab->applying_change = FALSE;
+    editor_tab_clear_file_monitor(tab);
     g_free(tab->file_path);
     g_clear_pointer(&tab->display_title, g_free);
     g_clear_pointer(&tab->display_title_markup, g_free);
+    g_clear_pointer(&tab->plugin_preview_title, g_free);
+    g_clear_pointer(&tab->plugin_preview_body, g_free);
+    tab->plugin_preview_active = FALSE;
     tab->file_path = g_canonicalize_filename(path, NULL);
+    editor_tab_update_file_monitor(tab);
     editor_tab_load_notes(tab);
     cleanup_legacy_tilde_backup(tab->file_path);
     tab->modified = FALSE;
@@ -211,6 +418,7 @@ gboolean editor_tab_load_file(EditorTab *tab, const char *path) {
     update_gutter_width(tab);
     update_minimap_text(tab);
     editor_tab_auto_select_syntax(tab);
+    editor_tab_update_highlight_engine(tab);
     if (tab->win && tab->win->lsp_client) lsp_client_document_opened(tab->win->lsp_client, tab);
     editor_tab_schedule_color_literals(tab);
     editor_tab_update_title(tab);
@@ -298,10 +506,12 @@ gboolean save_to_path(EditorTab *tab, const char *path) {
                                 error ? error->message : stable_path, TRUE);
         return FALSE;
     }
+    editor_tab_clear_file_monitor(tab);
     g_free(tab->file_path);
     g_clear_pointer(&tab->display_title, g_free);
     g_clear_pointer(&tab->display_title_markup, g_free);
     tab->file_path = g_canonicalize_filename(stable_path, NULL);
+    editor_tab_update_file_monitor(tab);
     editor_tab_load_notes(tab);
     cleanup_legacy_tilde_backup(tab->file_path);
     tab->modified = FALSE;
@@ -309,6 +519,7 @@ gboolean save_to_path(EditorTab *tab, const char *path) {
     tab->low_latency_mode_active = FALSE;
     reset_undo_state(tab);
     editor_tab_auto_select_syntax(tab);
+    editor_tab_update_highlight_engine(tab);
     if (tab->win && tab->win->lsp_client) {
         lsp_client_document_opened(tab->win->lsp_client, tab);
         lsp_client_document_saved(tab->win->lsp_client, tab);

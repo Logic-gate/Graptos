@@ -55,6 +55,7 @@ typedef struct {
     char *native_library; /**< Optional native library path relative to base. */
     guint graptos_api_version; /**< Required plugin API version. */
     gboolean enabled; /**< FALSE when manifest disables the plugin. */
+    gboolean default_enabled; /**< Manifest enable value before user overrides. */
     GPtrArray *permissions; /**< char*. */
     GPtrArray *syntax_dirs; /**< char*. */
     GPtrArray *theme_dirs; /**< char*. */
@@ -65,7 +66,18 @@ typedef struct {
     gpointer native_handle; /**< Private GModule handle. */
     GHashTable *native_commands; /**< char* to native command handler. */
     GPtrArray *native_completion_providers; /**< Native completion providers. */
+    GPtrArray *native_hover_providers; /**< Native hover providers. */
+    GPtrArray *native_hubs; /**< Native hub providers. */
 } GraptosPlugin;
+
+/**
+ * @brief A lightweight plugin hub entry for UI callers.
+ */
+typedef struct {
+    char *plugin_id; /**< Plugin id that owns the hub. */
+    char *hub_id; /**< Hub id inside the plugin. */
+    char *label; /**< Human-facing hub label. */
+} GraptosPluginHubView;
 
 /**
  * @brief Plugin registry.
@@ -121,6 +133,32 @@ void graptos_plugin_registry_free(GraptosPluginRegistry *registry);
 gboolean graptos_plugin_registry_discover(GraptosPluginRegistry *registry,
                                           GError **error);
 /**
+ * @brief Apply persisted user enable and disable choices.
+ * @details Manifest `enabled:` remains the plugin default. User choices are
+ *          stored outside plugin folders so package updates do not overwrite
+ *          local decisions.
+ * @param registry Registry receiving persisted state.
+ */
+void graptos_plugin_registry_apply_user_state(GraptosPluginRegistry *registry);
+/**
+ * @brief Save current plugin enable state.
+ * @details Only disabled plugin ids are persisted. Plugins default to enabled
+ *          when their manifest enables them and no user override exists.
+ * @param registry Registry whose state should be saved.
+ * @return TRUE when the state reached disk.
+ */
+gboolean graptos_plugin_registry_save_user_state(GraptosPluginRegistry *registry);
+/**
+ * @brief Set one plugin enabled state.
+ * @param registry Registry to update.
+ * @param plugin_id Stable plugin id.
+ * @param enabled TRUE to enable the plugin.
+ * @return TRUE when a plugin was found and updated.
+ */
+gboolean graptos_plugin_registry_set_enabled(GraptosPluginRegistry *registry,
+                                             const char *plugin_id,
+                                             gboolean enabled);
+/**
  * @brief Return contribution directories of one kind.
  * @details Relative contribution paths are resolved against each plugin root
  *          and only existing directories are returned.
@@ -171,6 +209,23 @@ guint graptos_plugin_append_editor_tool_items(GraptosPluginRegistry *registry,
                                               GtkWidget *box,
                                               guint line);
 /**
+ * @brief Append plugin editor items to a transient tool popover.
+ * @details This keeps the bottom plugin surface compact while reusing the
+ *          same command path as editor context menus and the plugin tool panel.
+ *          The popover is closed before a selected command runs.
+ * @param registry Plugin registry to inspect.
+ * @param tab Active editor tab.
+ * @param box Popover box receiving button widgets.
+ * @param popover Popover to close before running the command.
+ * @param line One-based active editor line.
+ * @return Number of plugin command rows appended.
+ */
+guint graptos_plugin_append_editor_tool_menu_items(GraptosPluginRegistry *registry,
+                                                   EditorTab *tab,
+                                                   GtkWidget *box,
+                                                   GtkWidget *popover,
+                                                   guint line);
+/**
  * @brief Run a plugin shortcut command.
  * @details Keyboard handling passes stable shortcut ids here so plugins can
  *          own behavior without the editor knowing command ids.
@@ -198,5 +253,59 @@ GPtrArray *graptos_plugin_registry_completion_candidates(GraptosPluginRegistry *
                                                         EditorTab *tab,
                                                         char **replace_prefix_out,
                                                         char **source_label_out);
+
+/**
+ * @brief Return native plugin hover text for a token.
+ * @details The first enabled provider returning text owns the label and body.
+ * @param registry Plugin registry to inspect.
+ * @param tab Active editor tab.
+ * @param word Token under the pointer.
+ * @param source_label_out Owned source label for the hover heading.
+ * @return Owned hover body, or NULL.
+ */
+char *graptos_plugin_registry_hover_text(GraptosPluginRegistry *registry,
+                                         EditorTab *tab,
+                                         const char *word,
+                                         char **source_label_out);
+
+/**
+ * @brief Free one hub view.
+ * @param data GraptosPluginHubView.
+ */
+void graptos_plugin_hub_view_free(gpointer data);
+/**
+ * @brief Return enabled native plugin hubs.
+ * @param registry Plugin registry to inspect.
+ * @return GPtrArray of GraptosPluginHubView*.
+ */
+GPtrArray *graptos_plugin_registry_hub_views(GraptosPluginRegistry *registry);
+/**
+ * @brief Render a native plugin hub.
+ * @param registry Plugin registry to inspect.
+ * @param tab Active editor tab.
+ * @param plugin_id Plugin id.
+ * @param hub_id Hub id.
+ * @return Owned hub body, or NULL.
+ */
+char *graptos_plugin_registry_render_hub(GraptosPluginRegistry *registry,
+                                         EditorTab *tab,
+                                         const char *plugin_id,
+                                         const char *hub_id);
+/**
+ * @brief Run a native plugin hub action.
+ * @param registry Plugin registry to inspect.
+ * @param tab Active editor tab.
+ * @param plugin_id Plugin id.
+ * @param hub_id Hub id.
+ * @param action_id Action id.
+ * @param input Prompt input.
+ * @return TRUE when a hub handled the action.
+ */
+gboolean graptos_plugin_registry_run_hub_action(GraptosPluginRegistry *registry,
+                                                EditorTab *tab,
+                                                const char *plugin_id,
+                                                const char *hub_id,
+                                                const char *action_id,
+                                                const char *input);
 
 #endif /* GRAPTOS_PLUGIN_H */
