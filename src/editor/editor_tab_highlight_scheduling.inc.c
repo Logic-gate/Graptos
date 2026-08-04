@@ -7,15 +7,22 @@
  * @param tab The editor tab whose buffer or widgets are being inspected.
  */
 
+/**
+ * @brief Return whether YAML regex highlighting should run.
+ * @details GtkSourceView owns highlighting when it has a real language for the
+ *          active syntax. Graptoς YAML rules are still needed for custom
+ *          syntaxes such as Beancount that do not have a GtkSourceView language.
+ * @param tab The editor tab whose highlight engine is being inspected.
+ * @return TRUE when Graptoς should apply YAML regex tags.
+ */
 void editor_tab_apply_highlight(EditorTab *tab) {
     if (!tab || !tab->buffer) return;
-    /* Graptoς no longer applies regex YAML highlighting to the editor buffer.
-     * Highlighting is owned by GtkSourceView; YAML rules only generate optional
-     * GtkSourceView style-scheme overrides when the user enables them.
-     */
+    if (editor_tab_custom_highlight_needed(tab)) {
+        editor_tab_apply_custom_highlight(tab);
+        return;
+    }
     editor_tab_update_highlight_engine(tab);
 }
-
 
 /**
  * @brief Minimap timeout cb.
@@ -123,10 +130,21 @@ gboolean highlight_timeout_cb(gpointer user_data) {
  */
 void editor_tab_schedule_highlight(EditorTab *tab) {
     if (!tab) return;
-    /* GtkSourceView performs syntax highlighting internally. There is no
-     * Graptoς regex highlighter to schedule; keep this as a redraw compatibility
-     * hook for undo/load paths that still call it.
+    /* GtkSourceView updates internally for supported languages. Custom YAML
+     * syntaxes without a GtkSourceView language need the delayed Graptoς regex
+     * fallback so edits recolor after the user pauses.
      */
+    if (editor_tab_custom_highlight_needed(tab)) {
+        graptos_source_cancel(&tab->highlight_timeout);
+        tab->highlight_timeout = g_timeout_add_full(G_PRIORITY_LOW,
+                                                    tab->win && tab->win->highlight_delay_ms > 0u
+                                                        ? tab->win->highlight_delay_ms
+                                                        : GRAPTOS_HIGHLIGHT_DELAY_MS,
+                                                    highlight_timeout_cb,
+                                                    tab,
+                                                    NULL);
+        return;
+    }
     if (tab->text_view) gtk_widget_queue_draw(tab->text_view);
     if (tab->minimap_view) gtk_widget_queue_draw(tab->minimap_view);
 }

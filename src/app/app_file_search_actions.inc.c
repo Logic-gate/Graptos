@@ -26,6 +26,36 @@ void set_search_panel(EditorWindow *win, gboolean visible, gboolean replace_mode
     }
 }
 
+/**
+ * @brief Seed find from selection and run it.
+ * @details Ctrl+F should respect the selected editor text the same way common
+ *          editors do: the selection becomes the query, the find field shows
+ *          that query, and the first search happens immediately.
+ * @param win The window whose active tab supplies the selection.
+ */
+static void show_find_from_selection(EditorWindow *win) {
+    if (!win) return;
+    EditorTab *tab = app_window_current_tab(win);
+    g_autofree char *selected = NULL;
+    if (tab && tab->buffer) {
+        GtkTextIter start;
+        GtkTextIter end;
+        if (gtk_text_buffer_get_selection_bounds(tab->buffer, &start, &end)) {
+            selected = gtk_text_buffer_get_text(tab->buffer, &start, &end, FALSE);
+        }
+    }
+    set_search_panel(win, TRUE, FALSE);
+    if (selected && selected[0] != '\0') {
+        gtk_entry_set_text(GTK_ENTRY(win->find_entry), selected);
+    }
+    const char *query = win->find_entry
+        ? gtk_entry_get_text(GTK_ENTRY(win->find_entry))
+        : NULL;
+    if (tab && query && query[0] != '\0') {
+        editor_tab_find(tab, query, FALSE);
+    }
+}
+
 
 /**
  * @brief Action new.
@@ -178,7 +208,7 @@ void action_save_as(GtkWidget *widget, gpointer user_data) {
  */
 void action_show_find(GtkWidget *widget, gpointer user_data) {
     (void)widget;
-    set_search_panel(user_data, TRUE, FALSE);
+    show_find_from_selection(user_data);
 }
 
 

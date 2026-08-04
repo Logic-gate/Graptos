@@ -149,6 +149,27 @@ window.graptos-window .graptos-dialog-output text {
   color: @graptos_editor_fg;
 }
 
+window.graptos-window.graptos-plugin-manager-window,
+window.graptos-window.graptos-plugin-manager-window > contents,
+window.graptos-window .graptos-plugin-manager-root,
+window.graptos-window .graptos-plugin-manager-scroll,
+window.graptos-window .graptos-plugin-manager-scroll viewport,
+window.graptos-window .graptos-plugin-manager-list,
+window.graptos-window .graptos-plugin-manager-row {
+  background: ;
+  background-color: ;
+  color: ;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  outline: none;
+}
+window.graptos-window .graptos-plugin-manager-root label,
+window.graptos-window .graptos-plugin-manager-list label,
+window.graptos-window .graptos-plugin-manager-row label {
+  color: ;
+}
+
 .graptos-search-match {
   background: @graptos_accent;
 }

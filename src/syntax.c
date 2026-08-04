@@ -282,6 +282,31 @@ static gboolean text_has_token(const char *text, const char *token) {
 }
 
 /**
+ * @brief Detect Beancount content before generic YAML.
+ * @details Unsaved ledgers do not have a `.bean` or `.beancount` extension yet.
+ *          A dated directive or account root is specific enough to pick
+ *          Beancount while the user types, and it avoids the generic colon
+ *          rule from selecting YAML first.
+ * @param text The text fragment supplied by the caller.
+ * @return TRUE when the text looks like a Beancount ledger.
+ */
+static gboolean text_looks_like_beancount(const char *text) {
+    if (!text || text[0] == '\0') return FALSE;
+    static const char *dated_directive =
+        "(?m)^[0-9]{4}-[0-9]{2}-[0-9]{2}[ \\t]+"
+        "(open|close|commodity|pad|balance|event|price|note|document|query|custom|txn|[*!&?#%])"
+        "([ \\t]|$)";
+    static const char *account_root =
+        "(?m)(^|[ \\t])(Assets|Liabilities|Equity|Income|Expenses):"
+        "[A-Z][A-Za-z0-9_-]*";
+    static const char *ledger_option =
+        "(?m)^(option|plugin|include|pushtag|poptag)[ \\t]+";
+    return g_regex_match_simple(dated_directive, text, 0, 0) ||
+           g_regex_match_simple(account_root, text, 0, 0) ||
+           g_regex_match_simple(ledger_option, text, 0, 0);
+}
+
+/**
  * @brief Syntax for content.
  * @details Syntax data comes from YAML rules but is applied to live buffers. The comment calls out the narrow contract between static language metadata and mutable editor state.
  * @param syntaxes The syntaxes supplied by the caller.
@@ -308,6 +333,8 @@ SyntaxDef *syntax_for_content(GPtrArray *syntaxes, GtkTextBuffer *buffer) {
         syntax = syntax_by_name(syntaxes, "Python");
     } else if (text_has_token(text, "#include") || text_has_token(text, "int main(") || text_has_token(text, "int main (")) {
         syntax = syntax_by_name(syntaxes, "C");
+    } else if (text_looks_like_beancount(text)) {
+        syntax = syntax_by_name(syntaxes, "Beancount");
     } else if (trimmed && (g_str_has_prefix(trimmed, "---") || text_has_token(text, ": ") || text_has_token(text, ":\n"))) {
         syntax = syntax_by_name(syntaxes, "YAML");
     } else if (trimmed && (g_str_has_prefix(trimmed, "# ") || g_str_has_prefix(trimmed, "## ") || text_has_token(text, "```"))) {

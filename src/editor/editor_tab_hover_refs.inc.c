@@ -191,14 +191,20 @@ char *word_at_iter(GtkTextBuffer *buffer, GtkTextIter *iter) {
         if (!gtk_text_iter_backward_char(&prev)) break;
 
         gunichar ch = gtk_text_iter_get_char(&prev);
-        if (!completion_is_word_char(ch) && ch != '#') break;
+        if (!completion_is_word_char(ch) && ch != '#' && ch != ':' &&
+            ch != '-') {
+            break;
+        }
 
         start = prev;
     }
 
     while (!gtk_text_iter_ends_line(&end) && !gtk_text_iter_is_end(&end)) {
         gunichar ch = gtk_text_iter_get_char(&end);
-        if (!completion_is_word_char(ch) && ch != '#') break;
+        if (!completion_is_word_char(ch) && ch != '#' && ch != ':' &&
+            ch != '-') {
+            break;
+        }
 
         if (!gtk_text_iter_forward_char(&end)) break;
     }

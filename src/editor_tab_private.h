@@ -127,6 +127,13 @@ gboolean write_all_fd(int fd, const char *data, gsize len);
  */
 gboolean write_text_atomic(const char *path, const char *text, GError **error);
 /**
+ * @brief Clear the editor file monitor.
+ * @details Tab teardown and path replacement must disconnect monitor signals
+ *          before releasing tab state.
+ * @param tab The editor tab whose monitor should be removed.
+ */
+void editor_tab_clear_file_monitor(EditorTab *tab);
+/**
  * @brief Autosave path for tab.
  * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
  * @param tab The editor tab whose buffer or widgets are being inspected.
@@ -204,6 +211,17 @@ gboolean editor_tab_lsp_sync_allowed(EditorTab *tab);
  * @return TRUE when the condition is satisfied; otherwise FALSE.
  */
 gboolean editor_tab_highlighting_allowed(EditorTab *tab);
+/**
+ * @brief Return whether custom YAML highlighting owns this tab.
+ * @param tab The editor tab whose highlighting engine is being inspected.
+ * @return TRUE when Graptoς regex highlighting should run.
+ */
+gboolean editor_tab_custom_highlight_needed(EditorTab *tab);
+/**
+ * @brief Apply custom YAML highlighting without resetting the source engine.
+ * @param tab The editor tab whose visible range should be highlighted.
+ */
+void editor_tab_apply_custom_highlight(EditorTab *tab);
 /**
  * @brief Editor tab reference features allowed.
  * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
@@ -503,13 +521,13 @@ void editor_tab_schedule_regex_tester(EditorTab *tab);
  */
 void editor_tab_show_reference_at_pointer_or_cursor(EditorTab *tab);
 /**
- * @brief On text view right click.
- * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
- * @param gesture The gesture supplied by the caller.
- * @param n_press The n press supplied by the caller.
- * @param x The x supplied by the caller.
- * @param y The y supplied by the caller.
+ * @brief On text view context event.
+ * @details This capture-phase handler opens Graptoς's context menu and stops
+ *          GtkTextView's default secondary-click menu from also appearing.
+ * @param controller Event controller installed on the editor text view.
+ * @param event GDK event being inspected.
  * @param user_data The callback context passed through GTK signal data.
+ * @return GDK_EVENT_STOP when Graptoς handled the event.
  */
 void on_text_view_right_click(GtkGestureClick *gesture, int n_press, double x, double y, gpointer user_data);
 /**

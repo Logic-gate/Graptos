@@ -939,6 +939,7 @@ static void terminal_panel_close_clicked(GtkWidget *widget, gpointer user_data) 
     TerminalPanel *panel = user_data;
     if (!panel || !panel->revealer) return;
     gtk_revealer_set_reveal_child(GTK_REVEALER(panel->revealer), FALSE);
+    app_window_hide_bottom_pane_if_empty(panel->win);
 }
 
 /**
@@ -952,11 +953,12 @@ static void terminal_panel_revealer_child_revealed(GtkRevealer *revealer,
                                                    GParamSpec *pspec,
                                                    gpointer user_data) {
     (void)pspec;
-    (void)user_data;
+    TerminalPanel *panel = user_data;
     if (!revealer) return;
     if (!gtk_revealer_get_reveal_child(revealer) &&
         !gtk_revealer_get_child_revealed(revealer)) {
         gtk_widget_set_visible(GTK_WIDGET(revealer), FALSE);
+        app_window_hide_bottom_pane_if_empty(panel->win);
     }
 }
 
@@ -1035,13 +1037,13 @@ TerminalPanel *terminal_panel_new(EditorWindow *win) {
     gtk_revealer_set_transition_duration(GTK_REVEALER(panel->revealer), 120u);
     gtk_revealer_set_reveal_child(GTK_REVEALER(panel->revealer), FALSE);
     gtk_widget_set_visible(panel->revealer, FALSE);
-    gtk_widget_set_vexpand(panel->revealer, FALSE);
+    gtk_widget_set_vexpand(panel->revealer, TRUE);
     g_signal_connect(panel->revealer, "notify::child-revealed",
                      G_CALLBACK(terminal_panel_revealer_child_revealed),
                      panel);
 
     panel->box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-    gtk_widget_set_vexpand(panel->box, FALSE);
+    gtk_widget_set_vexpand(panel->box, TRUE);
     gtk_widget_add_css_class(panel->box, "graptos-terminal-panel");
 
     GtkWidget *header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
@@ -1080,7 +1082,7 @@ TerminalPanel *terminal_panel_new(EditorWindow *win) {
 
     panel->notebook = gtk_notebook_new();
     gtk_notebook_set_scrollable(GTK_NOTEBOOK(panel->notebook), TRUE);
-    gtk_widget_set_vexpand(panel->notebook, FALSE);
+    gtk_widget_set_vexpand(panel->notebook, TRUE);
     gtk_widget_set_hexpand(panel->notebook, TRUE);
     g_signal_connect(panel->notebook, "switch-page",
                      G_CALLBACK(terminal_panel_switch_page), panel);
@@ -1173,9 +1175,11 @@ void terminal_panel_toggle(TerminalPanel *panel) {
         gtk_revealer_get_reveal_child(GTK_REVEALER(panel->revealer));
     if (visible) {
         gtk_revealer_set_reveal_child(GTK_REVEALER(panel->revealer), FALSE);
+        app_window_hide_bottom_pane_if_empty(panel->win);
         return;
     }
 
+    app_window_show_bottom_pane(panel->win);
     gtk_widget_set_visible(panel->revealer, TRUE);
     gtk_revealer_set_reveal_child(GTK_REVEALER(panel->revealer), TRUE);
     terminal_panel_apply_colors(panel);

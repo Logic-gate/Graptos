@@ -204,6 +204,7 @@ void graptos_apply_css(void) {
         ".graptos-git-status-staged { color: currentColor; }"
         ".graptos-search-panel { border-top: 1px solid alpha(currentColor, 0.18); padding: 5px 8px; }"
         ".graptos-tool-panel { border-top: 1px solid alpha(currentColor, 0.18); padding: 5px 8px; min-height: 34px; }"
+        ".graptos-plugin-hub-scroll { border: 1px solid alpha(currentColor, 0.16); }"
         ".graptos-tool-title { opacity: 0.72; font-size: 8pt; font-weight: 700; padding: 0 4px; }"
         ".graptos-bottom { border-top: 1px solid alpha(currentColor, 0.18); padding: 3px 6px; }"
         ".graptos-bottom-controls { border: none; min-height: 34px; }"

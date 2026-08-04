@@ -9,6 +9,16 @@
 #include "editor_tab_private.h"
 
 /**
+ * @brief Background custom highlight chunk size.
+ */
+#define CUSTOM_HIGHLIGHT_BACKGROUND_LINES 160u
+
+/**
+ * @brief Background custom highlight delay.
+ */
+#define CUSTOM_HIGHLIGHT_BACKGROUND_DELAY_MS 20u
+
+/**
  * @brief Source language id for syntax.
  * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
  * @param syntax The syntax definition used by the editor path.
@@ -50,16 +60,207 @@ static GtkSourceLanguage *source_language_for_tab(EditorTab *tab) {
     if (!manager || !tab) return NULL;
 
     GtkSourceLanguage *language = NULL;
+    const char *id = source_language_id_for_syntax(tab->active_syntax);
+    if (tab->active_syntax) {
+        return id ? gtk_source_language_manager_get_language(manager, id) : NULL;
+    }
     if (tab->file_path && tab->file_path[0] != '\0') {
         language = gtk_source_language_manager_guess_language(manager,
                                                               tab->file_path,
                                                               NULL);
     }
     if (!language) {
-        const char *id = source_language_id_for_syntax(tab->active_syntax);
         if (id) language = gtk_source_language_manager_get_language(manager, id);
     }
     return language;
+}
+
+/**
+ * @brief Return the effective custom highlight mode.
+ * @param tab The editor tab whose window config is being inspected.
+ * @return Stable mode text.
+ */
+static const char *custom_highlight_mode(EditorTab *tab) {
+    const char *mode = tab && tab->win ? tab->win->custom_highlight_mode : NULL;
+    if (g_strcmp0(mode, "viewport") == 0 ||
+        g_strcmp0(mode, "background") == 0 ||
+        g_strcmp0(mode, "full") == 0) {
+        return mode;
+    }
+    return "auto";
+}
+
+/**
+ * @brief Return whether the current custom highlighter should use a viewport.
+ * @param tab The editor tab whose buffer is being inspected.
+ * @return TRUE when full-buffer regex highlighting should be avoided.
+ */
+static gboolean custom_highlight_uses_viewport(EditorTab *tab) {
+    const char *mode = custom_highlight_mode(tab);
+    if (g_strcmp0(mode, "viewport") == 0 ||
+        g_strcmp0(mode, "background") == 0) {
+        return TRUE;
+    }
+    if (g_strcmp0(mode, "full") == 0) return FALSE;
+    guint max_chars = tab && tab->win && tab->win->full_highlight_max_chars > 0u
+        ? tab->win->full_highlight_max_chars
+        : GRAPTOS_FULL_HIGHLIGHT_MAX_CHARS;
+    return tab && tab->buffer &&
+           (guint)gtk_text_buffer_get_char_count(tab->buffer) > max_chars;
+}
+
+/**
+ * @brief Return whether background custom highlighting is enabled.
+ * @param tab The editor tab whose window config is being inspected.
+ * @return TRUE when offscreen ranges may be highlighted slowly.
+ */
+static gboolean custom_highlight_uses_background(EditorTab *tab) {
+    return g_strcmp0(custom_highlight_mode(tab), "background") == 0;
+}
+
+/**
+ * @brief Return whether full custom tag clearing should be avoided.
+ * @details Only custom YAML syntaxes need the large-file clear avoidance. When
+ *          a tab switches to a GtkSourceView language, old Graptoς regex tags
+ *          must still be cleared so stale custom colours do not remain.
+ * @param tab The editor tab whose syntax target is being inspected.
+ * @return TRUE when clearing should stay range-bound.
+ */
+static gboolean custom_highlight_avoid_full_clear(EditorTab *tab) {
+    return tab &&
+           editor_tab_highlighting_allowed(tab) &&
+           source_language_for_tab(tab) == NULL &&
+           custom_highlight_uses_viewport(tab);
+}
+
+/**
+ * @brief Compute visible custom highlight line range.
+ * @param tab The editor tab whose text view is visible.
+ * @param start_out First line to highlight.
+ * @param end_out Last line to highlight.
+ * @return TRUE when a range was computed.
+ */
+static gboolean custom_highlight_visible_range(EditorTab *tab,
+                                               guint *start_out,
+                                               guint *end_out) {
+    if (!tab || !tab->buffer || !start_out || !end_out) return FALSE;
+    gint line_count = gtk_text_buffer_get_line_count(tab->buffer);
+    if (line_count <= 0) return FALSE;
+
+    guint top_line = 0u;
+    guint bottom_line = (guint)MIN(line_count - 1, 0);
+    if (tab->text_view && gtk_widget_get_mapped(tab->text_view)) {
+        GtkTextView *view = GTK_TEXT_VIEW(tab->text_view);
+        GdkRectangle visible;
+        GtkTextIter top;
+        GtkTextIter bottom;
+        gint ignored = 0;
+        gtk_text_view_get_visible_rect(view, &visible);
+        gtk_text_view_get_line_at_y(view, &top, visible.y, &ignored);
+        gtk_text_view_get_line_at_y(view, &bottom, visible.y + visible.height, &ignored);
+        top_line = (guint)gtk_text_iter_get_line(&top);
+        bottom_line = (guint)gtk_text_iter_get_line(&bottom);
+    } else {
+        GtkTextIter cursor;
+        GtkTextMark *insert = gtk_text_buffer_get_insert(tab->buffer);
+        gtk_text_buffer_get_iter_at_mark(tab->buffer, &cursor, insert);
+        top_line = (guint)gtk_text_iter_get_line(&cursor);
+        bottom_line = top_line;
+    }
+
+    guint context = GRAPTOS_HIGHLIGHT_CONTEXT_LINES;
+    guint start = top_line > context ? top_line - context : 0u;
+    guint end = bottom_line + context;
+    if (end >= (guint)line_count) end = (guint)line_count - 1u;
+    if (end < start) end = start;
+    *start_out = start;
+    *end_out = end;
+    return TRUE;
+}
+
+/**
+ * @brief Clear old viewport-only custom highlight ranges.
+ * @param tab The editor tab whose previous range should be trimmed.
+ * @param start New highlighted start line.
+ * @param end New highlighted end line.
+ */
+static void custom_highlight_clear_old_viewport(EditorTab *tab,
+                                                guint start,
+                                                guint end) {
+    if (!tab || !tab->custom_highlight_range_valid || !tab->win) return;
+    if (tab->custom_highlight_end_line < start) {
+        syntax_clear_range(tab->buffer,
+                           tab->win->syntaxes,
+                           tab->custom_highlight_start_line,
+                           tab->custom_highlight_end_line);
+        return;
+    }
+    if (tab->custom_highlight_start_line > end) {
+        syntax_clear_range(tab->buffer,
+                           tab->win->syntaxes,
+                           tab->custom_highlight_start_line,
+                           tab->custom_highlight_end_line);
+        return;
+    }
+    if (tab->custom_highlight_start_line < start) {
+        syntax_clear_range(tab->buffer,
+                           tab->win->syntaxes,
+                           tab->custom_highlight_start_line,
+                           start - 1u);
+    }
+    if (tab->custom_highlight_end_line > end) {
+        syntax_clear_range(tab->buffer,
+                           tab->win->syntaxes,
+                           end + 1u,
+                           tab->custom_highlight_end_line);
+    }
+}
+
+static gboolean custom_highlight_background_cb(gpointer user_data);
+
+/**
+ * @brief Schedule one background custom highlight chunk.
+ * @param tab The editor tab whose offscreen lines should be highlighted.
+ */
+static void custom_highlight_schedule_background(EditorTab *tab) {
+    if (!tab || !custom_highlight_uses_background(tab)) return;
+    if (tab->custom_highlight_background_timeout) return;
+    tab->custom_highlight_background_timeout =
+        g_timeout_add_full(G_PRIORITY_LOW,
+                           CUSTOM_HIGHLIGHT_BACKGROUND_DELAY_MS,
+                           custom_highlight_background_cb,
+                           tab,
+                           NULL);
+}
+
+/**
+ * @brief Apply one background custom highlight chunk.
+ * @param user_data Editor tab.
+ * @return G_SOURCE_REMOVE after one chunk.
+ */
+static gboolean custom_highlight_background_cb(gpointer user_data) {
+    EditorTab *tab = user_data;
+    if (!tab || !tab->buffer || !tab->win || !editor_tab_custom_highlight_needed(tab)) {
+        return G_SOURCE_REMOVE;
+    }
+    tab->custom_highlight_background_timeout = 0u;
+    gint line_count = gtk_text_buffer_get_line_count(tab->buffer);
+    if (line_count <= 0 || tab->custom_highlight_background_line >= (guint)line_count) {
+        return G_SOURCE_REMOVE;
+    }
+    guint start = tab->custom_highlight_background_line;
+    guint end = start + CUSTOM_HIGHLIGHT_BACKGROUND_LINES - 1u;
+    if (end >= (guint)line_count) end = (guint)line_count - 1u;
+    syntax_apply_range(tab->buffer,
+                       tab->win->syntaxes,
+                       tab->active_syntax,
+                       start,
+                       end);
+    tab->custom_highlight_background_line = end + 1u;
+    if (tab->custom_highlight_background_line < (guint)line_count) {
+        custom_highlight_schedule_background(tab);
+    }
+    return G_SOURCE_REMOVE;
 }
 
 /**
@@ -485,7 +686,9 @@ static GtkSourceStyleScheme *source_yaml_override_scheme_for_tab(EditorTab *tab)
  */
 static void clear_graptos_transient_tags(EditorTab *tab) {
     if (!tab || !tab->buffer) return;
-    syntax_clear(tab->buffer, tab->win ? tab->win->syntaxes : NULL);
+    if (!custom_highlight_avoid_full_clear(tab)) {
+        syntax_clear(tab->buffer, tab->win ? tab->win->syntaxes : NULL);
+    }
     if (tab->selection_matches_active) clear_selection_matches(tab);
     if (tab->diagnostics_active &&
         (!tab->active_syntax ||
@@ -494,6 +697,75 @@ static void clear_graptos_transient_tags(EditorTab *tab) {
         clear_syntax_diagnostics(tab);
     }
     tab->custom_highlight_active = FALSE;
+    tab->custom_highlight_range_valid = FALSE;
+    graptos_source_cancel(&tab->custom_highlight_background_timeout);
+}
+
+/**
+ * @brief Return whether custom YAML highlighting owns this tab.
+ * @details GtkSourceView-backed syntaxes are excluded because GTK already owns
+ *          their incremental highlighter. This function only covers Graptoς
+ *          regex syntax fallback.
+ * @param tab The editor tab whose highlighting engine is being inspected.
+ * @return TRUE when Graptoς regex highlighting should run.
+ */
+gboolean editor_tab_custom_highlight_needed(EditorTab *tab) {
+    return tab &&
+           tab->source_buffer &&
+           editor_tab_highlighting_allowed(tab) &&
+           gtk_source_buffer_get_language(tab->source_buffer) == NULL;
+}
+
+/**
+ * @brief Apply custom YAML highlighting without resetting the source engine.
+ * @details Large custom files highlight only the visible range plus context.
+ *          Small files keep the full-buffer behavior unless config selects a
+ *          viewport mode.
+ * @param tab The editor tab whose visible range should be highlighted.
+ */
+void editor_tab_apply_custom_highlight(EditorTab *tab) {
+    if (!tab || !tab->buffer || !tab->win || !editor_tab_custom_highlight_needed(tab)) {
+        return;
+    }
+
+    guint max_chars = tab->win->full_highlight_max_chars > 0u
+        ? tab->win->full_highlight_max_chars
+        : GRAPTOS_FULL_HIGHLIGHT_MAX_CHARS;
+    if (!custom_highlight_uses_viewport(tab)) {
+        if ((guint)gtk_text_buffer_get_char_count(tab->buffer) <= max_chars) {
+            syntax_apply(tab->buffer,
+                         tab->win->syntaxes,
+                         tab->active_syntax);
+            tab->custom_highlight_active = TRUE;
+        }
+        return;
+    }
+
+    guint start = 0u;
+    guint end = 0u;
+    if (!custom_highlight_visible_range(tab, &start, &end)) return;
+    if (!custom_highlight_uses_background(tab)) {
+        custom_highlight_clear_old_viewport(tab, start, end);
+    }
+    syntax_apply_range(tab->buffer, tab->win->syntaxes, tab->active_syntax, start, end);
+    tab->custom_highlight_start_line = start;
+    tab->custom_highlight_end_line = end;
+    tab->custom_highlight_range_valid = TRUE;
+    tab->custom_highlight_active = TRUE;
+
+    if (custom_highlight_uses_background(tab)) {
+        gint line_count = gtk_text_buffer_get_line_count(tab->buffer);
+        if (line_count > 0) {
+            if (tab->custom_highlight_background_line < end + 1u) {
+                tab->custom_highlight_background_line = end + 1u;
+            }
+            if (tab->custom_highlight_background_line < (guint)line_count) {
+                custom_highlight_schedule_background(tab);
+            }
+        }
+    } else {
+        graptos_source_cancel(&tab->custom_highlight_background_timeout);
+    }
 }
 
 /**
@@ -520,6 +792,10 @@ void editor_tab_update_highlight_engine(EditorTab *tab) {
         source_yaml_override_scheme_for_tab(tab));
     gtk_source_buffer_set_language(tab->source_buffer, source_language_for_tab(tab));
     gtk_source_buffer_set_highlight_syntax(tab->source_buffer, TRUE);
+    if (editor_tab_custom_highlight_needed(tab)) {
+        tab->custom_highlight_background_line = 0u;
+        editor_tab_apply_custom_highlight(tab);
+    }
 
     if (tab->text_view) gtk_widget_queue_draw(tab->text_view);
     if (tab->minimap_view) gtk_widget_queue_draw(tab->minimap_view);

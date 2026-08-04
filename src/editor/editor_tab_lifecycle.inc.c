@@ -168,6 +168,7 @@ void editor_tab_cancel_live_work(EditorTab *tab) {
     cancel_timeout_id(&tab->selection_match_timeout);
     cancel_timeout_id(&tab->color_literal_timeout);
     cancel_timeout_id(&tab->regex_tester_timeout);
+    cancel_timeout_id(&tab->custom_highlight_background_timeout);
     cancel_timeout_id(&tab->lsp_change_timeout);
     cancel_timeout_id(&tab->lsp_completion_retry_timeout);
     cancel_timeout_id(&tab->preview_reparent_idle);
@@ -465,11 +466,14 @@ void editor_tab_free(EditorTab *tab) {
     graptos_source_cancel(&tab->hover_timeout);
     graptos_source_cancel(&tab->hover_hide_timeout);
     graptos_source_cancel(&tab->hover_lsp_fallback_timeout);
+    graptos_source_cancel(&tab->custom_highlight_background_timeout);
+    graptos_source_cancel(&tab->disk_change_timeout);
     graptos_source_cancel(&tab->ui_refresh_timeout);
 
     if (tab->buffer) {
         g_signal_handlers_disconnect_by_data(tab->buffer, tab);
     }
+    editor_tab_clear_file_monitor(tab);
     editor_tab_preview_close_detached(tab);
     editor_tab_destroy_popovers(tab);
     if (tab->win && tab->win->lsp_client) lsp_client_document_closed(tab->win->lsp_client, tab);
@@ -485,6 +489,8 @@ void editor_tab_free(EditorTab *tab) {
     g_free(tab->lsp_completion_retry_key);
     g_free(tab->hover_word);
     g_free(tab->last_typing_debug_key);
+    g_free(tab->plugin_preview_title);
+    g_free(tab->plugin_preview_body);
 
     if (tab->undo_stack) g_ptr_array_free(tab->undo_stack, TRUE);
     if (tab->redo_stack) g_ptr_array_free(tab->redo_stack, TRUE);

@@ -1,0 +1,15 @@
+id: beancount-tools
+name: Beancount Tools
+version: 1.0
+description: Validates, formats, queries, and completes Beancount ledgers.
+graptos_api_version: 1
+enabled: true
+native: lib/libgraptos_beancount_tools.so
+
+permissions:
+  - native
+  - editor.read
+  - editor.write
+  - project.read
+  - command
+  - ui

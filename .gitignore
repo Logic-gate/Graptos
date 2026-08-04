@@ -65,6 +65,7 @@ build/
 .zig-cache/
 git_check.sh
 .graptos/
+.graptos-task.ini
 
 # Github actions
 .github/

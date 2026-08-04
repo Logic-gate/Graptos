@@ -1,0 +1,14 @@
+id: taskwarrior
+name: Taskwarrior
+version: 1.0
+description: Project-scoped Taskwarrior hub for listing, adding, and updating tasks.
+graptos_api_version: 1
+enabled: true
+native: lib/libgraptos_taskwarrior.so
+
+permissions:
+  - native
+  - editor.read
+  - project.read
+  - command
+  - ui

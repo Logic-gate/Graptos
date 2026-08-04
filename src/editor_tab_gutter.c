@@ -279,6 +279,7 @@ void on_vadjustment_value_changed(GtkAdjustment *adjustment, gpointer user_data)
     if (tab) {
         sync_minimap_scroll(tab, adjustment);
         if (tab->minimap_view) gtk_widget_queue_draw(tab->minimap_view);
+        editor_tab_schedule_highlight(tab);
         editor_tab_reposition_visible_cursor_popovers(tab);
     }
 }

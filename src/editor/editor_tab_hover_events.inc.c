@@ -253,6 +253,10 @@ static gboolean hover_render_index_references(EditorTab *tab,
  * @param locations The locations supplied by the caller.
  * @param user_data The callback context passed through GTK signal data.
  */
+
+static gboolean editor_tab_show_plugin_hover(EditorTab *tab,
+                                             const char *word,
+                                             GtkTextIter *iter);
 static void hover_lsp_references_cb(EditorTab *tab,
                                     GPtrArray *locations,
                                     gpointer user_data) {
@@ -357,6 +361,10 @@ gboolean hover_timeout_cb(gpointer user_data) {
         tab->color_preview_rgba = rgba;
 
         show_color_preview_in_hover(tab, tab->hover_word, &cursor);
+        return G_SOURCE_REMOVE;
+    }
+
+    if (editor_tab_show_plugin_hover(tab, tab->hover_word, &cursor)) {
         return G_SOURCE_REMOVE;
     }
 
@@ -687,6 +695,79 @@ static GtkWidget *diagnostic_hover_row_new(const char *message) {
     gtk_box_append(GTK_BOX(box), body);
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
     return row;
+}
+
+/**
+ * @brief Create a plugin hover row.
+ * @details Plugin hover rows are informational text, so they are not
+ *          activatable reference rows.
+ * @param label Provider label shown as the heading.
+ * @param body Hover body returned by the plugin.
+ * @return Newly created list row.
+ */
+static GtkWidget *plugin_hover_row_new(const char *label, const char *body) {
+    GtkWidget *row = gtk_list_box_row_new();
+    gtk_widget_set_sensitive(row, FALSE);
+
+    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
+    gtk_widget_set_margin_start(box, 10);
+    gtk_widget_set_margin_end(box, 10);
+    gtk_widget_set_margin_top(box, 8);
+    gtk_widget_set_margin_bottom(box, 10);
+
+    GtkWidget *title = gtk_label_new(label && label[0] ? label : "Plugin");
+    gtk_label_set_xalign(GTK_LABEL(title), 0.0f);
+    gtk_widget_add_css_class(title, "graptos-ref-heading");
+
+    GtkWidget *text = gtk_label_new(body ? body : "");
+    gtk_label_set_xalign(GTK_LABEL(text), 0.0f);
+    gtk_label_set_wrap(GTK_LABEL(text), TRUE);
+    gtk_widget_add_css_class(text, "graptos-ref-snippet");
+
+    gtk_box_append(GTK_BOX(box), title);
+    gtk_box_append(GTK_BOX(box), text);
+    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
+    return row;
+}
+
+/**
+ * @brief Show plugin hover text for a word.
+ * @details Native plugins get the first chance to provide language-specific
+ *          hover information before the generic reference lookup runs.
+ * @param tab Editor tab owning the hover popover.
+ * @param word Token under the pointer.
+ * @param iter Iterator used to place the hover.
+ * @return TRUE when a plugin hover was shown.
+ */
+static gboolean editor_tab_show_plugin_hover(EditorTab *tab,
+                                             const char *word,
+                                             GtkTextIter *iter) {
+    if (!tab || !tab->win || !tab->win->plugins || !word || !iter ||
+        !tab->hover_popover || !tab->hover_list) {
+        return FALSE;
+    }
+    g_autofree char *label = NULL;
+    char *body = graptos_plugin_registry_hover_text(tab->win->plugins,
+                                                    tab,
+                                                    word,
+                                                    &label);
+    if (!body) return FALSE;
+
+    hover_clear_rows(tab);
+    cancel_hover_hide(tab);
+    tab->color_preview_valid = FALSE;
+    tab->regex_tester_active = FALSE;
+    tab->hover_pinned = FALSE;
+    tab->hover_popover_locked = TRUE;
+
+    gtk_list_box_insert(GTK_LIST_BOX(tab->hover_list),
+                        plugin_hover_row_new(label, body),
+                        -1);
+    g_free(body);
+
+    if (!place_hover_popover_at_iter(tab, iter, tab->hover_popover)) return FALSE;
+    graptos_popover_show(tab->hover_popover);
+    return TRUE;
 }
 
 /**

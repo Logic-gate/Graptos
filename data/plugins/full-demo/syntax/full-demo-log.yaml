@@ -30,7 +30,7 @@ statement_exempt_suffixes: []
 formatting:
   enabled: false
   scope: selection_or_block
-  profile: none
+  profile: plain
   block_style: none
   statement_style: newline
   brace_style: attach

@@ -7,6 +7,7 @@
  */
 
 #include "editor_tab_private.h"
+#include "config.h"
 
 #include <ctype.h>
 #include <sys/stat.h>
@@ -15,47 +16,6 @@
  * @brief Latex build dir macro.
  */
 #define LATEX_BUILD_DIR ".graptos-latex-build"
-
-/**
- * @brief Has space.
- * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
- * @param text The text fragment supplied by the caller.
- * @return TRUE when the condition is satisfied; otherwise FALSE.
- */
-static gboolean has_space(const char *text) {
-    const unsigned char *p = (const unsigned char *)text;
-    while (p && *p != '\0') {
-        if (g_ascii_isspace(*p)) return TRUE;
-        p++;
-    }
-    return FALSE;
-}
-
-/**
- * @brief Find latex command.
- * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
- * @return The resolved value for the caller, or NULL when no suitable value is available.
- */
-static char *find_latex_command(void) {
-    const char *env = g_getenv("GRAPTOS_LATEX_COMMAND");
-    if (env && env[0] != '\0' && !has_space(env)) return g_strdup(env);
-
-    static const char *commands[] = {
-        "pdflatex",
-        "xelatex",
-        "lualatex",
-        NULL
-    };
-
-    for (guint i = 0u; commands[i] != NULL; i++) {
-        char *path = g_find_program_in_path(commands[i]);
-        if (path) {
-            g_free(path);
-            return g_strdup(commands[i]);
-        }
-    }
-    return NULL;
-}
 
 /**
  * @brief Basename without suffix.
@@ -177,17 +137,17 @@ static gboolean run_latex(EditorTab *tab,
     g_autoptr(GError) error = NULL;
     int status = 0;
 
-    char *argv[] = {
-        (char *)command,
-        "-interaction=nonstopmode",
-        "-halt-on-error",
-        "-file-line-error",
-        "-no-shell-escape",
-        "-output-directory",
-        (char *)output_dir,
-        (char *)source_path,
-        NULL
-    };
+    g_auto(GStrv) argv = graptos_latex_build_argv(tab ? tab->win : NULL,
+                                                  command,
+                                                  output_dir,
+                                                  source_path,
+                                                  &error);
+    if (!argv) {
+        app_window_set_error_status(tab->win,
+                                    "LaTeX arguments invalid",
+                                    error ? error->message : "Could not parse latex_arguments.");
+        return FALSE;
+    }
 
     gboolean ok = g_spawn_sync(working_dir, argv, NULL, G_SPAWN_SEARCH_PATH,
                               NULL, NULL, &stdout_text, &stderr_text,
@@ -239,11 +199,11 @@ void editor_tab_render_latex(EditorTab *tab) {
         return;
     }
 
-    g_autofree char *command = find_latex_command();
+    g_autofree char *command = graptos_latex_resolve_command(tab->win);
     if (!command) {
         app_window_set_error_status(tab->win, "LaTeX command not found",
                                     "Install pdflatex, xelatex, or lualatex, or set "
-                                    "GRAPTOS_LATEX_COMMAND to the command path.");
+                                    "latex_command in config.ini.");
         return;
     }
 

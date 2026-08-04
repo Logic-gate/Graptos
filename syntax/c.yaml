@@ -8,7 +8,7 @@ line_comment: //
 auto_indent: true
 indent_openers: ["{"]
 indent_closers: ["}"]
-close_pairs: ["(=>)", "{=>}", "[=>]", '"=>"']
+close_pairs: ["(=>)", "{=>}", "[=>]"]
 line_close_pairs: ["#include <=>>"]
 statement_required_enders: [";"]
 statement_exempt_prefixes: ["#", "//", "/*", "*", "}", "{", "else", "case ", "default:", "if ", "if(", "for ", "for(", "while ", "while(", "switch ", "switch(", "do", "struct ", "enum ", "union ", "typedef "]

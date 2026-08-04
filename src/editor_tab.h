@@ -66,6 +66,7 @@ struct _EditorTab {
     GtkWidget *preview_scrolled; /**< Preview scrolled. */
     GtkWidget *preview_view; /**< Preview view. */
     GtkTextBuffer *preview_buffer; /**< Preview buffer. */
+    GFileMonitor *file_monitor; /**< Monitor for external file changes. */
     GtkWidget *tab_widget; /**< Tab widget. */
     GtkWidget *tab_lock_icon; /**< Tab lock icon. */
     GtkWidget *tab_title; /**< Tab title. */
@@ -80,6 +81,8 @@ struct _EditorTab {
     char *lsp_completion_retry_key; /**< Active LSP completion retry key. */
     char *hover_word; /**< Hover word. */
     char *last_typing_debug_key; /**< Last key name shown in typing debug logs. */
+    char *plugin_preview_title; /**< Plugin-owned preview title. */
+    char *plugin_preview_body; /**< Plugin-owned preview body. */
     SyntaxDef *active_syntax; /**< Active syntax. */
 
     GPtrArray *undo_stack; /**< char*. */
@@ -103,6 +106,11 @@ struct _EditorTab {
     guint hover_timeout; /**< Hover timeout. */
     guint hover_hide_timeout; /**< Hover hide timeout. */
     guint hover_lsp_fallback_timeout; /**< Hover LSP fallback timeout. */
+    guint custom_highlight_background_timeout; /**< Deferred background custom highlight source. */
+    guint custom_highlight_start_line; /**< First custom-highlighted line. */
+    guint custom_highlight_end_line; /**< Last custom-highlighted line. */
+    guint custom_highlight_background_line; /**< Next line for background custom highlighting. */
+    guint disk_change_timeout; /**< Debounced external disk change prompt source. */
     guint ui_refresh_timeout; /**< Ui refresh timeout. */
     guint note_autocomplete_timeout; /**< Deferred note autocomplete timeout. */
     guint tab_width; /**< Tab width. */
@@ -134,6 +142,9 @@ struct _EditorTab {
     gboolean minimap_updating; /**< Minimap updating. */
     gboolean preview_updating; /**< Preview updating. */
     gboolean preview_detached; /**< TRUE while the preview container lives in its own window. */
+    gboolean plugin_preview_active; /**< TRUE while a plugin owns preview text. */
+    gboolean disk_change_prompt_visible; /**< TRUE while external-change dialog is open. */
+    gboolean disk_change_pending; /**< TRUE when a changed-on-disk event is pending. */
     gboolean locked; /**< Locked. */
     gboolean folded_tile_member; /**< TRUE when this tab is owned by a visible tile group host. */
     gboolean notebook_refs_held; /**< TRUE when folded widgets are reffed outside the notebook. */
@@ -144,6 +155,7 @@ struct _EditorTab {
     gboolean color_literals_active; /**< Color literals active. */
     gboolean diagnostics_active; /**< Diagnostics active. */
     gboolean custom_highlight_active; /**< Custom highlight active. */
+    gboolean custom_highlight_range_valid; /**< TRUE when custom highlight range is tracked. */
     gboolean low_latency_mode_active; /**< Low latency mode active. */
 };
 

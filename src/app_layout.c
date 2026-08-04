@@ -444,6 +444,64 @@ static void hide_tool_panel(GtkWidget *widget, gpointer user_data) {
     }
 }
 
+void app_window_show_bottom_pane(EditorWindow *win) {
+    if (!win || !win->bottom_pane) return;
+    gboolean attached_now = FALSE;
+    if (win->work_pane && !win->bottom_pane_attached) {
+        gtk_paned_set_end_child(GTK_PANED(win->work_pane), win->bottom_pane);
+        gtk_paned_set_resize_end_child(GTK_PANED(win->work_pane), TRUE);
+        gtk_paned_set_shrink_end_child(GTK_PANED(win->work_pane), FALSE);
+        win->bottom_pane_attached = TRUE;
+        attached_now = TRUE;
+    }
+    gtk_widget_set_visible(win->bottom_pane, TRUE);
+    if (attached_now && win->work_pane) {
+        int height = gtk_widget_get_height(win->work_pane);
+        gtk_paned_set_position(GTK_PANED(win->work_pane),
+                               height > 320 ? height - 220 : 520);
+    }
+    if (attached_now && win->bottom_pane) {
+        gtk_paned_set_position(GTK_PANED(win->bottom_pane), 150);
+    }
+}
+
+void app_window_hide_bottom_pane_if_empty(EditorWindow *win) {
+    if (!win || !win->bottom_pane) return;
+    gboolean terminal_open = terminal_panel_is_open(win->terminal_panel);
+    gboolean hub_open = win->plugin_hub_revealer
+        ? gtk_revealer_get_reveal_child(GTK_REVEALER(win->plugin_hub_revealer))
+        : FALSE;
+    if (terminal_open || hub_open) return;
+    gtk_widget_set_visible(win->bottom_pane, FALSE);
+    if (win->work_pane && win->bottom_pane_attached) {
+        gtk_paned_set_end_child(GTK_PANED(win->work_pane), NULL);
+        win->bottom_pane_attached = FALSE;
+    }
+    if (win->work_pane) {
+        int height = gtk_widget_get_height(win->work_pane);
+        gtk_paned_set_position(GTK_PANED(win->work_pane),
+                               height > 0 ? height : 100000);
+    }
+}
+
+/**
+ * @brief Hide the tool revealer after its close transition completes.
+ * @param revealer The revealer supplied by GTK.
+ * @param pspec The changed property, unused.
+ * @param user_data The editor window, unused.
+ */
+static void tool_panel_revealer_child_revealed(GtkRevealer *revealer,
+                                               GParamSpec *pspec,
+                                               gpointer user_data) {
+    (void)pspec;
+    (void)user_data;
+    if (!revealer) return;
+    if (!gtk_revealer_get_reveal_child(revealer) &&
+        !gtk_revealer_get_child_revealed(revealer)) {
+        gtk_widget_set_visible(GTK_WIDGET(revealer), FALSE);
+    }
+}
+
 /**
  * @brief Tool panel show ready.
  * @details Application glue touches actions, tabs, panels, and persistent state. Keeping the contract explicit here makes UI callbacks easier to audit when a later change moves work between the window and child widgets.
@@ -451,11 +509,66 @@ static void hide_tool_panel(GtkWidget *widget, gpointer user_data) {
  */
 static void tool_panel_show_ready(EditorWindow *win) {
     if (!win || !win->tool_panel || !win->tool_revealer) return;
+    gtk_widget_set_visible(win->tool_revealer, TRUE);
     GtkWidget *spacer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_widget_set_hexpand(spacer, TRUE);
     tool_panel_append(win, spacer);
     tool_panel_append(win, tool_button_new("×", "Close option bar", G_CALLBACK(hide_tool_panel), win));
     gtk_revealer_set_reveal_child(GTK_REVEALER(win->tool_revealer), TRUE);
+}
+
+static void plugin_hub_panel_clear(EditorWindow *win) {
+    if (!win || !win->plugin_hub_panel) return;
+    GtkWidget *child = gtk_widget_get_first_child(win->plugin_hub_panel);
+    while (child) {
+        GtkWidget *next = gtk_widget_get_next_sibling(child);
+        gtk_box_remove(GTK_BOX(win->plugin_hub_panel), child);
+        child = next;
+    }
+}
+
+static void plugin_hub_panel_begin(EditorWindow *win, const char *title) {
+    if (!win || !win->plugin_hub_panel) return;
+    plugin_hub_panel_clear(win);
+    gtk_box_append(GTK_BOX(win->plugin_hub_panel),
+                   tool_title_new(title ? title : "Plugin Hub"));
+    gtk_box_append(GTK_BOX(win->plugin_hub_panel), graptos_separator_new());
+}
+
+static void hide_plugin_hub_panel(GtkWidget *widget, gpointer user_data) {
+    (void)widget;
+    EditorWindow *win = user_data;
+    if (win && win->plugin_hub_revealer) {
+        gtk_revealer_set_reveal_child(GTK_REVEALER(win->plugin_hub_revealer), FALSE);
+    }
+}
+
+static void plugin_hub_revealer_child_revealed(GtkRevealer *revealer,
+                                               GParamSpec *pspec,
+                                               gpointer user_data) {
+    (void)pspec;
+    EditorWindow *win = user_data;
+    if (!revealer) return;
+    if (!gtk_revealer_get_reveal_child(revealer) &&
+        !gtk_revealer_get_child_revealed(revealer)) {
+        gtk_widget_set_visible(GTK_WIDGET(revealer), FALSE);
+        app_window_hide_bottom_pane_if_empty(win);
+    }
+}
+
+static void plugin_hub_panel_show_ready(EditorWindow *win) {
+    if (!win || !win->plugin_hub_panel || !win->plugin_hub_revealer) return;
+    app_window_show_bottom_pane(win);
+    gtk_widget_set_visible(win->plugin_hub_revealer, TRUE);
+    GtkWidget *spacer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_widget_set_hexpand(spacer, TRUE);
+    gtk_box_append(GTK_BOX(win->plugin_hub_panel), spacer);
+    gtk_box_append(GTK_BOX(win->plugin_hub_panel),
+                   tool_button_new("×",
+                                   "Close plugin hub",
+                                   G_CALLBACK(hide_plugin_hub_panel),
+                                   win));
+    gtk_revealer_set_reveal_child(GTK_REVEALER(win->plugin_hub_revealer), TRUE);
 }
 
 /**
@@ -467,6 +580,32 @@ typedef struct {
     GtkWidget *button; /**< Button whose label mirrors the current syntax. */
     GtkWidget *popover; /**< Popover containing syntax choices. */
 } ToolSyntaxChoice;
+
+/**
+ * @brief Plugin hub callback state.
+ */
+typedef struct {
+    EditorWindow *win; /**< Owning editor window. */
+    char *plugin_id; /**< Plugin id. */
+    char *hub_id; /**< Hub id. */
+    char *label; /**< Visible hub label. */
+    GtkWidget *popover; /**< Optional popover to close. */
+    char *action_id; /**< Optional hub action id. */
+} ToolPluginHubAction;
+
+/**
+ * @brief Free plugin hub callback state.
+ * @param data ToolPluginHubAction.
+ */
+static void tool_plugin_hub_action_free(gpointer data) {
+    ToolPluginHubAction *action = data;
+    if (!action) return;
+    g_free(action->plugin_id);
+    g_free(action->hub_id);
+    g_free(action->label);
+    g_free(action->action_id);
+    g_free(action);
+}
 
 /**
  * @brief Free a tool syntax choice.
@@ -952,6 +1091,379 @@ static void show_git_tools(GtkWidget *widget, gpointer user_data) {
 }
 
 /**
+ * @brief Plugin manager row state.
+ */
+typedef struct {
+    EditorWindow *win; /**< Window owning the plugin registry. */
+    char *plugin_id; /**< Stable plugin id controlled by this row. */
+} PluginManagerRow;
+
+/**
+ * @brief Free plugin manager row state.
+ * @param data PluginManagerRow allocated for a switch.
+ */
+static void plugin_manager_row_free(gpointer data) {
+    PluginManagerRow *row = data;
+    if (!row) return;
+    g_free(row->plugin_id);
+    g_free(row);
+}
+
+/**
+ * @brief Close the plugin manager dialog.
+ * @param widget Widget that emitted the close action.
+ * @param user_data Plugin manager window.
+ */
+static void plugin_manager_close(GtkWidget *widget, gpointer user_data) {
+    (void)widget;
+    if (GTK_IS_WINDOW(user_data)) gtk_window_destroy(GTK_WINDOW(user_data));
+}
+
+/**
+ * @brief Toggle one plugin from the manager.
+ * @details The manifest is left untouched. Graptoς persists user disabled
+ *          plugin ids under the config directory and refreshes contributions
+ *          that can affect active tabs.
+ * @param switch_widget Switch that changed state.
+ * @param pspec Property that changed.
+ * @param user_data PluginManagerRow for the switch.
+ */
+static void plugin_manager_switch_changed(GObject *switch_widget,
+                                          GParamSpec *pspec,
+                                          gpointer user_data) {
+    (void)pspec;
+    PluginManagerRow *row = user_data;
+    if (!row || !row->win || !row->plugin_id) return;
+    gboolean enabled = gtk_switch_get_active(GTK_SWITCH(switch_widget));
+    if (!graptos_plugin_registry_set_enabled(row->win->plugins,
+                                             row->plugin_id,
+                                             enabled)) {
+        return;
+    }
+    (void)graptos_plugin_registry_save_user_state(row->win->plugins);
+    if (enabled) {
+        g_autoptr(GError) error = NULL;
+        if (!graptos_plugin_registry_load_native(row->win->plugins, &error) &&
+            error) {
+            g_warning("Native plugin loading failed: %s", error->message);
+        }
+    }
+    app_window_reload_syntaxes(row->win);
+    app_window_set_status(row->win,
+                          enabled ? "Plugin enabled" : "Plugin disabled");
+}
+
+/**
+ * @brief Append one plugin manager row.
+ * @param list List box receiving the row.
+ * @param win Window owning the plugin registry.
+ * @param plugin Plugin shown by the row.
+ */
+static void plugin_manager_append_row(GtkWidget *list,
+                                      EditorWindow *win,
+                                      GraptosPlugin *plugin) {
+    if (!list || !win || !plugin) return;
+    GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    gtk_widget_add_css_class(row, "graptos-plugin-manager-row");
+    graptos_set_all_margins(row, 8);
+
+    GtkWidget *text = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
+    gtk_widget_set_hexpand(text, TRUE);
+    GtkWidget *title = gtk_label_new(plugin->name ? plugin->name : plugin->id);
+    gtk_label_set_xalign(GTK_LABEL(title), 0.0f);
+    gtk_widget_add_css_class(title, "graptos-menu-title");
+    gtk_box_append(GTK_BOX(text), title);
+
+    char *detail_text = g_strdup_printf("%s%s%s",
+                                        plugin->id ? plugin->id : "(unknown)",
+                                        plugin->description ? " - " : "",
+                                        plugin->description ? plugin->description : "");
+    GtkWidget *detail = menu_small_label(detail_text);
+    g_free(detail_text);
+    gtk_label_set_wrap(GTK_LABEL(detail), TRUE);
+    gtk_box_append(GTK_BOX(text), detail);
+    gtk_box_append(GTK_BOX(row), text);
+
+    GtkWidget *enabled = gtk_switch_new();
+    gtk_switch_set_active(GTK_SWITCH(enabled), plugin->enabled);
+    gtk_widget_set_valign(enabled, GTK_ALIGN_CENTER);
+    PluginManagerRow *state = g_new0(PluginManagerRow, 1);
+    state->win = win;
+    state->plugin_id = g_strdup(plugin->id);
+    g_object_set_data_full(G_OBJECT(enabled),
+                           "graptos-plugin-manager-row",
+                           state,
+                           plugin_manager_row_free);
+    g_signal_connect(enabled,
+                     "notify::active",
+                     G_CALLBACK(plugin_manager_switch_changed),
+                     state);
+    gtk_box_append(GTK_BOX(row), enabled);
+    gtk_list_box_append(GTK_LIST_BOX(list), row);
+}
+
+/**
+ * @brief Show the plugin manager dialog.
+ * @details The manager exposes runtime plugin enable state without editing
+ *          plugin YAML files. A restart is not required for command hiding;
+ *          enabling native code loads any missing shared libraries on demand.
+ * @param widget Widget that emitted the action.
+ * @param user_data EditorWindow owning the plugin registry.
+ */
+static void show_plugin_manager(GtkWidget *widget, gpointer user_data) {
+    EditorWindow *win = user_data;
+    if (!win) return;
+    GtkWidget *popover = widget ? gtk_widget_get_ancestor(widget, GTK_TYPE_POPOVER) : NULL;
+    if (popover) graptos_popover_hide(popover);
+
+    GtkWidget *window = gtk_window_new();
+    gtk_widget_add_css_class(window, "graptos-window");
+    gtk_widget_add_css_class(window, "graptos-dialog");
+    gtk_widget_add_css_class(window, "graptos-plugin-manager-window");
+    gtk_window_set_title(GTK_WINDOW(window), "Plugin Manager");
+    gtk_window_set_default_size(GTK_WINDOW(window), 520, 420);
+    gtk_window_set_transient_for(GTK_WINDOW(window), app_window_gtk(win));
+    gtk_window_set_modal(GTK_WINDOW(window), TRUE);
+
+    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+    gtk_widget_add_css_class(box, "graptos-root");
+    gtk_widget_add_css_class(box, "graptos-dialog-root");
+    gtk_widget_add_css_class(box, "graptos-flat-dialog");
+    gtk_widget_add_css_class(box, "graptos-plugin-manager-root");
+    graptos_set_all_margins(box, 12);
+
+    GtkWidget *heading = gtk_label_new("Plugin Manager");
+    gtk_label_set_xalign(GTK_LABEL(heading), 0.0f);
+    gtk_widget_add_css_class(heading, "graptos-dialog-title");
+    gtk_box_append(GTK_BOX(box), heading);
+
+    GtkWidget *scrolled = gtk_scrolled_window_new();
+    gtk_widget_add_css_class(scrolled, "graptos-plugin-manager-scroll");
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled),
+                                   GTK_POLICY_NEVER,
+                                   GTK_POLICY_AUTOMATIC);
+    gtk_widget_set_vexpand(scrolled, TRUE);
+    GtkWidget *list = gtk_list_box_new();
+    gtk_widget_add_css_class(list, "graptos-plugin-manager-list");
+    gtk_list_box_set_selection_mode(GTK_LIST_BOX(list), GTK_SELECTION_NONE);
+    for (guint i = 0u; win->plugins && win->plugins->plugins &&
+         i < win->plugins->plugins->len; i++) {
+        plugin_manager_append_row(list,
+                                  win,
+                                  g_ptr_array_index(win->plugins->plugins, i));
+    }
+    gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolled), list);
+    gtk_box_append(GTK_BOX(box), scrolled);
+
+    GtkWidget *actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    gtk_widget_set_halign(actions, GTK_ALIGN_END);
+    GtkWidget *close = tool_button_new("Close",
+                                       "Close plugin manager",
+                                       G_CALLBACK(plugin_manager_close),
+                                       window);
+    gtk_box_append(GTK_BOX(actions), close);
+    gtk_box_append(GTK_BOX(box), actions);
+
+    gtk_window_set_child(GTK_WINDOW(window), box);
+    gtk_window_present(GTK_WINDOW(window));
+}
+
+/**
+ * @brief Show one plugin hub in the tool panel.
+ * @param win Owning window.
+ * @param plugin_id Plugin id.
+ * @param hub_id Hub id.
+ * @param label Visible label.
+ */
+static void show_plugin_hub_panel(EditorWindow *win,
+                                  const char *plugin_id,
+                                  const char *hub_id,
+                                  const char *label);
+
+/**
+ * @brief Return prompt label for one hub action.
+ * @param action_id Hub action id.
+ * @return Prompt label, or NULL for no prompt.
+ */
+static const char *plugin_hub_action_prompt(const char *action_id) {
+    if (g_strcmp0(action_id, "add") == 0) return "Task description:";
+    if (g_strcmp0(action_id, "modify") == 0) {
+        return "Task id and modifications, e.g. 12 due:tomorrow +tag:";
+    }
+    if (g_strcmp0(action_id, "priority") == 0) {
+        return "Task id and priority H/M/L, or id only to clear:";
+    }
+    if (g_strcmp0(action_id, "done") == 0) return "Task id:";
+    if (g_strcmp0(action_id, "delete") == 0) return "Task id:";
+    return NULL;
+}
+
+/**
+ * @brief Run one plugin hub action.
+ * @param widget Button that emitted the callback.
+ * @param user_data ToolPluginHubAction.
+ */
+static void plugin_hub_action_clicked(GtkWidget *widget, gpointer user_data) {
+    (void)widget;
+    ToolPluginHubAction *action = user_data;
+    if (!action || !action->win || !action->action_id) return;
+    EditorWindow *win = action->win;
+    g_autofree char *plugin_id = g_strdup(action->plugin_id);
+    g_autofree char *hub_id = g_strdup(action->hub_id);
+    g_autofree char *label = g_strdup(action->label);
+    g_autofree char *action_id = g_strdup(action->action_id);
+    EditorTab *tab = app_window_current_tab(win);
+    const char *prompt = plugin_hub_action_prompt(action_id);
+    g_autofree char *input = NULL;
+    if (prompt) {
+        input = dialog_prompt_text(app_window_gtk(win),
+                                   label ? label : "Plugin Hub",
+                                   prompt,
+                                   "");
+        if (!input) return;
+    }
+    (void)graptos_plugin_registry_run_hub_action(win->plugins,
+                                                 tab,
+                                                 plugin_id,
+                                                 hub_id,
+                                                 action_id,
+                                                 input);
+    show_plugin_hub_panel(win, plugin_id, hub_id, label);
+}
+
+/**
+ * @brief Open one plugin hub from the plugin popover.
+ * @param widget Button that emitted the callback.
+ * @param user_data ToolPluginHubAction.
+ */
+static void plugin_hub_open_clicked(GtkWidget *widget, gpointer user_data) {
+    (void)widget;
+    ToolPluginHubAction *action = user_data;
+    if (!action || !action->win) return;
+    if (action->popover && GTK_IS_POPOVER(action->popover)) {
+        gtk_popover_popdown(GTK_POPOVER(action->popover));
+    }
+    show_plugin_hub_panel(action->win,
+                          action->plugin_id,
+                          action->hub_id,
+                          action->label);
+}
+
+/**
+ * @brief Add one hub button with owned callback state.
+ * @param box Destination box.
+ * @param label Button label.
+ * @param tooltip Tooltip text.
+ * @param callback Button callback.
+ * @param state Owned callback state.
+ */
+static void plugin_hub_append_button(GtkWidget *box,
+                                     const char *label,
+                                     const char *tooltip,
+                                     GCallback callback,
+                                     ToolPluginHubAction *state) {
+    GtkWidget *button = tool_button_new(label, tooltip, callback, state);
+    g_object_set_data_full(G_OBJECT(button),
+                           "graptos-plugin-hub-action",
+                           state,
+                           tool_plugin_hub_action_free);
+    gtk_box_append(GTK_BOX(box), button);
+}
+
+/**
+ * @brief Create callback state for a plugin hub.
+ * @param win Owning window.
+ * @param view Hub view.
+ * @param popover Optional popover.
+ * @param action_id Optional action id.
+ * @return Owned state.
+ */
+static ToolPluginHubAction *plugin_hub_action_new(EditorWindow *win,
+                                                  const GraptosPluginHubView *view,
+                                                  GtkWidget *popover,
+                                                  const char *action_id) {
+    ToolPluginHubAction *state = g_new0(ToolPluginHubAction, 1);
+    state->win = win;
+    state->plugin_id = g_strdup(view ? view->plugin_id : NULL);
+    state->hub_id = g_strdup(view ? view->hub_id : NULL);
+    state->label = g_strdup(view ? view->label : "Plugin Hub");
+    state->popover = popover;
+    state->action_id = g_strdup(action_id);
+    return state;
+}
+
+static void show_plugin_hub_panel(EditorWindow *win,
+                                  const char *plugin_id,
+                                  const char *hub_id,
+                                  const char *label) {
+    if (!win || !plugin_id || !hub_id) return;
+    EditorTab *tab = app_window_current_tab(win);
+    g_autofree char *body = graptos_plugin_registry_render_hub(win->plugins,
+                                                               tab,
+                                                               plugin_id,
+                                                               hub_id);
+    plugin_hub_panel_begin(win, label && label[0] ? label : "Plugin Hub");
+
+    GtkWidget *scrolled = gtk_scrolled_window_new();
+    gtk_widget_add_css_class(scrolled, "graptos-plugin-hub-scroll");
+    gtk_widget_set_size_request(scrolled, 500, 72);
+    gtk_widget_set_hexpand(scrolled, TRUE);
+    gtk_widget_set_vexpand(scrolled, TRUE);
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled),
+                                   GTK_POLICY_AUTOMATIC,
+                                   GTK_POLICY_AUTOMATIC);
+    GtkWidget *output = gtk_label_new(body && body[0] ? body : "No hub content.");
+    gtk_widget_add_css_class(output, "graptos-editor");
+    gtk_widget_add_css_class(output, "graptos-plugin-hub-view");
+    gtk_label_set_selectable(GTK_LABEL(output), TRUE);
+    gtk_label_set_wrap(GTK_LABEL(output), TRUE);
+    gtk_label_set_xalign(GTK_LABEL(output), 0.0f);
+    gtk_label_set_yalign(GTK_LABEL(output), 0.0f);
+    gtk_widget_set_halign(output, GTK_ALIGN_FILL);
+    gtk_widget_set_valign(output, GTK_ALIGN_START);
+    gtk_widget_set_hexpand(output, TRUE);
+    graptos_set_all_margins(output, 6);
+    gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolled), output);
+    gtk_box_append(GTK_BOX(win->plugin_hub_panel), scrolled);
+
+    GraptosPluginHubView view = {0};
+    view.plugin_id = (char *)plugin_id;
+    view.hub_id = (char *)hub_id;
+    view.label = (char *)(label && label[0] ? label : "Plugin Hub");
+    plugin_hub_append_button(win->plugin_hub_panel,
+                             "Refresh",
+                             "Refresh task list",
+                             G_CALLBACK(plugin_hub_action_clicked),
+                             plugin_hub_action_new(win, &view, NULL, "refresh"));
+    plugin_hub_append_button(win->plugin_hub_panel,
+                             "Add",
+                             "Add task",
+                             G_CALLBACK(plugin_hub_action_clicked),
+                             plugin_hub_action_new(win, &view, NULL, "add"));
+    plugin_hub_append_button(win->plugin_hub_panel,
+                             "Modify",
+                             "Modify task",
+                             G_CALLBACK(plugin_hub_action_clicked),
+                             plugin_hub_action_new(win, &view, NULL, "modify"));
+    plugin_hub_append_button(win->plugin_hub_panel,
+                             "Priority",
+                             "Set task priority",
+                             G_CALLBACK(plugin_hub_action_clicked),
+                             plugin_hub_action_new(win, &view, NULL, "priority"));
+    plugin_hub_append_button(win->plugin_hub_panel,
+                             "Done",
+                             "Mark task done",
+                             G_CALLBACK(plugin_hub_action_clicked),
+                             plugin_hub_action_new(win, &view, NULL, "done"));
+    plugin_hub_append_button(win->plugin_hub_panel,
+                             "Delete",
+                             "Delete task",
+                             G_CALLBACK(plugin_hub_action_clicked),
+                             plugin_hub_action_new(win, &view, NULL, "delete"));
+    plugin_hub_panel_show_ready(win);
+}
+
+/**
  * @brief Show plugin tools.
  * @details Declarative plugin menu commands are also available from the bottom
  *          tool panel so plugins are not limited to editor right-click menus.
@@ -959,20 +1471,56 @@ static void show_git_tools(GtkWidget *widget, gpointer user_data) {
  * @param user_data The callback context passed through GTK signal data.
  */
 static void show_plugin_tools(GtkWidget *widget, gpointer user_data) {
-    (void)widget;
     EditorWindow *win = user_data;
-    if (!win || !win->tool_panel) return;
-    tool_panel_begin(win, "Plugins");
+    if (!win || !widget) return;
 
     EditorTab *tab = app_window_current_tab(win);
-    guint added = graptos_plugin_append_editor_tool_items(win->plugins,
-                                                          tab,
-                                                          win->tool_panel,
-                                                          tool_active_editor_line(tab));
-    if (added == 0u) {
-        tool_panel_append(win, menu_small_label("No plugin commands for the active editor"));
+    GtkWidget *popover = gtk_popover_new();
+    graptos_popover_attach(popover, widget);
+    gtk_popover_set_has_arrow(GTK_POPOVER(popover), FALSE);
+    gtk_popover_set_position(GTK_POPOVER(popover), GTK_POS_TOP);
+    gtk_widget_add_css_class(popover, "graptos-tools-popover");
+
+    GtkWidget *scrolled = gtk_scrolled_window_new();
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled),
+                                   GTK_POLICY_NEVER,
+                                   GTK_POLICY_AUTOMATIC);
+    gtk_widget_set_size_request(scrolled, 260, 320);
+
+    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
+    graptos_set_all_margins(box, 6);
+    gtk_box_append(GTK_BOX(box),
+                   tool_button_new("Manage Plugins",
+                                   "Enable or disable plugins",
+                                   G_CALLBACK(show_plugin_manager),
+                                   win));
+    gtk_box_append(GTK_BOX(box), gtk_separator_new(GTK_ORIENTATION_HORIZONTAL));
+    g_autoptr(GPtrArray) hubs = graptos_plugin_registry_hub_views(win->plugins);
+    if (hubs && hubs->len > 0u) {
+        for (guint i = 0u; i < hubs->len; i++) {
+            GraptosPluginHubView *view = g_ptr_array_index(hubs, i);
+            if (!view) continue;
+            plugin_hub_append_button(box,
+                                     view->label ? view->label : "Plugin Hub",
+                                     "Open plugin hub",
+                                     G_CALLBACK(plugin_hub_open_clicked),
+                                     plugin_hub_action_new(win, view, popover, NULL));
+        }
+        gtk_box_append(GTK_BOX(box), gtk_separator_new(GTK_ORIENTATION_HORIZONTAL));
     }
-    tool_panel_show_ready(win);
+    guint added = graptos_plugin_append_editor_tool_menu_items(win->plugins,
+                                                               tab,
+                                                               box,
+                                                               popover,
+                                                               tool_active_editor_line(tab));
+    if (added == 0u) {
+        gtk_box_append(GTK_BOX(box),
+                       menu_small_label("No plugin commands for the active editor"));
+    }
+    gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolled), box);
+    gtk_popover_set_child(GTK_POPOVER(popover), scrolled);
+    g_signal_connect(popover, "closed", G_CALLBACK(tool_popover_closed), NULL);
+    graptos_popover_show(popover);
 }
 
 /**
@@ -1021,13 +1569,43 @@ GtkWidget *build_tool_panel(EditorWindow *win) {
     win->tool_revealer = gtk_revealer_new();
     gtk_revealer_set_transition_type(GTK_REVEALER(win->tool_revealer), GTK_REVEALER_TRANSITION_TYPE_SLIDE_UP);
     gtk_revealer_set_transition_duration(GTK_REVEALER(win->tool_revealer), 120u);
+    gtk_widget_set_visible(win->tool_revealer, FALSE);
+    gtk_widget_set_vexpand(win->tool_revealer, FALSE);
+    g_signal_connect(win->tool_revealer, "notify::child-revealed",
+                     G_CALLBACK(tool_panel_revealer_child_revealed),
+                     win);
 
     win->tool_panel = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
     gtk_widget_add_css_class(win->tool_panel, "graptos-tool-panel");
     gtk_widget_set_hexpand(win->tool_panel, TRUE);
+    gtk_widget_set_vexpand(win->tool_panel, FALSE);
     gtk_revealer_set_child(GTK_REVEALER(win->tool_revealer), win->tool_panel);
     gtk_revealer_set_reveal_child(GTK_REVEALER(win->tool_revealer), FALSE);
     return win->tool_revealer;
+}
+
+GtkWidget *build_plugin_hub_panel(EditorWindow *win) {
+    win->plugin_hub_revealer = gtk_revealer_new();
+    gtk_revealer_set_transition_type(GTK_REVEALER(win->plugin_hub_revealer),
+                                     GTK_REVEALER_TRANSITION_TYPE_SLIDE_UP);
+    gtk_revealer_set_transition_duration(GTK_REVEALER(win->plugin_hub_revealer),
+                                         120u);
+    gtk_widget_set_visible(win->plugin_hub_revealer, FALSE);
+    gtk_widget_set_vexpand(win->plugin_hub_revealer, TRUE);
+    g_signal_connect(win->plugin_hub_revealer,
+                     "notify::child-revealed",
+                     G_CALLBACK(plugin_hub_revealer_child_revealed),
+                     win);
+
+    win->plugin_hub_panel = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    gtk_widget_add_css_class(win->plugin_hub_panel, "graptos-tool-panel");
+    gtk_widget_set_hexpand(win->plugin_hub_panel, TRUE);
+    gtk_widget_set_vexpand(win->plugin_hub_panel, TRUE);
+    gtk_revealer_set_child(GTK_REVEALER(win->plugin_hub_revealer),
+                           win->plugin_hub_panel);
+    gtk_revealer_set_reveal_child(GTK_REVEALER(win->plugin_hub_revealer),
+                                  FALSE);
+    return win->plugin_hub_revealer;
 }
 
 /**

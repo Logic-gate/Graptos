@@ -846,6 +846,18 @@ void graptos_apply_editor_css(const char *editor_bg_color,
         ".graptos-window .graptos-root.graptos-dialog-root textview, "
         ".graptos-window .graptos-root.graptos-dialog-root textview text { "
         "background: %s; background-color: %s; color: %s; }\n"
+        "window.graptos-window.graptos-plugin-manager-window, "
+        "window.graptos-window.graptos-plugin-manager-window > contents, "
+        "window.graptos-window .graptos-plugin-manager-root, "
+        "window.graptos-window .graptos-plugin-manager-scroll, "
+        "window.graptos-window .graptos-plugin-manager-scroll viewport, "
+        "window.graptos-window .graptos-plugin-manager-list, "
+        "window.graptos-window .graptos-plugin-manager-row { "
+        "background: %s; background-color: %s; color: %s; "
+        "border-radius: 0; border: none; box-shadow: none; outline: none; }\n"
+        "window.graptos-window .graptos-plugin-manager-root label, "
+        "window.graptos-window .graptos-plugin-manager-list label, "
+        "window.graptos-window .graptos-plugin-manager-row label { color: %s; }\n"
         ".graptos-window .graptos-dialog-output, "
         ".graptos-window .graptos-dialog-output text, "
         ".graptos-window textview.graptos-dialog-output, "
@@ -871,6 +883,10 @@ void graptos_apply_editor_css(const char *editor_bg_color,
         effective_dialog_input_bg,
         effective_dialog_input_bg,
         effective_dialog_input_fg,
+        effective_dialog_bg,
+        effective_dialog_bg,
+        effective_dialog_fg,
+        effective_dialog_fg,
         effective_dialog_bg,
         effective_dialog_bg,
         effective_dialog_output);

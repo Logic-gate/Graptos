@@ -186,6 +186,49 @@ static void test_syntax_diagnostics_summary(void) {
 }
 
 /**
+ * @brief Verifies bundled Beancount syntax is loadable.
+ * @details The Beancount syntax has real regex rules and file extensions, so
+ *          loading it in tests catches missing bundled data and invalid syntax
+ *          definitions before users see plain text for ledger files.
+ */
+static void test_syntax_beancount_loaded(void) {
+    GPtrArray *syntaxes = syntax_load_all();
+    g_assert_nonnull(syntaxes);
+
+    SyntaxDef *bean = syntax_for_path(syntaxes, "/tmp/example.bean");
+    SyntaxDef *beancount = syntax_for_path(syntaxes, "/tmp/example.beancount");
+    g_assert_nonnull(bean);
+    g_assert_nonnull(beancount);
+    g_assert_cmpstr(bean->name, ==, "Beancount");
+    g_assert_cmpstr(beancount->name, ==, "Beancount");
+    g_assert_cmpuint(bean->rules ? bean->rules->len : 0u, >, 0u);
+
+    g_ptr_array_free(syntaxes, TRUE);
+}
+
+/**
+ * @brief Verifies unsaved Beancount content is detected while typing.
+ * @details Beancount ledgers use colon-heavy account names, so the content
+ *          detector must classify them before the generic YAML fallback runs.
+ */
+static void test_syntax_beancount_content_detection(void) {
+    GPtrArray *syntaxes = syntax_load_all();
+    g_assert_nonnull(syntaxes);
+
+    GtkTextBuffer *buffer = gtk_text_buffer_new(NULL);
+    gtk_text_buffer_set_text(buffer,
+                             "2026-08-02 open Assets:Cash USD\n"
+                             "2026-08-02 balance Assets:Cash 10 USD\n",
+                             -1);
+    SyntaxDef *syntax = syntax_for_content(syntaxes, buffer);
+    g_assert_nonnull(syntax);
+    g_assert_cmpstr(syntax->name, ==, "Beancount");
+
+    g_object_unref(buffer);
+    g_ptr_array_free(syntaxes, TRUE);
+}
+
+/**
  * @brief Create a minimal C-like syntax for formatter tests.
  * @details The fixture uses the same structural fields as real syntax files so
  *          tests catch accidental formatter-only structural configuration.
@@ -913,6 +956,8 @@ int main(int argc, char **argv) {
     g_test_add_func("/codex/protocol/rejects_invalid_json", test_codex_protocol_rejects_invalid_json);
     g_test_add_func("/syntax/diagnostics/empty", test_syntax_diagnostics_empty);
     g_test_add_func("/syntax/diagnostics/summary", test_syntax_diagnostics_summary);
+    g_test_add_func("/syntax/beancount/loaded", test_syntax_beancount_loaded);
+    g_test_add_func("/syntax/beancount/content-detection", test_syntax_beancount_content_detection);
     g_test_add_func("/formatter/disabled", test_formatter_disabled);
     g_test_add_func("/formatter/one-line-function", test_formatter_one_line_function);
     g_test_add_func("/formatter/for-semicolons", test_formatter_for_semicolons);

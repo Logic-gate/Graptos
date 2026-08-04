@@ -11,6 +11,8 @@
 #include <errno.h>
 #include <string.h>
 
+#define GRAPTOS_DEFAULT_LATEX_ARGUMENTS "-interaction=nonstopmode -halt-on-error -file-line-error -no-shell-escape -output-directory {output_dir} {source_path}"
+
 /**
  * @brief Parse bool.
  * @details Configuration values are user data, not internal constants. The comment makes the fallback path explicit so missing keys do not overwrite intentional manual edits.
@@ -195,6 +197,96 @@ static void replace_config_string(char **slot, const char *value) {
     if (!slot) return;
     g_free(*slot);
     *slot = g_strdup(value ? value : "");
+}
+
+/**
+ * @brief Return whether a command token is safe for legacy env config.
+ * @param text Command token.
+ * @return TRUE when it is a single executable token.
+ */
+static gboolean command_token_has_no_space(const char *text) {
+    if (!text || !text[0]) return FALSE;
+    for (const char *p = text; *p; p++) {
+        if (g_ascii_isspace(*p)) return FALSE;
+    }
+    return TRUE;
+}
+
+/**
+ * @brief Replace one placeholder token in a string.
+ * @param text Source text.
+ * @param placeholder Placeholder token.
+ * @param value Replacement value.
+ * @return Owned replaced string.
+ */
+static char *replace_placeholder(const char *text,
+                                 const char *placeholder,
+                                 const char *value) {
+    GString *out = g_string_new(NULL);
+    const char *cursor = text ? text : "";
+    gsize placeholder_len = strlen(placeholder);
+    while (TRUE) {
+        const char *match = g_strstr_len(cursor, -1, placeholder);
+        if (!match) {
+            g_string_append(out, cursor);
+            break;
+        }
+        g_string_append_len(out, cursor, (gssize)(match - cursor));
+        g_string_append(out, value ? value : "");
+        cursor = match + placeholder_len;
+    }
+    return g_string_free(out, FALSE);
+}
+
+char *graptos_latex_resolve_command(EditorWindow *win) {
+    if (win && win->latex_command && win->latex_command[0] != '\0') {
+        return g_strdup(win->latex_command);
+    }
+
+    const char *env = g_getenv("GRAPTOS_LATEX_COMMAND");
+    if (command_token_has_no_space(env)) return g_strdup(env);
+
+    static const char *commands[] = {
+        "pdflatex",
+        "xelatex",
+        "lualatex",
+        NULL
+    };
+    for (guint i = 0u; commands[i]; i++) {
+        g_autofree char *path = g_find_program_in_path(commands[i]);
+        if (path) return g_strdup(commands[i]);
+    }
+    return NULL;
+}
+
+char **graptos_latex_build_argv(EditorWindow *win,
+                                const char *command,
+                                const char *output_dir,
+                                const char *source_path,
+                                GError **error) {
+    if (!command || !command[0]) return NULL;
+    const char *arguments = win && win->latex_arguments && win->latex_arguments[0] != '\0'
+        ? win->latex_arguments
+        : GRAPTOS_DEFAULT_LATEX_ARGUMENTS;
+
+    gint argc = 0;
+    g_auto(GStrv) parsed = NULL;
+    if (!g_shell_parse_argv(arguments, &argc, &parsed, error)) {
+        return NULL;
+    }
+
+    char **argv = g_new0(char *, (gsize)argc + 2u);
+    argv[0] = g_strdup(command);
+    for (gint i = 0; i < argc; i++) {
+        g_autofree char *with_output = replace_placeholder(parsed[i],
+                                                           "{output_dir}",
+                                                           output_dir);
+        argv[i + 1] = replace_placeholder(with_output,
+                                          "{source_path}",
+                                          source_path);
+    }
+    argv[argc + 1] = NULL;
+    return argv;
 }
 
 /**
@@ -512,6 +604,26 @@ static char *build_managed_theme_css(EditorWindow *win) {
         "  background: @graptos_dialog_input_bg;\n"
         "  color: @graptos_dialog_input_fg;\n"
         "}\n\n"
+        "window.graptos-window.graptos-plugin-manager-window,\n"
+        "window.graptos-window.graptos-plugin-manager-window > contents,\n"
+        "window.graptos-window .graptos-plugin-manager-root,\n"
+        "window.graptos-window .graptos-plugin-manager-scroll,\n"
+        "window.graptos-window .graptos-plugin-manager-scroll viewport,\n"
+        "window.graptos-window .graptos-plugin-manager-list,\n"
+        "window.graptos-window .graptos-plugin-manager-row {\n"
+        "  background: @graptos_dialog_bg;\n"
+        "  background-color: @graptos_dialog_bg;\n"
+        "  color: @graptos_dialog_fg;\n"
+        "  border-radius: 0;\n"
+        "  border: none;\n"
+        "  box-shadow: none;\n"
+        "  outline: none;\n"
+        "}\n"
+        "window.graptos-window .graptos-plugin-manager-root label,\n"
+        "window.graptos-window .graptos-plugin-manager-list label,\n"
+        "window.graptos-window .graptos-plugin-manager-row label {\n"
+        "  color: @graptos_dialog_fg;\n"
+        "}\n\n"
         ".graptos-search-match { background: @graptos_search_match_bg; color: @graptos_search_match_fg; }\n"
         ".graptos-diagnostic-warning { background: @graptos_diagnostic_warning_bg; color: @graptos_diagnostic_warning_fg; }\n"
         "/* GRAPTOS THEME END */\n");
@@ -753,6 +865,8 @@ static void populate_config_key_file(EditorWindow *win, GKeyFile *key_file) {
     if (!win || !key_file) return;
 
     save_string(key_file, "theme_css_path", win->theme_css_path ? win->theme_css_path : "");
+    save_string(key_file, "latex_command", win->latex_command ? win->latex_command : "");
+    save_string(key_file, "latex_arguments", win->latex_arguments ? win->latex_arguments : "");
     g_key_file_set_boolean(key_file, "Editor", "autocomplete_enabled", win->autocomplete_enabled);
     g_key_file_set_boolean(key_file, "Editor", "regex_tester_enabled", win->regex_tester_enabled);
     g_key_file_set_boolean(key_file, "Editor", "diagnostics_enabled", win->diagnostics_enabled);
@@ -773,6 +887,7 @@ static void populate_config_key_file(EditorWindow *win, GKeyFile *key_file) {
     g_key_file_set_integer(key_file, "Editor", "lsp_sync_max_chars", (gint)win->lsp_sync_max_chars);
     g_key_file_set_integer(key_file, "Editor", "max_undo_states", (gint)win->max_undo_states);
     g_key_file_set_integer(key_file, "Editor", "full_highlight_max_chars", (gint)win->full_highlight_max_chars);
+    save_string(key_file, "custom_highlight_mode", win->custom_highlight_mode ? win->custom_highlight_mode : "auto");
     g_key_file_set_integer(key_file, "Editor", "max_undo_capture_bytes", (gint)win->max_undo_capture_bytes);
     g_key_file_set_integer(key_file, "Editor", "highlight_delay_ms", (gint)win->highlight_delay_ms);
     g_key_file_set_integer(key_file, "Editor", "completion_delay_ms", (gint)win->completion_delay_ms);
@@ -933,6 +1048,12 @@ void graptos_config_load(EditorWindow *win) {
     load_string(key_file, "preview_font", &win->preview_font);
     load_string(key_file, "terminal_font", &win->terminal_font);
     load_string(key_file, "code_font", &win->code_font);
+    load_string(key_file, "latex_command", &win->latex_command);
+    load_string(key_file, "latex_arguments", &win->latex_arguments);
+    if (!win->latex_arguments || win->latex_arguments[0] == '\0') {
+        replace_config_string(&win->latex_arguments,
+                              "-interaction=nonstopmode -halt-on-error -file-line-error -no-shell-escape -output-directory {output_dir} {source_path}");
+    }
     /**
      * @brief Resolve the active CSS theme path from new and legacy keys.
      * @details CSS is now the primary theme source. The old custom_css_path key
@@ -978,6 +1099,14 @@ void graptos_config_load(EditorWindow *win) {
     win->lsp_sync_max_chars = parse_uint(key_file, "lsp_sync_max_chars", win->lsp_sync_max_chars, 1024u, 16u * 1024u * 1024u);
     win->max_undo_states = parse_uint(key_file, "max_undo_states", win->max_undo_states, 1u, 10000u);
     win->full_highlight_max_chars = parse_uint(key_file, "full_highlight_max_chars", win->full_highlight_max_chars, 1024u, 16u * 1024u * 1024u);
+    load_string(key_file, "custom_highlight_mode", &win->custom_highlight_mode);
+    if (g_strcmp0(win->custom_highlight_mode, "auto") != 0 &&
+        g_strcmp0(win->custom_highlight_mode, "viewport") != 0 &&
+        g_strcmp0(win->custom_highlight_mode, "background") != 0 &&
+        g_strcmp0(win->custom_highlight_mode, "full") != 0) {
+        g_free(win->custom_highlight_mode);
+        win->custom_highlight_mode = g_strdup("auto");
+    }
     win->max_undo_capture_bytes = parse_uint(key_file, "max_undo_capture_bytes", win->max_undo_capture_bytes, 1024u, 16u * 1024u * 1024u);
     win->highlight_delay_ms = parse_uint(key_file, "highlight_delay_ms", win->highlight_delay_ms, 0u, 60000u);
     win->completion_delay_ms = parse_uint(key_file, "completion_delay_ms", win->completion_delay_ms, 0u, 60000u);

@@ -321,7 +321,7 @@ gboolean on_window_key_pressed(GtkEventControllerKey *controller,
     }
 
     // Search uses one panel. Ctrl+F opens find mode and Ctrl+H opens replace mode.
-    if (ctrl && key == GDK_KEY_f) { set_search_panel(win, TRUE, FALSE); return TRUE; }
+    if (ctrl && key == GDK_KEY_f) { action_show_find(NULL, win); return TRUE; }
     if (ctrl && key == GDK_KEY_h) { set_search_panel(win, TRUE, TRUE); return TRUE; }
 
     // Editing helpers are tab-scoped because they operate on the active buffer.
