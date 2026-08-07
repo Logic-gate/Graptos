@@ -476,6 +476,39 @@ static gboolean key_event_is_plain_editor_text(GdkModifierType state) {
     return (state & blocked) == 0;
 }
 
+static char *plugin_shortcut_for_key_event(guint keyval,
+                                           GdkModifierType state) {
+    gboolean ctrl = (state & GDK_CONTROL_MASK) != 0;
+    gboolean alt = (state & GDK_ALT_MASK) != 0;
+    gboolean shift = (state & GDK_SHIFT_MASK) != 0;
+    gboolean meta = (state & GDK_META_MASK) != 0;
+    gboolean super = (state & GDK_SUPER_MASK) != 0;
+    gboolean hyper = (state & GDK_HYPER_MASK) != 0;
+    if (!ctrl && !alt && !shift && !meta && !super && !hyper) return NULL;
+
+    guint key = gdk_keyval_to_upper(keyval);
+    if (key == GDK_KEY_Control_L || key == GDK_KEY_Control_R ||
+        key == GDK_KEY_Alt_L || key == GDK_KEY_Alt_R ||
+        key == GDK_KEY_Shift_L || key == GDK_KEY_Shift_R ||
+        key == GDK_KEY_Meta_L || key == GDK_KEY_Meta_R ||
+        key == GDK_KEY_Super_L || key == GDK_KEY_Super_R ||
+        key == GDK_KEY_Hyper_L || key == GDK_KEY_Hyper_R) {
+        return NULL;
+    }
+
+    const char *name = gdk_keyval_name(key);
+    if (!name || !name[0]) return NULL;
+    GString *shortcut = g_string_new(NULL);
+    if (ctrl) g_string_append(shortcut, "Ctrl+");
+    if (alt) g_string_append(shortcut, "Alt+");
+    if (shift) g_string_append(shortcut, "Shift+");
+    if (meta) g_string_append(shortcut, "Meta+");
+    if (super) g_string_append(shortcut, "Super+");
+    if (hyper) g_string_append(shortcut, "Hyper+");
+    g_string_append(shortcut, name);
+    return g_string_free(shortcut, FALSE);
+}
+
 /**
  * @brief Text for keyval.
  * @details Editor code runs in response to fast input, delayed timeouts, and background language work. The notes here mark the boundary between immediate GTK state and deferred refresh paths so latency fixes do not turn into stale-widget bugs.
@@ -731,6 +764,18 @@ gboolean on_text_view_key_pressed(GtkEventControllerKey *controller,
     if (ctrl && shift && key == GDK_KEY_m) {
         editor_tab_show_add_note(tab);
         if (debug_typing) g_message("Typing: key-handled action=add-note");
+        return TRUE;
+    }
+    g_autofree char *plugin_shortcut = plugin_shortcut_for_key_event(keyval, state);
+    if (plugin_shortcut && tab->win && tab->win->plugins &&
+        graptos_plugin_registry_run_shortcut(tab->win->plugins,
+                                             tab,
+                                             plugin_shortcut,
+                                             0u)) {
+        if (debug_typing) {
+            g_message("Typing: key-handled action=plugin-shortcut shortcut=%s",
+                      plugin_shortcut);
+        }
         return TRUE;
     }
     if (ctrl && alt && key == GDK_KEY_p) {
