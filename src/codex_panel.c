@@ -709,12 +709,15 @@ CodexPanel *codex_panel_new(EditorWindow *win) {
     gtk_revealer_set_transition_duration(GTK_REVEALER(panel->revealer), 0u);
     gtk_revealer_set_reveal_child(GTK_REVEALER(panel->revealer), FALSE);
     gtk_widget_set_size_request(panel->revealer, 340, -1);
+    gtk_widget_set_hexpand(panel->revealer, FALSE);
+    gtk_widget_set_halign(panel->revealer, GTK_ALIGN_FILL);
     gtk_widget_set_visible(panel->revealer, FALSE);
     panel->visible = FALSE;
 
     GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
     gtk_widget_add_css_class(box, "graptos-codex-panel");
     gtk_widget_set_size_request(box, 340, -1);
+    gtk_widget_set_hexpand(box, FALSE);
 
     GtkWidget *header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
     GtkWidget *title = gtk_label_new("Codex");
@@ -792,7 +795,25 @@ CodexPanel *codex_panel_new(EditorWindow *win) {
     g_object_set_data(G_OBJECT(allow), "decision", "accept");
     gtk_box_append(GTK_BOX(approval_actions), deny);
     gtk_box_append(GTK_BOX(approval_actions), allow);
-    gtk_box_append(GTK_BOX(panel->approval_box), panel->approval_label);
+    GtkWidget *approval_scroll = gtk_scrolled_window_new();
+    gtk_widget_add_css_class(approval_scroll, "graptos-codex-approval-scroll");
+    gtk_widget_set_size_request(approval_scroll, -1, 120);
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(approval_scroll),
+                                   GTK_POLICY_NEVER,
+                                   GTK_POLICY_AUTOMATIC);
+    gtk_scrolled_window_set_propagate_natural_height(GTK_SCROLLED_WINDOW(approval_scroll),
+                                                     FALSE);
+    gtk_scrolled_window_set_propagate_natural_width(GTK_SCROLLED_WINDOW(approval_scroll),
+                                                    FALSE);
+    gtk_label_set_wrap_mode(GTK_LABEL(panel->approval_label),
+                            PANGO_WRAP_WORD_CHAR);
+    gtk_label_set_max_width_chars(GTK_LABEL(panel->approval_label), 42);
+    gtk_label_set_selectable(GTK_LABEL(panel->approval_label), TRUE);
+    gtk_widget_set_hexpand(panel->approval_label, TRUE);
+    gtk_widget_set_halign(panel->approval_label, GTK_ALIGN_FILL);
+    gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(approval_scroll),
+                                  panel->approval_label);
+    gtk_box_append(GTK_BOX(panel->approval_box), approval_scroll);
     gtk_box_append(GTK_BOX(panel->approval_box), approval_actions);
     gtk_widget_set_visible(panel->approval_box, FALSE);
     gtk_box_append(GTK_BOX(box), panel->approval_box);

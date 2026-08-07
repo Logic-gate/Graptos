@@ -44,7 +44,7 @@ gboolean graptos_plugin_register(GraptosPluginHost *host) {
     t_done = graptos_plugin_host_register_editor_line_command_with_shortcut(host,
                                                                         "beancount-complete",
                                                                         "Beancount Complete",
-                                                                        "Ctrl+Alt+B",
+                                                                        "Ctrl+Shift+X",
                                                                         show_beancount_completion,
                                                                         NULL,
                                                                         NULL) && t_done;
